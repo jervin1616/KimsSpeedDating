@@ -21,7 +21,7 @@
   // "npx wrangler secret put <NAME>" and are never stored in this repo. See DEPLOY.md.
   "vars": {
     // Your Google OAuth client ID (it is public). Fill in at step 6 of DEPLOY.md.
-    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_CLIENT_ID": "429244706676-rqnm8ofktcdk1l8cc1rop7e7qbtvtln5.apps.googleusercontent.com",
     // Role for signed-in emails that are not on the ROLES list: none, viewer or contributor.
     "DEFAULT_ROLE": "none",
     // How long a login lasts before the page quietly renews it (hours).
