@@ -82,9 +82,18 @@ If Google Cloud ever shows "Activate free trial" or asks for billing, close it a
    - **Audience:** choose **External**
    - **Contact email:** your email
    - Tick the agreement box, click **Continue**, then **Create**.
-5. In the left menu click **Audience**. Click **Publish app**, then **Confirm**.
+5. In the left menu click **Branding** and fill in (Google requires these before it lets you publish):
+   - **App homepage:** `https://kims-speed-dating.THATNAME.workers.dev/`
+   - **Application privacy policy link:** `https://kims-speed-dating.THATNAME.workers.dev/privacy.html`
+   - **Authorized domains:** click **Add domain** and enter `THATNAME.workers.dev`
+   - **Developer contact information:** your email
+   - Click **Save**.
+   The privacy page is part of this project (`public/privacy.html`), so it must be deployed first (`npx wrangler deploy`).
+6. In the left menu click **Audience**. Click **Publish app**, then **Confirm**.
    This matters: if the app stays in "Testing", only people you list by hand can sign in. Publishing is free and needs no review for plain Google sign-in.
-6. In the left menu click **Clients**, then **Create client**.
+   If Google refuses to publish, you can stay in Testing instead: on the same Audience page add every person from your `ROLES` list under **Test users**
+   (up to 100). It works the same, you just keep the list in two places.
+7. In the left menu click **Clients**, then **Create client**.
    - **Application type:** `Web application`
    - **Name:** `Kims Speed Dating web`
    - Under **Authorized JavaScript origins** click **Add URI** and enter YOUR ADDRESS exactly, like
@@ -92,9 +101,9 @@ If Google Cloud ever shows "Activate free trial" or asks for billing, close it a
      with no slash at the end and nothing after `.dev`.
    - Leave **Authorized redirect URIs** empty.
    - Click **Create**.
-7. A box shows a **Client ID** that ends in `.apps.googleusercontent.com`. Copy the Client ID.
+8. A box shows a **Client ID** that ends in `.apps.googleusercontent.com`. Copy the Client ID.
    You do not need the client secret. Ignore it.
-8. Google can take a few minutes (rarely a few hours) to start accepting a new origin. If sign-in says "origin not allowed" later, wait and try again.
+9. Google can take a few minutes (rarely a few hours) to start accepting a new origin. If sign-in says "origin not allowed" later, wait and try again.
 
 ### Step 6. Put the Client ID in the config
 
@@ -310,6 +319,7 @@ If a limit is ever hit, Cloudflare stops that kind of operation until midnight U
 | `public/index.html` | The page. Same as before except sign-in text and a small Google button on the sign-in screen, and "connection lost / back online" messages |
 | `public/db-shim.js` | Replaces the Claude runtime. Keeps the same calls the page already used |
 | `public/backup.html` | Editor-only page that downloads a backup |
+| `public/privacy.html` | Privacy page that Google requires for the sign-in app |
 | `src/worker.js` | The API: sign-in, sessions, WebSocket door, export, import |
 | `src/auth.js` | Checks Google tokens, maps emails to roles, signs sessions |
 | `src/database.js` | The Durable Object: SQLite storage and live sync |
@@ -354,9 +364,9 @@ The one thing it cannot test is the real Google button, because that needs your 
 | You see | Do this |
 |---|---|
 | Sign in button says "Sign-in is not set up yet" | Step 6 and step 8: Client ID missing from `wrangler.jsonc` or not deployed |
-| Google says "origin not allowed" or "Error 400: origin_mismatch" | The address in step 5 item 6 must match exactly. Wait a few minutes after saving |
+| Google says "origin not allowed" or "Error 400: origin_mismatch" | The address in step 5 item 7 must match exactly. Wait a few minutes after saving |
 | "This Google account is not on the list" | Add the exact email to `ROLES` (step 7b) |
-| Google says only test users can sign in | Step 5 item 5: publish the app |
+| Google says only test users can sign in | Step 5 item 6: publish the app, or add the person as a test user |
 | Everything loads but nothing saves | Check `SESSION_SECRET` was set (step 7a), then `npx wrangler deploy` |
 | `npx wrangler secret put` says no Worker exists | Do step 4 first |
 | Want to see errors live | `npx wrangler tail` while you reproduce the problem |
