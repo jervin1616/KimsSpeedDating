@@ -1,0 +1,1010 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Kim's Speed Dating</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pacifico&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+[hidden] { display: none !important; }
+/* Layout: private host console. Heart pyramid (1 hot seat, 2, 3) on top, seat action bar, then tabbed Daters / Questions / Match log. */
+:root {
+  color-scheme: dark;
+  --bg: #12030a;
+  --bg-2: #1d0711;
+  --panel: #260a17;
+  --line: #4a1429;
+  --fg: #fff1f4;
+  --muted: #c99aa8;
+  --pink: #ff4f9a;
+  --heart: #8f1238;
+  --flame: #ffb347;
+  --mutual: #35d07f;
+  --close: #ffd23f;
+  --nofit: #ff3b4e;
+  --font-display: "Pacifico", "Brush Script MT", cursive;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  background: radial-gradient(1200px 600px at 50% -10%, #3a0a1f 0%, var(--bg) 60%), var(--bg);
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  margin: 0;
+  padding-inline: 16px;
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(2rem, 7vw, 3.2rem); margin: 0; text-shadow: 0 0 24px rgba(255,79,154,.55); text-wrap: balance; line-height: 1.1; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: center; text-align: center; }
+.pill { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); white-space: nowrap; }
+
+.gate { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 24px 18px; text-align: center; }
+.gate h2 { margin: 0 0 6px; }
+
+/* Stage */
+.stage { background: linear-gradient(180deg, var(--bg-2), var(--panel)); border: 1px solid var(--line); border-radius: 20px; padding: 16px 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.arena { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.side { display: flex; justify-content: center; gap: 6px; padding-top: 16px; }
+.sidecell { width: min(31%, 150px); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.sidecell .heart { width: 100%; }
+@media (min-width: 700px) {
+  .arena { grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .side { flex-direction: column; justify-content: flex-start; align-items: center; gap: 22px; padding-top: 16px; }
+  .sidecell { width: 100%; }
+}
+.heart.kim path { fill: #3b1a5c; stroke: #b58cff; stroke-width: 2.2; }
+.heart.kim .slot { color: #cdb3ff; }
+.heart.locked path { fill: #1c0a14; stroke: #6b4a5a; stroke-dasharray: 4 3; }
+.heart.locked .slot { color: #8c6a7a; }
+.heart .inner svg.lock { position: static; inset: auto; filter: none; width: 20cqw; height: 20cqw; flex: none; margin-bottom: 2px; color: var(--muted); }
+.heart .tmr { position: absolute; left: 0; right: 0; top: calc(100% - 2px); text-align: center; font-size: 12px; font-weight: 700; color: #ffe3ea; font-variant-numeric: tabular-nums; line-height: 1; pointer-events: none; }
+.rowTop, .rowMid, #rHot { padding-bottom: 16px; }
+.streambar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin: 4px 0 10px; }
+.streambar[hidden] { display: none; }
+.livechip { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; letter-spacing: .08em; padding: 6px 12px; border-radius: 999px; border: 1px solid #ff4d6d; color: #ffd6de; background: #2a0a14; }
+.livechip i { width: 8px; height: 8px; border-radius: 50%; background: #ff2d55; display: inline-block; }
+.livechip b { font-variant-numeric: tabular-nums; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.modal[hidden] { display: none; }
+.modal .card { background: #1a0610; border: 1px solid var(--line); border-radius: 16px; padding: 20px; max-width: 420px; width: 100%; display: flex; flex-direction: column; gap: 14px; max-height: 90vh; overflow: auto; }
+.sitem { border: 1px solid var(--line); border-radius: 12px; background: #1a0610; }
+.sitem summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; font-weight: 600; list-style: none; }
+.sitem summary::-webkit-details-marker { display: none; }
+.sitem summary::after { content: "\25BE"; color: var(--muted); margin-left: auto; transition: transform .15s; }
+.sitem[open] summary::after { transform: rotate(180deg); }
+.sitem .slen { color: var(--muted); font-size: 13px; font-weight: 500; }
+.sitem .sbody { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.sitem .sumgrid { width: 100%; }
+.sumgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sumgrid > div { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.sumgrid b { display: block; font-size: 22px; line-height: 1.1; }
+.sumgrid span { font-size: 12px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.row .stats { font-size: 12.5px; color: var(--flame); margin-top: 2px; }
+.heart .qd { font-size: 7cqw; color: #ffe3ea; font-weight: 700; line-height: 1.15; margin-top: 2px; overflow-wrap: anywhere; }
+.heart .lk { font-size: 7.5cqw; color: var(--muted); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.sw { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; padding: 2px 4px; min-height: 0; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.sw .trk { width: 34px; height: 20px; border-radius: 999px; background: #3a1f2e; border: 1px solid var(--line); position: relative; transition: background .2s; flex: none; }
+.sw .trk::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #c9a7b6; transition: transform .2s, background .2s; }
+.sw[aria-checked="true"] { color: var(--mutual); }
+.sw[aria-checked="true"] .trk { background: #14633f; }
+.sw[aria-checked="true"] .trk::after { transform: translateX(14px); background: #fff; }
+.pyramid { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.prow { display: flex; justify-content: center; gap: 6px; width: 100%; padding-top: 16px; }
+.heart { position: relative; aspect-ratio: 100 / 88; container-type: inline-size; padding: 0; border: 0; background: none; border-radius: 0; min-height: 0; display: block; color: inherit; font: inherit; }
+.rowTop .heart { width: min(31%, 160px); }
+.rowMid .heart { width: min(40%, 190px); }
+.rowHot { position: relative; }
+.rowHot .heart { width: min(54%, 230px); }
+.matchbtn { position: absolute; left: calc(50% + min(27%, 115px) + 8px); top: calc(16px + 38%); transform: translateY(-50%); padding: 9px 11px; border-radius: 999px; font-weight: 800; white-space: nowrap; font-size: 14px; }
+.matchbtn.armed { background: var(--mutual); color: #06210f; border-color: var(--mutual); animation: pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { to { box-shadow: 0 0 0 6px rgba(46,204,113,.25); } }
+.heart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 10px rgba(255,79,154,.4)); }
+.heart path { fill: var(--heart); stroke: var(--pink); stroke-width: 1.4; transition: fill .3s, stroke .3s; }
+.heart.vacant path { fill: #3d0c21; stroke-dasharray: 3 3; }
+.heart.hot path { fill: #6a1239; stroke: var(--flame); stroke-width: 2.2; }
+.heart.mutual path { fill: #14633f; stroke: var(--mutual); stroke-width: 2.4; }
+.heart.close path { fill: #6e5a07; stroke: var(--close); stroke-width: 2.4; }
+.heart.nofit path { fill: #7a1222; stroke: var(--nofit); stroke-width: 2.4; }
+.heart.sel svg { filter: drop-shadow(0 0 12px var(--flame)); }
+.heart.sel path { stroke: #fff; stroke-width: 3.4; }
+button.heart:hover { border: 0; }
+.heart .inner { position: absolute; left: 15%; right: 15%; top: 16%; bottom: 18%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1px; min-width: 0; }
+.heart .slot { position: absolute; left: 0; right: 0; top: -10cqw; font-size: 7cqw; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); line-height: 1; text-align: center; white-space: nowrap; }
+.heart.hot .slot { color: var(--flame); }
+.heart .nm { font-family: var(--font-body); font-weight: 800; letter-spacing: .01em; font-size: 11.5cqw; line-height: 1.1; overflow-wrap: anywhere; }
+.heart .ln { font-size: 7.5cqw; color: #ffe3ea; overflow-wrap: anywhere; line-height: 1.2; }
+.heart .st { font-size: 7.5cqw; font-weight: 700; line-height: 1.2; }
+.heart.mutual .st { color: var(--mutual); } .heart.close .st { color: var(--close); } .heart.nofit .st { color: #ff8a97; }
+.heart .em { font-size: 8cqw; color: var(--muted); }
+.heart.hot .inner { gap: 0; top: 14%; bottom: 20%; }
+.heart.hot .nm { font-size: 10.5cqw; }
+.heart .rg { font-size: 6.8cqw; line-height: 1.15; color: #ffe3ea; font-weight: 600; }
+.heart.ro { cursor: default; }
+.heart .gs { font-size: 7cqw; color: var(--muted); line-height: 1.2; }
+.heart .wn { font-size: 7cqw; color: var(--flame); font-weight: 700; line-height: 1.2; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); justify-content: center; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: var(--c); vertical-align: -1px; }
+
+.bar { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #1a0610; display: flex; flex-direction: column; gap: 8px; }
+.bar .ttl { font-weight: 700; }
+.bar .det { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.bar.mutual { border-color: var(--mutual); } .bar.close { border-color: var(--close); } .bar.nofit { border-color: var(--nofit); }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.qbox { border: 1px dashed var(--pink); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.qbox .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.qbox .qt { font-size: clamp(1.05rem, 3.6vw, 1.35rem); font-weight: 600; text-wrap: balance; overflow-wrap: anywhere; }
+.qbox .by { color: var(--muted); font-size: 13px; }
+
+/* Controls */
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: #33101f; padding: 8px 12px; min-height: 40px; }
+button:hover { border-color: var(--pink); }
+button.primary { background: var(--pink); border-color: var(--pink); color: #1a0510; font-weight: 700; }
+button.ghost { background: transparent; }
+button.danger { border-color: #7a1222; color: #ff9aa6; }
+button.small { min-height: 34px; padding: 5px 10px; font-size: 13px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px; }
+input, select, textarea { background: #170510; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; min-height: 40px; width: 100%; min-width: 0; }
+input::placeholder, textarea::placeholder { color: #8c5f6d; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.tab { border-radius: 999px; }
+.tab[aria-selected="true"] { background: var(--pink); color: #1a0510; border-color: var(--pink); font-weight: 700; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.panel h2 { margin: 0; font-size: 18px; }
+.subform { background: #1a0610; border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; align-items: end; }
+.check { flex-direction: row; align-items: center; gap: 8px; color: var(--fg); font-size: 14px; }
+.check input { width: auto; min-height: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.toolbar input { flex: 1 1 200px; }
+
+.list { display: flex; flex-direction: column; gap: 8px; }
+.list.scroll { max-height: min(60vh, 560px); overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; scrollbar-color: #6b2a45 transparent; }
+.row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #1a0610; }
+.row .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.row .dot.mutual { background: var(--mutual); } .row .dot.close { background: var(--close); } .row .dot.nofit { background: var(--nofit); }
+.row .main { min-width: 0; }
+.row .t { font-weight: 600; overflow-wrap: anywhere; }
+.row .m { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.row .racts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.row.seated { border-color: var(--pink); }
+.row.nodot { grid-template-columns: minmax(0, 1fr) auto; }
+.empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
+.note { color: var(--muted); font-size: 13px; margin: 0; }
+.toast .undo { margin-left: 6px; border: 0; background: rgba(26,5,16,.12); color: #1a0510; font-weight: 800; padding: 2px 10px; border-radius: 999px; min-height: 0; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: #1a0510; padding: 10px 16px; border-radius: 999px; font-weight: 600; max-width: calc(100% - 32px); z-index: 10; }
+.tag-ex { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--flame); border: 1px solid var(--flame); border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
+@media (max-width: 560px) {
+  .row { grid-template-columns: 14px minmax(0, 1fr); }
+  .row .racts { grid-column: 1 / -1; justify-content: flex-start; }
+  .row.nodot { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .heart path { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Kim's Speed Dating</h1>
+    </div>
+    <span class="pill" id="role">Loading</span>
+  </header>
+  <div class="streambar host-only" id="streamBar" hidden>
+    <span class="livechip" id="liveChip" hidden><i></i> LIVE <b id="liveClock" data-start="0">0:00</b></span>
+    <button class="primary small" id="streamStart" type="button">Start stream</button>
+    <button class="danger small" id="streamEnd" type="button" hidden>End stream</button>
+    <span id="endConfirm" class="toolbar" hidden>
+      <span class="note">End the stream and save the summary?</span>
+      <button class="danger small" id="endYes" type="button">Yes, end it</button>
+      <button class="ghost small" id="endNo" type="button">Cancel</button>
+    </span>
+  </div>
+
+  <p class="note" id="modeNote" hidden></p>
+
+  <section class="gate" id="gate" hidden>
+    <h2>Host access only</h2>
+    <p class="note" id="gateMsg">Ask Kim to invite you as an Editor.</p>
+  </section>
+
+  <div id="app" class="wrap" hidden>
+    <section class="stage" aria-label="Seats">
+      <div class="arena">
+        <div class="side" id="side"></div>
+        <div class="pyramid">
+          <div class="prow rowTop" id="rTop"></div>
+          <div class="prow rowMid" id="rMid"></div>
+          <div class="prow rowHot" id="rHot"></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span style="--c:var(--mutual)">Both fit</span>
+        <span style="--c:var(--close)">Off by 1 to 2 years</span>
+        <span style="--c:var(--nofit)">Off by 3 or more, or not looking for each other's gender</span>
+      </div>
+      <div class="bar host-only" id="bar"></div>
+      <div class="qbox">
+        <div class="lbl">Question</div>
+        <div class="qt" id="qtext">No question picked yet.</div>
+        <div class="by" id="qby"></div>
+      </div>
+      <div class="toolbar">
+        <button class="primary contrib-only" id="randomQ">Random question</button>
+        <button class="ghost contrib-only" id="backQ" hidden>Back</button>
+        <button class="ghost" id="clearQ" hidden>Clear question</button>
+        <span class="toolbar host-only" id="clearWrap">
+          <button class="danger" id="clearAll">Clear all seats</button>
+          <span id="clearConfirm" class="toolbar" hidden>
+            <span class="note">Clear every seat and the question?</span>
+            <button class="danger small" id="clearYes">Yes, clear all</button>
+            <button class="ghost small" id="clearNo">Cancel</button>
+          </span>
+        </span>
+      </div>
+    </section>
+
+    <div class="tabs" role="tablist" id="tabs">
+      <button class="tab" role="tab" id="tabD" aria-selected="true" aria-controls="panelD">Daters</button>
+      <button class="tab" role="tab" id="tabQ" aria-selected="false" aria-controls="panelQ">Questions</button>
+      <button class="tab" role="tab" id="tabM" aria-selected="false" aria-controls="panelM">Match log</button>
+      <button class="tab" role="tab" id="tabP" aria-selected="false" aria-controls="panelP">Past streams</button>
+    </div>
+
+    <section class="panel" id="panelD" role="tabpanel" aria-labelledby="tabD">
+      <h2>Speed daters <span class="pill" id="daterCount">0</span></h2>
+      <form id="dForm" class="subform">
+        <div class="grid-form">
+          <label>Name or handle<input id="fName" maxlength="40" required autocomplete="off" placeholder="First name or @handle"></label>
+          <label>Age<input id="fAge" type="number" min="18" max="99" required inputmode="numeric"></label>
+          <label>State<input id="fLoc" maxlength="20" required autocomplete="off" placeholder="NC"></label>
+          <label>Gender<select id="fGender" required><option value="">Choose</option><option value="man">Man</option><option value="woman">Woman</option><option value="nonbinary">Non-binary</option></select></label>
+          <label>Sexuality<select id="fSex" required><option value="">Choose</option><option value="straight">Straight</option><option value="gay">Gay or lesbian</option><option value="bi">Bisexual</option><option value="other">Other</option></select></label>
+        </div>
+        <div class="grid-form" id="rngSingle">
+          <label>Wants min age<input id="fMin" type="number" min="18" max="99" inputmode="numeric"></label>
+          <label>Wants max age<input id="fMax" type="number" min="18" max="99" inputmode="numeric"></label>
+        </div>
+        <div class="grid-form" id="rngBi" hidden>
+          <label>Men min age<input id="fMinM" type="number" min="18" max="99" inputmode="numeric"></label>
+          <label>Men max age<input id="fMaxM" type="number" min="18" max="99" inputmode="numeric"></label>
+          <label>Women min age<input id="fMinW" type="number" min="18" max="99" inputmode="numeric"></label>
+          <label>Women max age<input id="fMaxW" type="number" min="18" max="99" inputmode="numeric"></label>
+        </div>
+        <label class="check"><input id="fAdult" type="checkbox" required> This person confirmed they are 18 or older</label>
+        <div class="toolbar">
+          <button class="primary" id="fSave" type="submit">Add dater</button>
+          <button class="ghost" id="fCancel" type="button" hidden>Cancel edit</button>
+          <span class="note" id="fErr" role="alert"></span>
+        </div>
+        <p class="note">State only. No full names, street addresses, or phone numbers.</p>
+      </form>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search name or location" aria-label="Search daters">
+        <select id="sort" aria-label="Sort daters" style="width:auto">
+          <option value="added">Newest first</option>
+          <option value="age">Age</option>
+          <option value="name">Name</option>
+          <option value="panel">Most on panel</option>
+          <option value="panelLeast">Fewest on panel</option>
+        </select>
+      </div>
+      <p class="note" id="refNote"></p>
+      <div class="list scroll" id="dList"></div>
+    </section>
+
+    <section class="panel" id="panelQ" role="tabpanel" aria-labelledby="tabQ" hidden>
+      <h2>Question box</h2>
+      <form id="qForm" class="subform">
+        <label>Question from chat<textarea id="qIn" maxlength="160" rows="2" required placeholder="Type a question from the TikTok chat"></textarea></label>
+        <div class="grid-form">
+          <label>Asked by (optional)<input id="qHandle" maxlength="30" autocomplete="off" placeholder="@handle"></label>
+          <div><button class="primary" type="submit" id="qSend">Add question</button></div>
+        </div>
+      </form>
+      <div>
+        <div class="toolbar" style="justify-content:space-between;margin-bottom:8px">
+          <h2>Questions <span class="pill" id="readyCount">0</span> <span class="pill" id="totalCount">0 total</span></h2>
+          <button class="small ghost" id="resetUsed" hidden>Move all back to ready</button>
+          <select id="qSort" aria-label="Sort or filter questions" style="width:auto">
+            <option value="least">Least asked first</option>
+            <option value="most">Most asked first</option>
+            <option value="never">Never asked only</option>
+            <option value="asked">Asked only</option>
+            <option value="new">Newest first</option>
+          </select>
+        </div>
+        <div class="list scroll" id="readyList"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panelM" role="tabpanel" aria-labelledby="tabM" hidden>
+      <div class="toolbar" style="justify-content:space-between">
+        <h2>Match log <span class="pill" id="matchCount">0</span></h2>
+        <span class="toolbar">
+          <button class="small danger ghost" id="clearLog" hidden>Clear log</button>
+          <span id="logConfirm" class="toolbar" hidden>
+            <span class="note">Delete every entry?</span>
+            <button class="small danger" id="logYes">Yes, delete all</button>
+            <button class="small ghost" id="logNo">Cancel</button>
+          </span>
+        </span>
+      </div>
+      <p class="note">Only Kim and the mods can see this list.</p>
+      <div class="list scroll" id="mList"></div>
+    </section>
+    <section class="panel" id="panelP" role="tabpanel" aria-labelledby="tabP" hidden>
+      <h2>Past streams <span class="pill" id="streamCount">0</span></h2>
+      <p class="note">Saved when you press End stream. Only Kim and the mods can see this list.</p>
+      <div class="list scroll" id="pList"></div>
+    </section>
+  </div>
+</div>
+<div class="modal" id="sumModal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="sumTitle">
+    <h2 id="sumTitle">Stream summary</h2>
+    <div id="sumBody"></div>
+    <button class="primary" id="sumClose" type="button">Close</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var SEATS = ["hot", "s1", "s2", "s3", "s4", "s5", "banner", "cohost"];
+  var LOCKABLE = ["banner", "cohost"];
+  var SIDE = ["kim", "banner", "cohost"];
+  var PANEL = ["s1", "s2", "s3", "s4", "s5"], TIMED = ["s1", "s2", "s3", "s4", "s5", "hot"], HOT_MIN = 120000;
+  var LABEL = { kim: "Host", banner: "Banner", cohost: "Cohost", hot: "Hot seat", s1: "Seat 1", s2: "Seat 2", s3: "Seat 3", s4: "Seat 4", s5: "Seat 5" };
+  var ROWS = { rTop: ["s1", "s2", "s3"], rMid: ["s4", "s5"], rHot: ["hot"] };
+  var EMPTYDOC = null;
+  var state = { mode: "viewer", daters: [], questions: [], matches: [], seats: {}, seatView: {}, unlocked: {}, sinceSeat: {}, question: null, remote: { seats: {}, views: {}, unlocked: {}, since: {}, docs: {}, question: null, stream: null, hist: [] }, stream: null, streams: [], openStreams: {}, hist: [], gotSeats: false, gotDaters: false, inflight: 0, matching: false, db: null, editing: null, confirmDel: null, selected: null };
+  function stable(v) {
+    if (Array.isArray(v)) return "[" + v.map(stable).join(",") + "]";
+    if (v && typeof v === "object") return "{" + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(v[k]); }).join(",") + "}";
+    return JSON.stringify(v === undefined ? null : v);
+  }
+  function isLockable(k) { return LOCKABLE.indexOf(k) >= 0; }
+  function docFor(k, dater, view, unlocked, since) { var d = { dater: dater || null, view: view || null }; if (isLockable(k)) d.unlocked = !!unlocked; if (TIMED.indexOf(k) >= 0) d.since = dater && since ? since : null; return d; }
+  function emptySig(k) { return stable(docFor(k, null, null, false, null)); }
+  ["hot", "s1", "s2", "s3", "s4", "s5", "banner", "cohost"].forEach(function (k) { state.remote.docs[k] = emptySig(k); });
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function toast(msg) { var t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, 2600); }
+  function fmtClock(ms) {
+    var t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+    return (h ? h + ":" + (m < 10 ? "0" : "") + m : m) + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+  function fmtLen(ms) {
+    var t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+    return h ? h + "h " + m + "m" : m ? m + "m " + (sec < 10 ? "0" : "") + sec + "s" : sec + "s";
+  }
+  setInterval(function () { var now = Date.now(); document.querySelectorAll(".tmr").forEach(function (e) { e.textContent = fmtClock(now - Number(e.getAttribute("data-since"))); }); var lc = document.getElementById("liveClock"); if (lc && Number(lc.getAttribute("data-start"))) lc.textContent = fmtClock(now - Number(lc.getAttribute("data-start"))); }, 1000);
+  function toastUndo(msg, fn) {
+    var t = $("toast"); t.textContent = msg + " "; var b = el("button", "undo", "Undo");
+    b.onclick = function () { t.hidden = true; fn(); }; t.appendChild(b); t.hidden = false;
+    clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, 6000);
+  }
+  function yrs(n) { return n + (n === 1 ? " year" : " years"); }
+
+  /* ---------- fit logic ---------- */
+  var SEXLABEL = { straight: "Straight", gay: "Gay or lesbian", bi: "Bisexual", other: "Other" };
+  var GENLABEL = { man: "Man", woman: "Woman", nonbinary: "Non-binary" };
+  var SEXSHORT = { straight: "Straight", gay: "Gay", bi: "Bi", other: "Other" };
+  var GENSHORT = { man: "M", woman: "W", nonbinary: "NB" };
+  function isBi(d) { return d.sexuality === "bi" && d.minM != null && d.minW != null; }
+  function rangeFor(d, partner) {
+    if (isBi(d)) {
+      if (partner.gender === "man") return [d.minM, d.maxM];
+      if (partner.gender === "woman") return [d.minW, d.maxW];
+      return [Math.min(d.minM, d.minW), Math.max(d.maxM, d.maxW)];
+    }
+    return [d.min, d.max];
+  }
+  function rangeText(d) { return isBi(d) ? "men " + d.minM + " to " + d.maxM + ", women " + d.minW + " to " + d.maxW : d.min + " to " + d.max; }
+  function whoText(d) { return [GENLABEL[d.gender], SEXLABEL[d.sexuality]].filter(Boolean).join(" \u00b7 "); }
+  function gapOf(person, other) { var r = rangeFor(other, person); return Math.max(0, r[0] - person.age, person.age - r[1]); }
+  function attracted(d, g) {
+    if (!d.gender || !d.sexuality || !g || g === "nonbinary" || d.gender === "nonbinary") return true;
+    if (d.sexuality === "straight") return g !== d.gender;
+    if (d.sexuality === "gay") return g === d.gender;
+    return true;
+  }
+  function mismatch(a, b) { return !attracted(a, b.gender) || !attracted(b, a.gender); }
+  function fit(hot, p) {
+    var g1 = gapOf(p, hot), g2 = gapOf(hot, p), worst = Math.max(g1, g2), mm = mismatch(hot, p);
+    var key = worst === 0 ? "mutual" : worst <= 2 ? "close" : "nofit";
+    var label = worst === 0 ? "Fits both" : "Off by " + yrs(worst);
+    if (mm) { key = "nofit"; label = "Mismatch"; }
+    function side(a, b, g) { var r = rangeFor(b, a); return a.name + " (" + a.age + ") is " + (g === 0 ? "inside " : yrs(g) + " outside ") + b.name + "'s range of " + r[0] + " to " + r[1] + "."; }
+    var detail = side(p, hot, g1) + " " + side(hot, p, g2) + (mm ? " Orientation mismatch: at least one of them is not looking for the other's gender." : "");
+    return { key: key, label: label, worst: worst, mm: mm, detail: detail };
+  }
+  function byId(id) { for (var i = 0; i < state.daters.length; i++) if (state.daters[i].id === id) return state.daters[i]; return null; }
+  function seatsNow() { var s = state.seats || {}, o = {}; SEATS.forEach(function (k) { o[k] = s[k] || null; }); return o; }
+  function seatOf(id) { var s = seatsNow(); for (var i = 0; i < SEATS.length; i++) if (s[SEATS[i]] === id) return SEATS[i]; return null; }
+
+  /* ---------- stage ---------- */
+  function modelFor(key, seats, hotD) {
+    var d = byId(seats[key]); if (!d) return null;
+    if (seatLocked(key)) return null;
+    var f = hotD && key !== "hot" ? fit(hotD, d) : null;
+    var rng = [];
+    rng = isBi(d) ? ["Men " + d.minM + "-" + d.maxM, "Women " + d.minW + "-" + d.maxW] : ["Wants " + d.min + "-" + d.max];
+    return { name: d.name, age: d.age, location: d.location, gs: [GENSHORT[d.gender], SEXSHORT[d.sexuality]].filter(Boolean).join(" \u00b7 "), rng: rng, status: key === "hot" ? "hot" : (f ? f.key : ""), label: f ? f.label : "" };
+  }
+  function computeViews(seats) { var hotD = byId(seats.hot), o = {}; SEATS.forEach(function (k) { o[k] = modelFor(k, seats, hotD); }); return o; }
+  function seatLocked(key) { return isLockable(key) && !state.unlocked[key]; }
+  function seatModel(key) {
+    if (key === "kim") return { name: "Kim", gs: "", rng: [], status: "kim", label: "" };
+    if (seatLocked(key)) return null;
+    if (state.mode === "host") { var s = seatsNow(); return modelFor(key, s, byId(s.hot)); }
+    return state.seatView[key] || null;
+  }
+  function drawHeart(key) {
+    var m = seatModel(key);
+    var locked = seatLocked(key);
+    var node = el("button", "heart " + (locked ? "locked" : m ? (m.status || "") : "vacant") + (state.selected === key && state.mode === "host" ? " sel" : "") + (state.mode === "host" && key !== "kim" ? "" : " ro"));
+    node.type = "button"; node.setAttribute("aria-label", LABEL[key] + (locked ? ": locked" : m ? ": " + m.name : ": empty") + (m && m.label ? ", " + m.label : ""));
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 100 88"); svg.setAttribute("aria-hidden", "true");
+    var p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", "M50 86 C8 54 -2 28 18 12 C33 0 48 9 50 22 C52 9 67 0 82 12 C102 28 92 54 50 86 Z");
+    svg.appendChild(p); node.appendChild(svg);
+    var inner = el("span", "inner");
+    node.appendChild(el("span", "slot", LABEL[key]));
+    if (locked) {
+      var ns = "http://www.w3.org/2000/svg", lk = document.createElementNS(ns, "svg");
+      lk.setAttribute("viewBox", "0 0 24 24"); lk.setAttribute("class", "lock"); lk.setAttribute("aria-hidden", "true");
+      lk.innerHTML = '<rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>';
+      inner.appendChild(lk); inner.appendChild(el("span", "lk", "Locked"));
+      if (state.mode === "host") { var qd = byId(seatsNow()[key]); if (qd) inner.appendChild(el("span", "qd", "Waiting: " + qd.name)); }
+    } else if (m) {
+      inner.appendChild(el("span", "nm", m.name));
+      if (m.age != null) inner.appendChild(el("span", "ln", m.age + " \u00b7 " + m.location));
+      if (m.gs) inner.appendChild(el("span", "gs", m.gs));
+      (m.rng || []).forEach(function (t) { inner.appendChild(el("span", "rg", t)); });
+      if (m.label) inner.appendChild(el("span", "st", m.label));
+    } else inner.appendChild(el("span", "em", "Empty"));
+    node.appendChild(inner);
+    if (TIMED.indexOf(key) >= 0 && m && state.sinceSeat[key]) { var tm = el("span", "tmr", fmtClock(Date.now() - state.sinceSeat[key])); tm.setAttribute("data-since", state.sinceSeat[key]); node.appendChild(tm); }
+    if (state.mode === "host" && key !== "kim") node.onclick = function () { tapHeart(key); };
+    else node.tabIndex = -1;
+    return node;
+  }
+  function renderBar() {
+    if (state.mode !== "host") return;
+    var bar = $("bar"); bar.textContent = ""; bar.className = "bar";
+    var s = seatsNow(), key = state.selected;
+    if (!key) {
+      bar.appendChild(el("div", "ttl", "Tap a heart to choose a seat"));
+      bar.appendChild(el("div", "det", "Then tap Panel or Hot seat on a dater below. Panel fills the next empty seat, Seat 1 first."));
+      return;
+    }
+    var d = byId(s[key]), hot = byId(s.hot);
+    if (!d) {
+      bar.appendChild(el("div", "ttl", LABEL[key] + (seatLocked(key) ? " is locked and empty" : " is empty")));
+      bar.appendChild(el("div", "det", seatLocked(key) ? "Tap Panel on a dater below to have them ready. They stay hidden until you unlock this seat." : "Tap Panel or Hot seat on a dater below to place them here."));
+      return;
+    }
+    var title = LABEL[key] + ": " + d.name;
+    if (seatLocked(key)) {
+      bar.appendChild(el("div", "ttl", LABEL[key] + " (locked): " + d.name + " is waiting"));
+      bar.appendChild(el("div", "det", "Hidden from the board until you unlock this seat."));
+      var acts0 = el("div", "acts"), rm0 = el("button", "small danger ghost", "Remove from seat"); rm0.onclick = function () { setSeat(key, null); }; acts0.appendChild(rm0); bar.appendChild(acts0);
+      return;
+    }
+    if (key !== "hot" && hot) { var f = fit(hot, d); bar.className = "bar " + f.key; title += " · " + f.label; bar.appendChild(el("div", "ttl", title)); bar.appendChild(el("div", "det", f.detail)); }
+    else { bar.appendChild(el("div", "ttl", title)); bar.appendChild(el("div", "det", key === "hot" ? "The hot seat chooses who to go on a speed date with. Wants " + rangeText(d) + "." : "Seat the hot seat dater to see how this person fits.")); }
+    var acts = el("div", "acts");
+    if (key !== "hot") {
+      var mk = el("button", "small", "Make hot seat"); mk.onclick = function () { makeHot(key); }; acts.appendChild(mk);
+      if (hot) { var pk = el("button", "small primary", "Log pick"); pk.onclick = function () { logPick(key); }; acts.appendChild(pk); }
+    }
+    var rm = el("button", "small danger ghost", "Remove from seat"); rm.onclick = function () { setSeat(key, null); }; acts.appendChild(rm);
+    bar.appendChild(acts);
+  }
+  function renderStage() {
+    Object.keys(ROWS).forEach(function (r) {
+      var row = $(r); row.textContent = "";
+      ROWS[r].forEach(function (k) { row.appendChild(drawHeart(k)); });
+    });
+    if (state.mode === "host") {
+      var mb = el("button", "primary matchbtn" + (state.matching ? " armed" : ""), state.matching ? "Pick?" : "Match");
+      mb.type = "button"; mb.onclick = onMatch; $("rHot").appendChild(mb);
+    } else state.matching = false;
+    var side = $("side"); side.textContent = "";
+    SIDE.forEach(function (k) {
+      var cell = el("div", "sidecell"); cell.appendChild(drawHeart(k));
+      if (state.mode === "host" && isLockable(k)) {
+        var on = !!state.unlocked[k], sw = el("button", "sw"); sw.type = "button"; sw.setAttribute("role", "switch"); sw.setAttribute("aria-checked", on ? "true" : "false"); sw.setAttribute("aria-label", LABEL[k] + " unlocked");
+        sw.appendChild(el("span", "trk")); sw.appendChild(el("span", "", on ? "Unlocked" : "Locked"));
+        sw.onclick = function () { setLock(k, !on); };
+        cell.appendChild(sw);
+      }
+      side.appendChild(cell);
+    });
+    renderBar();
+    var q = state.question;
+    $("qtext").textContent = q && q.text ? q.text : "No question picked yet.";
+    $("qby").textContent = q && q.text ? (q.handle ? "Asked by " + q.handle : "") : "";
+    $("clearQ").hidden = !(state.mode === "host" && q && q.text); $("backQ").hidden = !(state.mode !== "viewer" && state.hist.length);
+  }
+
+  /* ---------- daters list ---------- */
+  function renderDaters() {
+    var list = $("dList"); list.textContent = "";
+    var q = $("search").value.trim().toLowerCase();
+    var items = state.daters.filter(function (d) { return !q || (d.name + " " + d.location).toLowerCase().indexOf(q) >= 0; });
+    var srt = $("sort").value;
+    items.sort(function (x, y) {
+      var px = x.panelCount || 0, py = y.panelCount || 0;
+      if (srt === "panel") return py - px || (y.panelMs || 0) - (x.panelMs || 0) || (y.ts || 0) - (x.ts || 0);
+      if (srt === "panelLeast") return px - py || (x.panelMs || 0) - (y.panelMs || 0) || (y.ts || 0) - (x.ts || 0);
+      return srt === "age" ? x.age - y.age : srt === "name" ? x.name.localeCompare(y.name) : (y.ts || 0) - (x.ts || 0);
+    });
+    $("daterCount").textContent = q ? items.length + " of " + state.daters.length : state.daters.length;
+    var hot = byId(seatsNow().hot);
+    $("refNote").textContent = hot ? "Dots show fit with " + hot.name + " in the hot seat." : "";
+    if (!items.length) { list.appendChild(el("div", "empty", state.daters.length ? "No daters match that search." : "No daters yet. Add the first one above.")); return; }
+    items.forEach(function (d) {
+      var sk = seatOf(d.id);
+      var row = el("div", "row" + (sk ? " seated" : ""));
+      var dotCls = "dot", fitTxt = "";
+      if (hot && hot.id !== d.id) { var f = fit(hot, d); dotCls += " " + f.key; fitTxt = " \u00b7 " + f.label; }
+      var dot = el("span", dotCls); dot.setAttribute("aria-hidden", "true");
+      var main = el("div", "main");
+      var t = el("div", "t", d.name + ", " + d.age);
+      if (d.example) t.appendChild(el("span", "tag-ex", "Example"));
+      main.appendChild(t);
+      main.appendChild(el("div", "m", [d.location, whoText(d), "wants " + rangeText(d)].filter(Boolean).join(" \u00b7 ") + fitTxt + (sk ? " \u00b7 in " + LABEL[sk] + (seatLocked(sk) ? " (locked)" : "") : "")));
+      var picked = state.matches.filter(function (x) { return x.pickId === d.id; }).length, chose = state.matches.filter(function (x) { return x.hotId === d.id; }).length, bits = [];
+      if (d.hotCount) bits.push(fmtLen(d.hotMs || 0) + " in hot seat (" + d.hotCount + (d.hotCount === 1 ? " date)" : " dates)"));
+      if (d.panelCount) bits.push(fmtLen(d.panelMs || 0) + " on panel (" + d.panelCount + (d.panelCount === 1 ? " time)" : " times)"));
+      if (picked + chose) bits.push("Matches " + (picked + chose) + " (picked " + picked + ", was picked " + chose + ")");
+      if (bits.length) main.appendChild(el("div", "stats", bits.join(" \u00b7 ")));
+      var acts = el("div", "racts");
+      var pan = el("button", "small" + (sk && sk !== "hot" ? " ghost" : ""), "Panel"); pan.onclick = function () { seatDater(d, "panel"); }; acts.appendChild(pan);
+      var hs = el("button", "small" + (sk === "hot" ? " ghost" : ""), "Hot seat"); hs.onclick = function () { seatDater(d, "hot"); }; acts.appendChild(hs);
+      var ed = el("button", "small ghost", "Edit"); ed.onclick = function () { startEdit(d); }; acts.appendChild(ed);
+      if (state.confirmDel === d.id) {
+        var yes = el("button", "small danger", "Confirm remove"); yes.onclick = function () { removeDater(d); };
+        var no = el("button", "small ghost", "Keep"); no.onclick = function () { state.confirmDel = null; renderDaters(); };
+        acts.appendChild(yes); acts.appendChild(no);
+      } else {
+        var del = el("button", "small danger ghost", "Remove"); del.onclick = function () { state.confirmDel = d.id; renderDaters(); }; acts.appendChild(del);
+      }
+      row.appendChild(dot); row.appendChild(main); row.appendChild(acts); list.appendChild(row);
+    });
+  }
+
+  /* ---------- questions ---------- */
+  function renderQuestions() {
+    var mode = $("qSort").value, all = state.questions.slice();
+    if (mode === "never") all = all.filter(function (q) { return qCount(q) === 0; });
+    if (mode === "asked") all = all.filter(function (q) { return qCount(q) > 0; });
+    all.sort(function (a, b) {
+      return mode === "most" || mode === "asked" ? qCount(b) - qCount(a) || (b.lastAsked || 0) - (a.lastAsked || 0) || a.ts - b.ts
+        : mode === "new" ? b.ts - a.ts : qCount(a) - qCount(b) || a.ts - b.ts;
+    });
+    var fresh = all.filter(function (q) { return qCount(q) === 0; }).length;
+    $("readyCount").textContent = fresh + " never asked"; $("totalCount").textContent = state.questions.length + " total"; $("resetUsed").hidden = true;
+    fillQ($("readyList"), all, state.questions.length ? "No questions match this view." : "No questions yet. Add one from the chat above.", false);
+  }
+  function qCount(q) { return Math.max(q.askCount || 0, q.status === "used" ? 1 : 0); }
+  function fillQ(box, items, emptyMsg, isUsed) {
+    box.textContent = "";
+    if (!items.length) { box.appendChild(el("div", "empty", emptyMsg)); return; }
+    items.forEach(function (q) {
+      var row = el("div", "row nodot"); var main = el("div", "main");
+      main.appendChild(el("div", "t", q.text)); main.appendChild(el("div", "m", (q.handle ? "From " + q.handle : "From chat") + (qCount(q) ? " \u00b7 Asked " + qCount(q) + (qCount(q) === 1 ? " time" : " times") : " \u00b7 Never asked")));
+      var acts = el("div", "racts");
+      var ask = el("button", "small", qCount(q) ? "Ask again" : "Ask this"); ask.onclick = function () { askQuestion(q); }; acts.appendChild(ask);
+      if (state.mode === "host") { var no = el("button", "small danger ghost", "Remove"); no.onclick = function () { delQ(q); }; acts.appendChild(no); }
+      row.appendChild(main); row.appendChild(acts); box.appendChild(row);
+    });
+  }
+
+  /* ---------- match log ---------- */
+  function renderMatches() {
+    var items = state.matches.slice().sort(function (a, b) { return b.ts - a.ts; });
+    $("matchCount").textContent = items.length; $("clearLog").hidden = !items.length || !$("logConfirm").hidden;
+    var box = $("mList"); box.textContent = "";
+    if (!items.length) { box.appendChild(el("div", "empty", "No picks logged yet. Select a seat and tap Log pick.")); return; }
+    items.forEach(function (m) {
+      var row = el("div", "row nodot"); var main = el("div", "main");
+      main.appendChild(el("div", "t", m.hotName + " picked " + m.pickName));
+      var time = new Date(m.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      main.appendChild(el("div", "m", time + (m.fit ? " · " + m.fit : "")));
+      var acts = el("div", "racts");
+      var no = el("button", "small danger ghost", "Remove"); no.onclick = function () { queue(function () { return state.db.collection("matches").doc(m.id).delete(); }); }; acts.appendChild(no);
+      row.appendChild(main); row.appendChild(acts); box.appendChild(row);
+    });
+  }
+
+  /* ---------- writes ---------- */
+  var chain = Promise.resolve();
+  function applyRemote() {
+    if (state.inflight) return;
+    state.seats = Object.assign({}, state.remote.seats); state.seatView = Object.assign({}, state.remote.views); state.unlocked = Object.assign({}, state.remote.unlocked); state.sinceSeat = Object.assign({}, state.remote.since); state.question = state.remote.question; state.hist = state.remote.hist.slice(); state.stream = state.remote.stream ? Object.assign({}, state.remote.stream) : null; renderAll();
+    syncViews();
+  }
+  function writeSeatDocs(seats, views) {
+    SEATS.forEach(function (k) {
+      var doc = docFor(k, seats[k], views[k], state.unlocked[k], state.sinceSeat[k]), sig = stable(doc);
+      if (sig !== state.remote.docs[k]) { state.remote.docs[k] = sig; queue(function () { return state.db.collection("seats").doc(k).set(doc); }); }
+    });
+  }
+  function syncViews() {
+    if (state.mode !== "host" || !state.gotSeats || !state.gotDaters || state.inflight) return;
+    var s = seatsNow(), now = Date.now();
+    TIMED.forEach(function (k) { if (s[k] && !state.sinceSeat[k]) state.sinceSeat[k] = now; });
+    writeSeatDocs(s, computeViews(s));
+  }
+  function queue(fn) {
+    state.inflight++;
+    var failed = false;
+    var p = chain.then(fn).catch(function (e) { failed = true; toast(e && e.code === "invalid_argument" ? "You do not have permission for that." : "Could not save. Try again."); })
+      .then(function () { state.inflight--; if (failed && !state.inflight) applyRemote(); });
+    chain = p; return p;
+  }
+  function addPanelStat(id, ms) {
+    var d = byId(id); if (!d || ms < 3000) return;
+    var body = { panelMs: (d.panelMs || 0) + ms, panelCount: (d.panelCount || 0) + 1 };
+    d.panelMs = body.panelMs; d.panelCount = body.panelCount;
+    queue(function () { return state.db.collection("daters").doc(id).update(body); });
+  }
+  function writeStream() {
+    var st = state.stream; if (!st) return; var body = Object.assign({}, st);
+    state.remote.stream = Object.assign({}, st);
+    queue(function () { return state.db.collection("seats").doc("stream").set(body); });
+  }
+  function streamDate(ms) {
+    var st = state.stream; if (!st || !st.running) return;
+    ms = Math.min(ms, Date.now() - st.startedAt); if (ms < 1) return;
+    st.dates = (st.dates || 0) + 1; st.hotMs = (st.hotMs || 0) + ms; st.hotMax = Math.max(st.hotMax || 0, ms); writeStream();
+  }
+  function endHot(id, ms) {
+    if (ms <= HOT_MIN) return;
+    var d = byId(id);
+    if (d) {
+      var body = { hotMs: (d.hotMs || 0) + ms, hotCount: (d.hotCount || 0) + 1 };
+      d.hotMs = body.hotMs; d.hotCount = body.hotCount;
+      queue(function () { return state.db.collection("daters").doc(id).update(body); });
+    }
+    streamDate(ms);
+  }
+  function commitSeats(next) {
+    var full = {}; SEATS.forEach(function (k) { full[k] = next[k] || null; });
+    var views = computeViews(full), now = Date.now();
+    var oldSince = {}; PANEL.forEach(function (k) { var id = (state.seats || {})[k]; if (id) oldSince[id] = state.sinceSeat[k] || now; });
+    var newSince = {}, inPanel = {};
+    PANEL.forEach(function (k) { var id = full[k]; if (id) { inPanel[id] = true; newSince[k] = oldSince[id] || now; } });
+    Object.keys(oldSince).forEach(function (id) { if (!inPanel[id]) addPanelStat(id, now - oldSince[id]); });
+    var hotOld = (state.seats || {}).hot || null, hotSince = state.sinceSeat.hot || now;
+    if (full.hot) newSince.hot = full.hot === hotOld ? hotSince : now;
+    if (hotOld && full.hot !== hotOld) endHot(hotOld, now - hotSince, now);
+    var st = state.stream;
+    if (st && st.running) {
+      var ids = (st.ids || []).slice(), added = false;
+      TIMED.forEach(function (k) { var id = full[k]; if (id && ids.indexOf(id) < 0) { ids.push(id); added = true; } });
+      if (added) { st.ids = ids; writeStream(); }
+    }
+    state.sinceSeat = newSince;
+    state.seats = full; state.seatView = views; renderAll();
+    writeSeatDocs(full, views);
+  }
+  function commitQuestion(q) {
+    var cur = state.question, hist = (state.hist || []).slice();
+    if (cur && cur.text && (!q || q.text !== cur.text)) { hist.unshift({ text: cur.text, handle: cur.handle || "", qid: cur.qid || "" }); hist = hist.slice(0, 5); }
+    setQuestion(q, hist);
+  }
+  function setQuestion(q, hist) {
+    state.hist = hist; state.question = q; renderAll();
+    var body = { text: q ? q.text : "", handle: q ? (q.handle || "") : "", qid: q ? (q.qid || "") : "", hist: hist };
+    queue(function () { return state.db.doc("game/question").set(body); });
+  }
+  function backQuestion() {
+    var h = state.hist || []; if (!h.length) return;
+    var prev = h[0], cur = state.question;
+    if (cur && cur.qid) {
+      var cq = state.questions.filter(function (x) { return x.id === cur.qid; })[0];
+      if (cq) { var n = Math.max(0, qCount(cq) - 1); try { cq.askCount = n; } catch (e) {} queue(function () { return state.db.collection("questions").doc(cq.id).update({ askCount: n }); }); }
+    }
+    setQuestion({ text: prev.text, handle: prev.handle || "", qid: prev.qid || "" }, h.slice(1));
+    toast("Brought back the last question.");
+  }
+  $("backQ").onclick = backQuestion;
+  function seatDater(d, target) {
+    var s = seatsNow(), cur = seatOf(d.id), key = null;
+    if (target === "hot") {
+      if (cur === "hot") { toast(d.name + " is already in the hot seat."); return; }
+      key = "hot";
+    } else {
+      var sel = state.selected;
+      if (sel && sel !== "hot" && !s[sel]) key = sel;
+      if (!key && cur && cur !== "hot") { toast(d.name + " is already in " + LABEL[cur] + "."); return; }
+      if (!key) for (var i = 0; i < PANEL.length; i++) if (!s[PANEL[i]]) { key = PANEL[i]; break; }
+      if (!key) { toast("All five panel seats are full. Remove someone first."); return; }
+    }
+    var replaced = key === "hot" && s.hot ? byId(s.hot) : null;
+    if (cur) s[cur] = null;
+    s[key] = d.id; state.selected = null; commitSeats(s);
+    toast(d.name + " is in " + LABEL[key] + (replaced ? ". " + replaced.name + " left it." : "."));
+  }
+  function onMatch() {
+    var s = seatsNow(), hot = byId(s.hot);
+    if (!hot) { toast("Put someone in the hot seat first."); return; }
+    var sel = state.selected;
+    if (sel && sel !== "hot" && byId(s[sel]) && !seatLocked(sel)) { state.matching = false; state.selected = null; logMatch(sel); return; }
+    if (state.matching) { state.matching = false; renderStage(); return; }
+    state.matching = true; renderStage(); toast("Tap the heart " + hot.name + " picked.");
+  }
+  function logMatch(key) {
+    var s = seatsNow(), hot = byId(s.hot), p = byId(s[key]); if (!hot || !p) return;
+    logPick(key, "Match logged: " + hot.name + " and " + p.name + "."); renderStage(); renderDaters();
+  }
+  function setLock(key, on) {
+    var s = seatsNow(), had = byId(s[key]);
+    state.unlocked[key] = on;
+    commitSeats(s);
+    toast(LABEL[key] + (on ? " unlocked." + (had ? " " + had.name + " is on the board." : " Pick a dater for it.") : " locked." + (had ? " " + had.name + " is hidden until it opens." : "")));
+  }
+  function tapHeart(key) {
+    var sel = state.selected, s = seatsNow();
+    if (state.matching) {
+      state.matching = false;
+      if (key !== "hot" && byId(s[key]) && !seatLocked(key)) { state.selected = null; logMatch(key); return; }
+      renderStage(); toast("Match cancelled."); return;
+    }
+    if (!sel || sel === key || (!s[sel] && !s[key])) { state.selected = sel === key ? null : key; renderStage(); renderDaters(); return; }
+    var before = {}; SEATS.forEach(function (k) { before[k] = s[k]; });
+    var a = s[sel], b = s[key]; s[sel] = b; s[key] = a;
+    state.selected = null; commitSeats(s);
+    var A = byId(a), B = byId(b);
+    toastUndo(A && B ? A.name + " and " + B.name + " swapped." : (A || B).name + " moved to " + LABEL[A ? key : sel] + ".", function () { state.selected = null; commitSeats(before); });
+  }
+  function setSeat(key, id) { var s = seatsNow(); s[key] = id; if (!id) state.selected = null; commitSeats(s); }
+  function makeHot(key) {
+    var s = seatsNow(); if (!s[key]) return;
+    s.hot = s[key]; s[key] = null; state.selected = key;
+    commitSeats(s); toast("New hot seat. " + LABEL[key] + " is open.");
+  }
+  function logPick(key, msg) {
+    var s = seatsNow(), hot = byId(s.hot), p = byId(s[key]); if (!hot || !p) return;
+    var f = fit(hot, p);
+    var body = { hotId: hot.id, hotName: hot.name, pickId: p.id, pickName: p.name, fit: f.label, ts: Date.now() };
+    queue(function () { return state.db.collection("matches").add(body); }).then(function () { toast(msg || "Pick logged."); });
+  }
+  function askQuestion(q) {
+    commitQuestion({ text: q.text, handle: q.handle || "", qid: q.id });
+    var n = qCount(q) + 1;
+    try { q.askCount = n; } catch (e) {}
+    queue(function () { return state.db.collection("questions").doc(q.id).update({ askCount: n, lastAsked: Date.now() }); });
+    renderQuestions();
+  }
+  function delQ(q) { queue(function () { return state.db.collection("questions").doc(q.id).delete(); }); }
+  function removeDater(d) {
+    state.confirmDel = null;
+    var s = seatsNow(), k = seatOf(d.id);
+    if (k) { s[k] = null; state.selected = null; commitSeats(s); }
+    queue(function () { return state.db.collection("daters").doc(d.id).delete(); });
+    renderAll();
+  }
+
+  /* ---------- clear all ---------- */
+  $("clearAll").onclick = function () { $("clearAll").hidden = true; $("clearConfirm").hidden = false; };
+  $("clearNo").onclick = function () { $("clearConfirm").hidden = true; $("clearAll").hidden = false; };
+  $("clearYes").onclick = function () {
+    $("clearConfirm").hidden = true; $("clearAll").hidden = false; state.selected = null;
+    commitSeats({}); commitQuestion(null); toast("All seats cleared.");
+  };
+  $("clearQ").onclick = function () { commitQuestion(null); };
+  $("randomQ").onclick = function () {
+    var cur = state.question && state.question.text, pool = state.questions.filter(function (q) { return q.text !== cur; });
+    if (!pool.length) pool = state.questions.slice();
+    if (!pool.length) { toast("Add a question first."); return; }
+    var w = pool.map(function (q) { return 1 / Math.pow(1 + qCount(q), 2); }), tot = w.reduce(function (a, b) { return a + b; }, 0), x = Math.random() * tot, i = 0;
+    while (i < pool.length - 1 && x >= w[i]) { x -= w[i]; i++; }
+    askQuestion(pool[i]);
+  };
+
+  /* ---------- dater form ---------- */
+  var RNG = ["fMin", "fMax", "fMinM", "fMaxM", "fMinW", "fMaxW"];
+  function syncRange() {
+    var bi = $("fSex").value === "bi";
+    $("rngSingle").hidden = bi; $("rngBi").hidden = !bi;
+    ["fMin", "fMax"].forEach(function (id) { $(id).required = !bi; });
+    ["fMinM", "fMaxM", "fMinW", "fMaxW"].forEach(function (id) { $(id).required = bi; });
+  }
+  $("fSex").addEventListener("change", syncRange);
+  function startEdit(d) {
+    state.editing = d.id;
+    $("fName").value = d.name; $("fAge").value = d.age; $("fLoc").value = d.location; $("fAdult").checked = true;
+    $("fGender").value = d.gender || ""; $("fSex").value = d.sexuality || "";
+    RNG.forEach(function (id) { $(id).value = ""; });
+    if (isBi(d)) { $("fMinM").value = d.minM; $("fMaxM").value = d.maxM; $("fMinW").value = d.minW; $("fMaxW").value = d.maxW; }
+    else { $("fMin").value = d.min; $("fMax").value = d.max; }
+    syncRange();
+    $("fSave").textContent = "Save changes"; $("fCancel").hidden = false; $("fName").focus();
+    $("dForm").scrollIntoView({ block: "center" });
+  }
+  function resetForm() { state.editing = null; $("dForm").reset(); syncRange(); $("fSave").textContent = "Add dater"; $("fCancel").hidden = true; $("fErr").textContent = ""; }
+  $("fCancel").onclick = resetForm;
+  function num(id) { return parseInt($(id).value, 10); }
+  $("dForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var name = $("fName").value.trim(), loc = $("fLoc").value.trim(), age = num("fAge");
+    var gender = $("fGender").value, sex = $("fSex").value, bi = sex === "bi";
+    var body = { name: name, age: age, location: loc, gender: gender, sexuality: sex };
+    var ages = [age], err = "";
+    if (bi) {
+      body.minM = num("fMinM"); body.maxM = num("fMaxM"); body.minW = num("fMinW"); body.maxW = num("fMaxW");
+      body.min = Math.min(body.minM, body.minW); body.max = Math.max(body.maxM, body.maxW);
+      ages = ages.concat([body.minM, body.maxM, body.minW, body.maxW]);
+      if (body.minM > body.maxM || body.minW > body.maxW) err = "A minimum age cannot be higher than its maximum.";
+    } else {
+      body.min = num("fMin"); body.max = num("fMax"); ages = ages.concat([body.min, body.max]);
+      if (body.min > body.max) err = "Minimum age cannot be higher than maximum age.";
+    }
+    if (!name || !loc) err = "Name and state are required.";
+    else if (!gender || !sex) err = "Choose a gender and a sexuality.";
+    else if (ages.some(function (a) { return !(a >= 18); })) err = "All ages must be 18 or older.";
+    else if (!$("fAdult").checked) err = "Confirm the dater is 18 or older.";
+    else if (/\d{2,}.*\b(st|street|ave|avenue|road|rd|dr|drive|ln|lane|blvd)\b/i.test(loc)) err = "Use the state only, no city or street address.";
+    $("fErr").textContent = err; if (err) return;
+    var id = state.editing, old = id ? byId(id) : null;
+    queue(function () {
+      if (id) { body.ts = (old && old.ts) || Date.now(); if (old && old.example) body.example = true; if (old && old.panelMs) { body.panelMs = old.panelMs; body.panelCount = old.panelCount || 0; } if (old && old.hotMs) { body.hotMs = old.hotMs; body.hotCount = old.hotCount || 0; } return state.db.collection("daters").doc(id).set(body); }
+      body.ts = Date.now(); return state.db.collection("daters").add(body);
+    }).then(function () { toast(id ? "Dater updated." : "Dater added."); });
+    resetForm();
+  });
+
+  /* ---------- question form ---------- */
+  $("qForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var text = $("qIn").value.trim(); if (!text) return;
+    var body = { text: text, handle: $("qHandle").value.trim(), status: "ready", ts: Date.now() };
+    queue(function () { return state.db.collection("questions").add(body); }).then(function () { toast("Question added."); });
+    $("qIn").value = ""; $("qHandle").value = ""; $("qIn").focus();
+  });
+  $("resetUsed").onclick = function () {
+    var used = state.questions.filter(function (q) { return q.status === "used"; });
+    used.forEach(function (q) { queue(function () { return state.db.collection("questions").doc(q.id).update({ status: "ready" }); }); });
+  };
+
+  /* ---------- log clear ---------- */
+  $("clearLog").onclick = function () { $("clearLog").hidden = true; $("logConfirm").hidden = false; };
+  $("logNo").onclick = function () { $("logConfirm").hidden = true; renderMatches(); };
+  $("logYes").onclick = function () {
+    $("logConfirm").hidden = true;
+    state.matches.forEach(function (m) { queue(function () { return state.db.collection("matches").doc(m.id).delete(); }); });
+  };
+
+  $("qSort").onchange = renderQuestions; $("search").oninput = renderDaters; $("sort").onchange = renderDaters;
+
+  /* ---------- stream ---------- */
+  function sumCells(x) {
+    var avg = x.dates ? x.hotMs / x.dates : 0;
+    return [[fmtLen(Math.max(0, (x.endedAt || Date.now()) - x.startedAt)), "Time live"], [x.dates || 0, "Speed dates"], [x.daters || 0, "Daters seated"], [x.matches || 0, "Matches"],
+      [x.dates ? fmtLen(avg) : "none", "Avg hot seat"], [x.dates ? fmtLen(x.hotMax || 0) : "none", "Longest hot seat"], [x.questions || 0, "Questions asked"]];
+  }
+  function sumGrid(x) {
+    var g = el("div", "sumgrid");
+    sumCells(x).forEach(function (c) { var d = el("div"); d.appendChild(el("b", "", String(c[0]))); d.appendChild(el("span", "", c[1])); g.appendChild(d); });
+    return g;
+  }
+  function renderStream() {
+    var st = state.stream, on = !!(st && st.running);
+    $("streamStart").hidden = on; $("streamEnd").hidden = !on || !$("endConfirm").hidden; $("liveChip").hidden = !on;
+    if (!on) $("endConfirm").hidden = true;
+    var lc = $("liveClock"); lc.setAttribute("data-start", on ? st.startedAt : 0); if (on) lc.textContent = fmtClock(Date.now() - st.startedAt);
+  }
+  function renderStreams() {
+    $("streamCount").textContent = state.streams.length;
+    var box = $("pList"); box.textContent = "";
+    if (!state.streams.length) { box.appendChild(el("div", "empty", "No saved streams yet. Press Start stream when you go live.")); return; }
+    state.streams.forEach(function (x) {
+      var det = el("details", "sitem"), sm = el("summary");
+      sm.appendChild(el("span", "sdate", new Date(x.startedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })));
+      det.appendChild(sm);
+      if (state.openStreams[x.id]) det.open = true;
+      det.addEventListener("toggle", function () { if (det.open) state.openStreams[x.id] = true; else delete state.openStreams[x.id]; });
+      var body = el("div", "sbody"); body.appendChild(sumGrid(x));
+      var no = el("button", "small danger ghost", "Remove"); no.onclick = function () { queue(function () { return state.db.collection("seats").doc(x.id).delete(); }); };
+      body.appendChild(no); det.appendChild(body); box.appendChild(det);
+    });
+  }
+  $("streamStart").onclick = function () {
+    var s = seatsNow(), ids = [];
+    TIMED.forEach(function (k) { if (s[k] && ids.indexOf(s[k]) < 0) ids.push(s[k]); });
+    state.stream = { running: true, startedAt: Date.now(), dates: 0, hotMs: 0, hotMax: 0, ids: ids };
+    writeStream(); renderStream(); toast("Stream started.");
+  };
+  $("streamEnd").onclick = function () { $("endConfirm").hidden = false; $("streamEnd").hidden = true; };
+  $("endNo").onclick = function () { $("endConfirm").hidden = true; renderStream(); };
+  $("endYes").onclick = function () {
+    var st = state.stream; if (!st || !st.running) return;
+    var now = Date.now(), hotId = (state.seats || {}).hot, cur = hotId ? now - (state.sinceSeat.hot || now) : 0;
+    if (cur > HOT_MIN) { cur = Math.min(cur, now - st.startedAt); st.dates = (st.dates || 0) + 1; st.hotMs = (st.hotMs || 0) + cur; st.hotMax = Math.max(st.hotMax || 0, cur); }
+    var sum = { startedAt: st.startedAt, endedAt: now, dates: st.dates || 0, daters: (st.ids || []).length, hotMs: st.hotMs || 0, hotMax: st.hotMax || 0,
+      matches: state.matches.filter(function (m) { return m.ts >= st.startedAt && m.ts <= now; }).length,
+      questions: state.questions.filter(function (q) { return q.lastAsked >= st.startedAt && q.lastAsked <= now; }).length };
+    queue(function () { return state.db.collection("seats").doc("stream_" + st.startedAt).set(sum); });
+    queue(function () { return state.db.collection("seats").doc("stream").delete(); });
+    state.stream = null; state.remote.stream = null; renderStream();
+    state.streams = [Object.assign({ id: "stream_" + st.startedAt }, sum)].concat(state.streams.filter(function (y) { return y.id !== "stream_" + st.startedAt; })); renderStreams();
+    var b = $("sumBody"); b.textContent = ""; b.appendChild(sumGrid(sum)); $("sumModal").hidden = false;
+  };
+  $("sumClose").onclick = function () { $("sumModal").hidden = true; };
+
+  /* ---------- tabs ---------- */
+  var TABS = { d: ["tabD", "panelD"], q: ["tabQ", "panelQ"], m: ["tabM", "panelM"], p: ["tabP", "panelP"] };
+  function showTab(which) {
+    if (state.mode !== "host") return;
+    Object.keys(TABS).forEach(function (k) { var on = k === which; $(TABS[k][0]).setAttribute("aria-selected", on); $(TABS[k][1]).hidden = !on; });
+    try { sessionStorage.setItem("sd-tab", which); } catch (e) {}
+  }
+  Object.keys(TABS).forEach(function (k) { $(TABS[k][0]).onclick = function () { showTab(k); }; });
+  function applyMode() {
+    var m = state.mode;
+    document.querySelectorAll(".host-only").forEach(function (e) { e.hidden = m !== "host"; });
+    document.querySelectorAll(".contrib-only").forEach(function (e) { e.hidden = m === "viewer"; });
+    $("tabs").hidden = m !== "host";
+    if (m === "host") { var t0 = "d"; try { t0 = sessionStorage.getItem("sd-tab") || "d"; } catch (e) {} showTab(TABS[t0] ? t0 : "d"); }
+    else { $("panelD").hidden = true; $("panelM").hidden = true; $("panelP").hidden = true; $("panelQ").hidden = m === "viewer"; }
+    var note = $("modeNote");
+    if (m === "host") note.hidden = true;
+    else {
+      note.hidden = false;
+      note.textContent = (m === "limited" ? "Limited access: you can add and ask questions. Hosts control the seats." : "View only: you can watch the board.") + " Expecting host controls? Ask Kim to invite this email as an Editor and to turn off \"Anyone with the link\", then reload.";
+    }
+  }
+
+  function renderAll() { renderStage(); renderDaters(); renderQuestions(); renderMatches(); renderStream(); renderStreams(); }
+
+  /* ---------- boot ---------- */
+  function snapDocs(snap) { return snap.docs.map(function (d) { var o = Object.assign({}, d.data() || {}); o.id = d.id; return o; }); }
+  function gate(msg, pill) { $("role").textContent = pill; $("gateMsg").textContent = msg; $("gate").hidden = false; $("app").hidden = true; }
+  function start() {
+    if (!window.claude || !window.claude.use) { gate("Open this page from your Claude app to use it.", "Offline"); return; }
+    Promise.all([window.claude.use("db"), window.claude.use("user")]).then(function (r) {
+      var db = r[0], user = r[1];
+      if (!db) { gate("Sign in to Claude to use the host console.", "Signed out"); return; }
+      (user ? user.canEdit() : Promise.resolve(false)).then(function (isAdmin) {
+        if (isAdmin) return "host";
+        return (user && user.can ? user.can("data.write") : Promise.resolve(null)).then(function (cw) { return cw === false ? "viewer" : "limited"; });
+      }).then(function (mode) {
+        state.mode = mode; state.db = db;
+        $("role").textContent = mode === "host" ? "Host view" : mode === "limited" ? "Limited view" : "View only";
+        $("gate").hidden = true; $("app").hidden = false; applyMode();
+        if (mode === "host") {
+          db.collection("daters").onSnapshot(function (s) { state.daters = snapDocs(s); state.gotDaters = true; renderAll(); syncViews(); }, function () {});
+          db.collection("matches").onSnapshot(function (s) { state.matches = snapDocs(s); renderMatches(); }, function () {});
+        }
+        if (mode !== "viewer") db.collection("questions").onSnapshot(function (s) { state.questions = snapDocs(s); renderQuestions(); }, function () {});
+        db.collection("seats").onSnapshot(function (s) {
+          var m = {}, v = {}, u = {}, sn = {}, docs = {};
+          SEATS.forEach(function (k) { docs[k] = emptySig(k); });
+          var strm = null, past = [];
+          s.docs.forEach(function (d) { var x = d.data() || {}; if (d.id === "stream") { if (x.running) strm = x; return; } if (d.id.indexOf("stream_") === 0) { past.push(Object.assign({}, x, { id: d.id })); return; } if (x.dater) m[d.id] = x.dater; if (x.view) v[d.id] = x.view; if (x.unlocked) u[d.id] = true; if (x.since) sn[d.id] = x.since; docs[d.id] = stable(docFor(d.id, x.dater, x.view, x.unlocked, x.since)); });
+          state.remote.seats = m; state.remote.views = v; state.remote.unlocked = u; state.remote.since = sn; state.remote.docs = docs; state.remote.stream = strm; state.streams = past.sort(function (a, b) { return (b.startedAt || 0) - (a.startedAt || 0); }); state.gotSeats = true; applyRemote(); renderStreams();
+        }, function () {});
+        db.doc("game/question").onSnapshot(function (s) { var v = s.exists ? s.data() : null; state.remote.question = v && v.text ? { text: v.text, handle: v.handle || "", qid: v.qid || "" } : null; state.remote.hist = v && Array.isArray(v.hist) ? v.hist : []; applyRemote(); }, function () {});
+        renderAll();
+      });
+    });
+  }
+  if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(start); else start();
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,160 @@
+Test results 2026-11-10T23:25:30.391Z
+
+
+== Import script and export endpoint (round trip)
+PASS  import with a wrong key is refused
+PASS  import script succeeds and its own count check passes
+PASS  running the import twice is safe (same counts)
+PASS  --replace without --yes refuses to erase anything
+PASS  Editor can download the export (one JSON file, attachment)
+PASS  daters: 230 records come back identical (ids and every field)
+PASS  questions: 500 records come back identical (ids and every field)
+PASS  matches: 4 records come back identical (ids and every field)
+PASS  streams: 6 records come back identical (ids and every field)
+PASS  game question and history come back identical
+PASS  Contributor cannot download the export (403)
+PASS  Viewer cannot download the export (403)
+PASS  export with no login is refused (401)
+PASS  export with a forged token is refused (401)
+
+== Google sign-in verification (forged and wrong tokens)
+PASS  genuine Editor token logs in with role editor
+PASS  genuine Contributor token gets role contributor
+PASS  genuine Viewer token gets role viewer
+PASS  email not on the list gets no access (403, default role none)
+PASS  token signed with the wrong private key is rejected
+PASS  token for a different Google client ID is rejected
+PASS  expired token is rejected
+PASS  unverified email is rejected
+PASS  wrong issuer is rejected
+PASS  unknown signing key id is rejected
+PASS  algorithm 'none' is rejected
+PASS  HS256 key-confusion attempt is rejected
+PASS  genuine signature with the email swapped to an Editor is rejected
+PASS  garbage credential is rejected
+PASS  missing credential is rejected
+
+== WebSocket door: origin and session checks
+PASS  no token: refused
+PASS  random token: refused (401)
+PASS  session signed with a different secret: refused (401)
+PASS  genuine signature but expired session: refused (401)
+PASS  valid session for an email not on the list: refused (403)
+PASS  wrong Origin: refused (403)
+PASS  missing Origin: refused (403)
+PASS  viewer session with the payload edited to an Editor email: refused (401)
+PASS  genuine Editor session from the right Origin connects
+PASS  server tells the page its role (editor)
+
+== Server-side rules by role (read and write)
+PASS  Editor can read daters
+PASS  Editor can read matches
+PASS  Editor can read seats
+PASS  Editor can read game
+PASS  Editor can read questions
+PASS  contributor can NOT read daters
+PASS  contributor can NOT read matches
+PASS  contributor can read seats
+PASS  contributor can read game
+PASS  contributor can read questions
+PASS  viewer can NOT read daters
+PASS  viewer can NOT read matches
+PASS  viewer can read seats
+PASS  viewer can read game
+PASS  viewer can read questions
+PASS  Editor can add a dater
+PASS  Editor can add a match
+PASS  Editor can set seat 'hot'
+PASS  Editor can set game/question
+PASS  Editor can add a question
+PASS  Contributor can add a question
+PASS  Contributor can mark a question asked (askCount + lastAsked)
+PASS  Contributor can change the current question (game/question)
+PASS  Contributor can NOT seat daters (seats)
+PASS  Contributor can NOT add a dater
+PASS  Contributor can NOT edit or delete a dater
+PASS  Contributor can NOT touch matches
+PASS  Viewer can NOT write daters (set)
+PASS  Viewer can NOT write matches (set)
+PASS  Viewer can NOT write seats (set)
+PASS  Viewer can NOT write game (set)
+PASS  Viewer can NOT write questions (set)
+PASS  Viewer can NOT add or delete
+PASS  the viewer's and contributor's rejected writes changed nothing
+
+== Server-side input checks
+PASS  unknown collection (write) is rejected
+PASS  unknown collection (read) is rejected
+PASS  seat id that is not a real seat is rejected
+PASS  game doc other than 'question' is rejected
+PASS  add() on seats is rejected
+PASS  path tricks in a document id are rejected
+PASS  very long document id is rejected
+PASS  oversized document (40 KB) is rejected
+PASS  bad field names are rejected
+PASS  __proto__ field is rejected
+PASS  a document that is not an object is rejected
+PASS  update of a missing document fails (not-found)
+PASS  unknown operation is rejected
+PASS  update can delete a field (db.deleteField)
+PASS  malformed JSON gets an error, connection survives
+
+== Limited users never receive dater data
+PASS  subscribing to daters is denied for a Contributor
+PASS  no dater or match changes are pushed to a Contributor
+PASS  subscribing to daters is denied for a Viewer
+
+== Rate limit, message size, idle wake-up
+PASS  a flood of 600 messages is answered 'slow down' (rate limit)
+PASS  ...and a connection that keeps flooding is closed (4429)
+PASS  a smaller burst of 260 is partly slowed down but not disconnected
+PASS  after calming down the same connection works again
+PASS  a message over 64 KB closes the connection (1009)
+PASS  a binary message closes the connection (1003)
+PASS  after 13 s idle (object hibernated) the connection still works
+PASS  ...and other users still get the change after the wake-up
+PASS  session refresh returns a new token
+PASS  an open connection accepts the refreshed session
+
+== Browser: three roles, live sync, reconnect
+PASS  Editor page opens in Host view
+PASS  second Editor page opens in Host view
+PASS  Contributor page opens in Limited view
+PASS  Viewer page opens in View only
+PASS  Editor sees the imported daters
+PASS  both Editors see the same dater count
+PASS  Contributor sees no Daters, Match log or Past streams panels and no tabs
+PASS  Contributor has Random question; Viewer does not
+PASS  Viewer sees no Questions panel
+PASS  Contributor page subscribes to 3 feeds only (no daters, no matches)
+PASS  Viewer page subscribes to 2 feeds only (seats and game)
+PASS  Editor page subscribes to 5 feeds
+PASS  Editor A adds a dater: Editor B sees it live
+PASS  ...and B's dater count went up by one
+PASS  Editor B seats that dater: Editor A sees them on the board live
+PASS  ...and the Contributor sees the seated dater on the board (display snapshot)
+PASS  ...and the Viewer sees it too
+PASS  Editor B moves them to the hot seat: Editor A sees it
+PASS  Editor A clears all seats: Editor B's board empties
+PASS  ...and so does the Viewer's
+PASS  Contributor presses Random question and gets a question
+PASS  Editor A sees the same question live
+PASS  Viewer sees the same question live
+PASS  the question's askCount and lastAsked were saved on the server
+PASS  Contributor 'Back' restores the question that was cleared, for everyone
+PASS  Contributor has the Questions panel
+PASS  Contributor adds a question: the Editor's question total goes up by one, live
+PASS  ...and the new question exists on the server
+PASS  Editor page through the test proxy is live
+PASS  connection loss is noticed and the page says so
+PASS  a write while offline fails fast with the page's normal 'Could not save' message
+PASS  ...and the page's question snaps back to the last known server state (no half-applied change)
+PASS  stale screen: still showing the old question while offline
+PASS  page reconnects by itself and re-syncs the question
+PASS  ...and re-syncs the question list (includes the one added during the outage)
+PASS  the page announced 'online' after resync
+PASS  writes work again after the reconnect
+PASS  5 abrupt drops in a row: the page reconnected every time
+PASS  no JavaScript errors on any page during the whole run
+
+140 passed, 0 failed, 140 total

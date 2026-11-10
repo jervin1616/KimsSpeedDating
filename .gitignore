@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+.dev.vars
+.env
+# Personal data (dater names and handles). Never commit.
+data/
+*.backup.json
+speed-dating-backup-*.json

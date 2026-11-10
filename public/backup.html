@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kim's Speed Dating backup</title>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;padding:24px 16px;background:#12030a;color:#fff1f4;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  h1{font-size:22px;margin:0}
+  p{margin:0;color:#c99aa8}
+  button{font:inherit;color:#1a0510;background:#ff4f9a;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #msg{color:#fff1f4;min-height:1.4em}
+</style></head><body><main>
+  <h1>Download a backup</h1>
+  <p>Editors only. This saves every dater, question, match, seat and past stream as one JSON file.</p>
+  <div id="gsi"></div>
+  <button id="dl" hidden>Download backup</button>
+  <p id="msg" role="status"></p>
+</main>
+<script src="/db-shim.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function ready() {
+    window.claude.use("user").then(function (u) {
+      if (!u) return needSignIn();
+      return u.canEdit().then(function (ok) {
+        if (!ok) { $("msg").textContent = "This account is not an Editor, so it cannot download backups."; return; }
+        $("gsi").textContent = ""; $("dl").hidden = false; $("msg").textContent = "Signed in as " + window.claude.status().email + ".";
+      });
+    });
+  }
+  function needSignIn() {
+    var st = window.claude.status();
+    $("msg").textContent = st.noAccess ? "This Google account (" + st.email + ") is not on the list." : "Sign in with Google to continue.";
+    window.claude.signIn($("gsi"), function (r) { if (r.error) $("msg").textContent = r.error; else ready(); });
+  }
+  $("dl").onclick = function () {
+    $("dl").disabled = true; $("msg").textContent = "Preparing the file...";
+    window.claude.authFetch("/api/export").then(function (r) {
+      if (!r.ok) throw new Error("The server said no (" + r.status + ").");
+      return r.blob();
+    }).then(function (b) {
+      var a = document.createElement("a"); a.href = URL.createObjectURL(b);
+      a.download = "speed-dating-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+      document.body.appendChild(a); a.click(); a.remove();
+      $("msg").textContent = "Done. Keep the file somewhere private: it contains your daters' names.";
+    }).catch(function (e) { $("msg").textContent = "Download failed: " + e.message; }).then(function () { $("dl").disabled = false; });
+  };
+  ready();
+})();
+</script></body></html>

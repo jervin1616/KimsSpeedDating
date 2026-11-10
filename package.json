@@ -1,0 +1,16 @@
+{
+  "name": "kims-speed-dating",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "import": "node scripts/import.mjs",
+    "test": "node test/run.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.160.0",
+    "ws": "^8.18.0"
+  }
+}
