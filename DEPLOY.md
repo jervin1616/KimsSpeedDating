@@ -306,6 +306,13 @@ npx wrangler secret put ROLES
 
 ---
 
+## Tips for hosts using the console
+
+- **Seating:** tap an empty heart to open a picker. It lists the newest daters first, with search. For a panel seat the best fits (green) come first. Tap someone to seat them in the heart you tapped. **Add new dater** inside the picker opens the form, and when you save, the new dater goes straight into that seat. The Panel and Hot seat buttons on each dater still work.
+- **Adding daters:** the form is hidden until you tap **+ Add dater**. Edit and Remove are under **More** on each dater.
+- **Question bar:** when the question card is scrolled out of view (most phones, and short laptop screens), a bar pinned to the bottom shows the current question with **Random question** and **Back**. It hides itself when the real card is visible.
+- **Connection dot:** a small green dot by the role label means you are live. If the connection drops it turns amber and says Reconnecting, then red and says Offline after 10 seconds. It fixes itself when the network returns.
+
 ## Signing out
 
 Everyone has a **Sign out** pill at the top of the console (and a button on the access and backup pages). It asks first, then signs that one browser out and clears its saved login.

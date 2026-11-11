@@ -470,8 +470,8 @@ try {
   /* ===== browser ===== */
   group("Browser: three roles, live sync, reconnect");
   browser = await chromium.launch();
-  const mkPage = async (session, base = BASE, path = "/") => {
-    const ctx = await browser.newContext({ viewport: { width: 1100, height: 1300 } });
+  const mkPage = async (session, base = BASE, path = "/", viewport = { width: 1100, height: 1300 }) => {
+    const ctx = await browser.newContext({ viewport });
     await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
     await ctx.addInitScript(([k, v]) => { try { if (!sessionStorage.getItem("__seeded")) { localStorage.setItem(k, v); sessionStorage.setItem("__seeded", "1"); } } catch (e) { /* ignore */ } window.__ev = []; window.addEventListener("claude-conn", (e) => window.__ev.push(e.detail.state)); }, ["sd.session.v1", JSON.stringify(session)]);
     const page = await ctx.newPage();
@@ -501,11 +501,29 @@ try {
   check("Editor page subscribes to 5 feeds", (await subsOf(A)) === 5, await subsOf(A));
 
   // two Editors, both directions
+  check("the add-dater form starts collapsed behind an Add dater button", await A.locator("#dForm").isHidden() && (await A.locator("#addToggle").textContent()) === "+ Add dater");
+  await A.click("#addToggle");
+  check("tapping Add dater opens the form and the button becomes Close", await A.locator("#dForm").isVisible() && (await A.locator("#addToggle").textContent()) === "Close");
   await A.fill("#fName", "SyncTest A"); await A.fill("#fAge", "30"); await A.fill("#fLoc", "NC");
   await A.selectOption("#fGender", "man"); await A.selectOption("#fSex", "straight");
   await A.fill("#fMin", "25"); await A.fill("#fMax", "35"); await A.check("#fAdult"); await A.click("#fSave");
+  check("after saving, the form closes again", await until(async () => await A.locator("#dForm").isHidden() && (await A.locator("#addToggle").textContent()) === "+ Add dater", 4000));
   check("Editor A adds a dater: Editor B sees it live", await until(async () => (await B.locator("#dList").innerText()).includes("SyncTest A"), 6000));
   check("...and B's dater count went up by one", await until(async () => Number(await text(B, "#daterCount")) === nDaters + 1));
+  const rowB = B.locator("#dList .row", { hasText: "SyncTest A" });
+  check("a dater row shows Panel, Hot seat and More, with Edit and Remove tucked away", await rowB.getByRole("button", { name: "Panel" }).isVisible() && await rowB.getByRole("button", { name: "Hot seat" }).isVisible() && await rowB.getByRole("button", { name: "More" }).isVisible() && (await rowB.getByRole("button", { name: "Edit" }).count()) === 0 && (await rowB.getByRole("button", { name: "Remove" }).count()) === 0);
+  await rowB.getByRole("button", { name: "More" }).click();
+  check("More reveals Edit and Remove", await rowB.getByRole("button", { name: "Edit" }).isVisible() && await rowB.getByRole("button", { name: "Remove" }).isVisible());
+  await rowB.getByRole("button", { name: "Remove" }).click();
+  check("Remove still asks 'Confirm remove / Keep' first", await rowB.getByRole("button", { name: "Confirm remove" }).isVisible() && await rowB.getByRole("button", { name: "Keep" }).isVisible());
+  await rowB.getByRole("button", { name: "Keep" }).click();
+  check("Keep leaves the dater in place", (await B.locator("#dList").innerText()).includes("SyncTest A"));
+  const delWs = await connect(sessions.editorB); const delAck = await delWs.w("add", "daters", null, { ...dataFor.daters, name: "DeleteMe Dater" });
+  await until(async () => (await B.locator("#dList").innerText()).includes("DeleteMe Dater"), 5000);
+  const delRow = B.locator("#dList .row", { hasText: "DeleteMe Dater" });
+  await delRow.getByRole("button", { name: "More" }).click(); await delRow.getByRole("button", { name: "Remove" }).click(); await delRow.getByRole("button", { name: "Confirm remove" }).click();
+  check("More, Remove, Confirm really deletes the dater (here and on the server)", await until(async () => !(await B.locator("#dList").innerText()).includes("DeleteMe Dater"), 5000) && !(await delWs.sub("daters")).docs.some((d) => d.id === delAck.id));
+  delWs.close();
   await B.locator("#dList .row", { hasText: "SyncTest A" }).getByRole("button", { name: "Panel" }).click();
   check("Editor B seats that dater: Editor A sees them on the board live", await until(async () => (await text(A, "#rTop")).includes("SyncTest A"), 6000));
   check("...and the Contributor sees the seated dater on the board (display snapshot)", await until(async () => (await text(K, "#rTop")).includes("SyncTest A"), 6000));
@@ -516,6 +534,58 @@ try {
   await A.getByRole("button", { name: "Clear all seats" }).click(); await A.click("#clearYes");
   check("Editor A clears all seats: Editor B's board empties", await until(async () => !(await text(B, "#rHot")).includes("SyncTest A") && !(await text(B, "#rTop")).includes("SyncTest A"), 6000));
   check("...and so does the Viewer's", await until(async () => !(await text(V, "#rTop")).includes("SyncTest A"), 6000));
+
+  // seat picker
+  const pw = await connect(sessions.editorA); const dsnap = await pw.sub("daters");
+  const newest = [...dsnap.docs].sort((x, y) => (y.data.ts || 0) - (x.data.ts || 0))[0].data.name;
+  await A.locator("#rTop .heart").nth(0).click();
+  check("tapping an empty seat opens the picker, titled with that seat", await until(async () => await A.locator("#pickModal").isVisible(), 4000) && /Seat 1/.test(await text(A, "#pickTitle")), await text(A, "#pickTitle"));
+  const firstRowText = await A.locator("#pickList .pickrow").first().innerText();
+  check("with no hot seat the newest dater (whoever joined last) is on top", firstRowText.includes(newest), { newest, firstRowText });
+  await A.fill("#pickSearch", newest.slice(0, 5).toLowerCase());
+  check("typing in the search box narrows the list", (await A.locator("#pickList .pickrow").count()) >= 1 && (await A.locator("#pickList .pickrow").count()) < 30);
+  await A.fill("#pickSearch", "");
+  await A.locator("#pickList .pickrow").first().click();
+  check("picking someone closes the picker and puts them in the seat that was tapped", await until(async () => await A.locator("#pickModal").isHidden() && (await text(A, "#rTop .heart:nth-child(1)")).includes(newest), 5000));
+  check("...and the other Editor sees them there live", await until(async () => (await text(B, "#rTop")).includes(newest), 5000));
+  await A.locator("#rHot .heart").click();
+  check("tapping the empty hot seat opens the picker for the hot seat", await until(async () => /Hot seat/.test(await text(A, "#pickTitle")), 4000));
+  const hotRows = await A.locator("#pickList .pickrow .t").allInnerTexts();
+  check("the hot seat list is newest first (no fit ordering)", hotRows.length > 10 && !(await A.locator("#pickList .pickrow[data-fit]").count()), hotRows.slice(0, 3));
+  await A.locator("#pickList .pickrow").nth(1).click();
+  check("picking someone for the hot seat seats them there", await until(async () => await A.locator("#pickModal").isHidden() && (await text(A, "#rHot")).length > 40 && !(await text(A, "#rHot .heart")).includes("Empty"), 5000));
+  await A.locator("#rMid .heart").nth(0).click();
+  await until(async () => await A.locator("#pickModal").isVisible(), 4000);
+  const ranks = await A.locator("#pickList .pickrow[data-fit]").evaluateAll((els) => els.map((e) => ({ mutual: 0, close: 1, nofit: 2 })[e.getAttribute("data-fit")]));
+  check("for a panel seat the list puts the best fits first (green, then yellow, then red)", ranks.length > 5 && ranks.every((r, i) => i === 0 || r >= ranks[i - 1]) && ranks[0] === 0, ranks.slice(0, 12));
+  check("each row shows its fit (label) so you can tell at a glance", /Fits both|Off by|Mismatch/.test(await A.locator("#pickList .pickrow[data-fit]").first().innerText()));
+  const bestName = (await A.locator("#pickList .pickrow .t").first().innerText()).split(",")[0];
+  await A.locator("#pickList .pickrow").first().click();
+  check("a panel pick lands in the seat that was tapped (Seat 4), not the first empty one", await until(async () => (await text(A, "#rMid .heart:nth-child(1)")).includes(bestName), 5000), bestName);
+  await A.locator("#rTop .heart").nth(1).click();
+  await until(async () => await A.locator("#pickModal").isVisible(), 4000);
+  await A.click("#pickAdd");
+  check("Add new dater from the picker closes it and opens the form", await A.locator("#pickModal").isHidden() && await A.locator("#dForm").isVisible());
+  await A.fill("#fName", "PickerNew"); await A.fill("#fAge", "28"); await A.fill("#fLoc", "NC");
+  await A.selectOption("#fGender", "woman"); await A.selectOption("#fSex", "straight");
+  await A.fill("#fMin", "24"); await A.fill("#fMax", "40"); await A.check("#fAdult"); await A.click("#fSave");
+  check("a dater added from the picker goes straight into that seat (Seat 2)", await until(async () => (await text(A, "#rTop .heart:nth-child(2)")).includes("PickerNew"), 7000), await text(A, "#rTop"));
+  check("...and is saved on the server and visible to the other Editor", (await pw.sub("daters")).docs.some((d) => d.data.name === "PickerNew") && await until(async () => (await text(B, "#rTop")).includes("PickerNew"), 5000));
+  await A.locator("#rTop .heart").nth(0).click(); await sleep(300);
+  check("tapping a seat that already has someone does not open the picker (select, swap and Remove still work)", await A.locator("#pickModal").isHidden() && await A.getByRole("button", { name: "Remove from seat" }).isVisible());
+  await A.locator("#rTop .heart").nth(0).click(); // deselect
+  await A.locator("#rTop .heart").nth(2).click();
+  await until(async () => await A.locator("#pickModal").isVisible(), 4000);
+  await A.keyboard.press("Escape");
+  check("Escape closes the picker without choosing anyone", await until(async () => await A.locator("#pickModal").isHidden(), 3000));
+  await A.locator("#rTop .heart").nth(2).click(); // deselect seat 3
+  await K.locator("#rTop .heart").nth(2).click({ force: true }); await sleep(300);
+  check("Contributors and Viewers cannot open the picker (hearts are read only for them)", await K.locator("#pickModal").isHidden());
+  for (const loc of ['#rTop .heart:nth-child(1)', '#rTop .heart:nth-child(2)', '#rMid .heart:nth-child(1)', '#rHot .heart']) {
+    await A.locator(loc).click(); await A.getByRole("button", { name: "Remove from seat" }).click(); await sleep(250);
+  }
+  check("seats cleaned up by removing each dater from their seat", await until(async () => !(await text(B, "#rTop")).includes("PickerNew") && !(await text(B, "#rMid")).includes(bestName), 5000));
+  pw.close();
 
   // Contributor asks and randomizes questions
   const q0 = await text(A, "#qtext");
@@ -535,6 +605,31 @@ try {
   await K.locator("#qIn").fill("Added by a mod live?"); await K.click("#qSend");
   check("Contributor adds a question: the Editor's question total goes up by one, live", await until(async () => Number(/(\d+) total/i.exec(await text(A, "#totalCount"))[1]) === totalA0 + 1, 5000), totalA0);
   check("...and the new question exists on the server", !!(await until(async () => (await viaWs.sub("questions")).docs.some((d) => d.data.text === "Added by a mod live?"), 4000)));
+
+  // connection pill, tabs and pinned bar
+  check("every role sees the connection pill saying Live", (await Promise.all([A, B, K, V].map(async (p) => (await p.locator("#connPill").isVisible()) && (await p.locator("#connTxt").textContent()) === "Live" && (await p.locator("#connPill").getAttribute("data-state")) === "live"))).every(Boolean));
+  const PH = await mkPage(sessions.editorA, BASE, "/", { width: 390, height: 844 });
+  await until(async () => (await roleOf(PH)) === "Host view");
+  const tabTops = await PH.evaluate(() => [...document.querySelectorAll("#tabs .tab")].map((t) => Math.round(t.getBoundingClientRect().top)));
+  check("on a phone all four tabs fit on one row", tabTops.length === 4 && new Set(tabTops).size === 1, tabTops);
+  check("on a phone the page does not scroll sideways", !(await PH.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)));
+  check("on a phone the question is below the fold, so the pinned bar shows", await until(async () => await PH.locator("#liveBar").isVisible(), 4000));
+  const qPhone0 = await text(PH, "#qtext");
+  await PH.click("#lbRandom");
+  check("Random question from the pinned bar works like the main button", await until(async () => { const t = await text(PH, "#qtext"); return t !== qPhone0 && t !== "No question picked yet." ? t : false; }, 5000));
+  check("the bar shows the current question", await until(async () => (await text(PH, "#lbQ")) === (await text(PH, "#qtext")), 3000));
+  await PH.locator("#qtext").scrollIntoViewIfNeeded();
+  check("the pinned bar hides itself when the real question card is on screen", await until(async () => await PH.locator("#liveBar").isHidden(), 4000));
+  const VP = await mkPage(sessions.viewer, BASE, "/", { width: 390, height: 844 });
+  await until(async () => (await roleOf(VP)) === "View only"); await sleep(500);
+  check("Viewers never get the pinned bar", await VP.locator("#liveBar").isHidden());
+  const KP = await mkPage(sessions.contributor, BASE, "/", { width: 390, height: 844 });
+  check("Contributors get the pinned bar on a phone", await until(async () => await KP.locator("#liveBar").isVisible(), 5000));
+  await PH.locator("#rTop .heart").nth(2).scrollIntoViewIfNeeded();
+  await PH.locator("#rTop .heart").nth(2).click(); await sleep(400);
+  const box = await PH.locator("#pickModal .card").boundingBox();
+  check("on a phone the picker fits the screen and does not scroll sideways", box && box.y >= 0 && box.y + box.height <= 844 && box.x >= 0 && box.x + box.width <= 390 && !(await PH.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), box);
+  await PH.keyboard.press("Escape"); await PH.locator("#rTop .heart").nth(2).click();
 
   // sign out
   check("every signed-in role sees a Sign out button", (await Promise.all([A, B, K, V].map((p) => p.locator("#signOut").isVisible()))).every(Boolean));
@@ -601,7 +696,10 @@ try {
   check("a write while offline fails fast with the page's normal 'Could not save' message", await until(async () => (await text(P, "#toast")).includes("Could not save"), 6000), await text(P, "#toast"));
   check("...and the page's question snaps back to the last known server state (no half-applied change)", await until(async () => (await text(P, "#qtext")) !== "" , 3000));
   check("stale screen: still showing the old question while offline", (await text(P, "#qtext")) !== "Changed during the outage");
+  check("while reconnecting the pill says Reconnecting (amber)", await until(async () => (await P.locator("#connTxt").textContent()) === "Reconnecting", 5000), await P.locator("#connTxt").textContent());
+  check("after 10 seconds without a connection the pill turns red and says Offline", await until(async () => (await P.locator("#connTxt").textContent()) === "Offline" && (await P.locator("#connPill").getAttribute("data-state")) === "offline", 14000), await P.locator("#connTxt").textContent());
   proxy.restore();
+  check("the pill goes back to Live after reconnecting", await until(async () => (await P.locator("#connTxt").textContent()) === "Live", 25000));
   check("page reconnects by itself and re-syncs the question", await until(async () => (await text(P, "#qtext")) === "Changed during the outage", 25000), await text(P, "#qtext"));
   check("...and re-syncs the question list (includes the one added during the outage)", await until(async () => Number(/(\d+) total/i.exec(await text(P, "#totalCount"))[1]) >= totalBefore + 1, 8000));
   check("the page announced 'online' after resync", (await P.evaluate(() => window.__ev)).includes("online"), await P.evaluate(() => window.__ev));
@@ -617,7 +715,7 @@ try {
   check("5 abrupt drops in a row: the page reconnected every time", okDrops === 5, okDrops);
   viaWs.close();
 
-  const errs = [A, B, K, V, P, AD, ADE, ADK].flatMap((p) => p.errors);
+  const errs = [A, B, K, V, P, AD, ADE, ADK, PH, VP, KP].flatMap((p) => p.errors);
   check("no JavaScript errors on any page during the whole run", errs.length === 0, errs);
 } catch (e) {
   console.error(e);

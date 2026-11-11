@@ -158,6 +158,19 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
 
 .tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .tab { border-radius: 999px; }
+@media (max-width: 560px) { .tabs { flex-wrap: nowrap; gap: 6px; } .tab { padding: 8px 10px; font-size: 14px; white-space: nowrap; } }
+.cd { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--close); }
+#connPill[data-state="live"] .cd { background: var(--mutual); }
+#connPill { position: relative; }
+/* quiet when all is well: just the green dot. The word appears only when something is wrong. */
+#connPill[data-state="live"] { padding: 5px 9px; }
+#connPill[data-state="live"] .cd { margin-right: 0; }
+#connPill[data-state="live"] #connTxt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#connPill[data-state="offline"] .cd { background: var(--nofit); }
+.livebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; display: flex; gap: 8px; align-items: center; padding: 8px max(16px, calc((100vw - 980px) / 2)) calc(8px + env(safe-area-inset-bottom, 0px)); background: #1a0610; border-top: 1px solid var(--line); }
+.livebar .lbq { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+body.has-bar { padding-bottom: 96px; }
+body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 .tab[aria-selected="true"] { background: var(--pink); color: #1a0510; border-color: var(--pink); font-weight: 700; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .panel h2 { margin: 0; font-size: 18px; }
@@ -178,6 +191,14 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
 .row .m { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .row .racts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .row.seated { border-color: var(--pink); }
+.pickrow { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #1a0610; min-height: 52px; }
+.pickrow:hover { border-color: var(--pink); }
+.pickrow .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.pickrow .dot.mutual { background: var(--mutual); } .pickrow .dot.close { background: var(--close); } .pickrow .dot.nofit { background: var(--nofit); }
+.pickrow .t { font-weight: 600; overflow-wrap: anywhere; }
+.pickrow .m { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.pickrow .tag { font-size: 12px; color: var(--muted); text-align: right; }
+.pickrow.here { opacity: .65; }
 .row.nodot { grid-template-columns: minmax(0, 1fr) auto; }
 .empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
 .note { color: var(--muted); font-size: 13px; margin: 0; }
@@ -198,6 +219,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
       <h1>Kim's Speed Dating</h1>
     </div>
     <span class="pill" id="role">Loading</span>
+    <span class="pill" id="connPill" data-state="connecting" hidden><i class="cd"></i><span id="connTxt">Connecting</span></span>
     <a class="pill" id="signOut" href="#" role="button" style="text-decoration:none" hidden>Sign out</a>
     <a class="pill" id="adminLink" href="/admin.html" target="_blank" rel="noopener" style="text-decoration:none" hidden>Admin</a>
   </header>
@@ -233,7 +255,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
       <div class="legend">
         <span style="--c:var(--mutual)">Both fit</span>
         <span style="--c:var(--close)">Off by 1 to 2 years</span>
-        <span style="--c:var(--nofit)">Off by 3 or more, or not looking for each other's gender</span>
+        <span style="--c:var(--nofit)">Off by 3 or more years, or a mismatch</span>
       </div>
       <div class="bar host-only" id="bar"></div>
       <div class="qbox">
@@ -270,8 +292,11 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     </div>
 
     <section class="panel" id="panelD" role="tabpanel" aria-labelledby="tabD">
-      <h2>Speed daters <span class="pill" id="daterCount">0</span></h2>
-      <form id="dForm" class="subform">
+      <div class="toolbar" style="justify-content:space-between">
+        <h2>Speed daters <span class="pill" id="daterCount">0</span></h2>
+        <button class="primary small" id="addToggle" type="button" aria-controls="dForm" aria-expanded="false">+ Add dater</button>
+      </div>
+      <form id="dForm" class="subform" hidden>
         <div class="grid-form">
           <label>Name or handle<input id="fName" maxlength="40" required autocomplete="off" placeholder="First name or @handle"></label>
           <label>Age<input id="fAge" type="number" min="18" max="99" required inputmode="numeric"></label>
@@ -358,12 +383,25 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     </section>
   </div>
 </div>
+<div class="modal" id="pickModal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+    <h2 id="pickTitle">Choose someone</h2>
+    <input id="pickSearch" type="search" placeholder="Search name or location" aria-label="Search daters" autocomplete="off">
+    <div class="list scroll" id="pickList"></div>
+    <div class="toolbar"><button class="primary small" id="pickAdd" type="button">+ Add new dater</button><button class="ghost small" id="pickClose" type="button">Close</button></div>
+  </div>
+</div>
 <div class="modal" id="sumModal" hidden>
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="sumTitle">
     <h2 id="sumTitle">Stream summary</h2>
     <div id="sumBody"></div>
     <button class="primary" id="sumClose" type="button">Close</button>
   </div>
+</div>
+<div class="livebar" id="liveBar" hidden>
+  <span class="lbq" id="lbQ"></span>
+  <button class="ghost small" id="lbBack" type="button" hidden>Back</button>
+  <button class="primary small" id="lbRandom" type="button">Random question</button>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -497,7 +535,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     var s = seatsNow(), key = state.selected;
     if (!key) {
       bar.appendChild(el("div", "ttl", "Tap a heart to choose a seat"));
-      bar.appendChild(el("div", "det", "Then tap Panel or Hot seat on a dater below. Panel fills the next empty seat, Seat 1 first."));
+      bar.appendChild(el("div", "det", "Then tap Panel or Hot seat on a dater below."));
       return;
     }
     var d = byId(s[key]), hot = byId(s.hot);
@@ -548,6 +586,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     $("qtext").textContent = q && q.text ? q.text : "No question picked yet.";
     $("qby").textContent = q && q.text ? (q.handle ? "Asked by " + q.handle : "") : "";
     $("clearQ").hidden = !(state.mode === "host" && q && q.text); $("backQ").hidden = !(state.mode !== "viewer" && state.hist.length);
+    $("lbQ").textContent = $("qtext").textContent; $("lbBack").hidden = $("backQ").hidden;
   }
 
   /* ---------- daters list ---------- */
@@ -585,8 +624,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
       var acts = el("div", "racts");
       var pan = el("button", "small" + (sk && sk !== "hot" ? " ghost" : ""), "Panel"); pan.onclick = function () { seatDater(d, "panel"); }; acts.appendChild(pan);
       var hs = el("button", "small" + (sk === "hot" ? " ghost" : ""), "Hot seat"); hs.onclick = function () { seatDater(d, "hot"); }; acts.appendChild(hs);
-      var ed = el("button", "small ghost", "Edit"); ed.onclick = function () { startEdit(d); }; acts.appendChild(ed);
-      if (state.confirmDel === d.id) {
+      var open = state.moreFor === d.id || state.confirmDel === d.id;
+      var more = el("button", "small ghost", open ? "Less" : "More"); more.setAttribute("aria-expanded", open ? "true" : "false");
+      more.onclick = function () { state.moreFor = open ? null : d.id; state.confirmDel = null; renderDaters(); };
+      acts.appendChild(more);
+      if (open) { var ed = el("button", "small ghost", "Edit"); ed.onclick = function () { startEdit(d); }; acts.appendChild(ed); }
+      if (!open) { /* Edit and Remove stay out of the way until More is tapped */ } else if (state.confirmDel === d.id) {
         var yes = el("button", "small danger", "Confirm remove"); yes.onclick = function () { removeDater(d); };
         var no = el("button", "small ghost", "Keep"); no.onclick = function () { state.confirmDel = null; renderDaters(); };
         acts.appendChild(yes); acts.appendChild(no);
@@ -776,7 +819,11 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
       if (key !== "hot" && byId(s[key]) && !seatLocked(key)) { state.selected = null; logMatch(key); return; }
       renderStage(); toast("Match cancelled."); return;
     }
-    if (!sel || sel === key || (!s[sel] && !s[key])) { state.selected = sel === key ? null : key; renderStage(); renderDaters(); return; }
+    if (!sel || sel === key || (!s[sel] && !s[key])) {
+      state.selected = sel === key ? null : key; renderStage(); renderDaters();
+      if (state.selected === key && !s[key]) openPicker(key); // an empty seat opens the picker; select-then-Panel still works
+      return;
+    }
     var before = {}; SEATS.forEach(function (k) { before[k] = s[k]; });
     var a = s[sel], b = s[key]; s[sel] = b; s[key] = a;
     state.selected = null; commitSeats(s);
@@ -837,8 +884,10 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     ["fMinM", "fMaxM", "fMinW", "fMaxW"].forEach(function (id) { $(id).required = bi; });
   }
   $("fSex").addEventListener("change", syncRange);
+  function openForm() { $("dForm").hidden = false; $("addToggle").textContent = "Close"; $("addToggle").setAttribute("aria-expanded", "true"); }
+  function closeForm() { $("dForm").hidden = true; $("addToggle").textContent = "+ Add dater"; $("addToggle").setAttribute("aria-expanded", "false"); }
   function startEdit(d) {
-    state.editing = d.id;
+    state.editing = d.id; state.moreFor = null; openForm();
     $("fName").value = d.name; $("fAge").value = d.age; $("fLoc").value = d.location; $("fAdult").checked = true;
     $("fGender").value = d.gender || ""; $("fSex").value = d.sexuality || "";
     RNG.forEach(function (id) { $(id).value = ""; });
@@ -848,8 +897,9 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     $("fSave").textContent = "Save changes"; $("fCancel").hidden = false; $("fName").focus();
     $("dForm").scrollIntoView({ block: "center" });
   }
-  function resetForm() { state.editing = null; $("dForm").reset(); syncRange(); $("fSave").textContent = "Add dater"; $("fCancel").hidden = true; $("fErr").textContent = ""; }
+  function resetForm() { state.editing = null; state.seatAfterAdd = null; $("dForm").reset(); syncRange(); $("fSave").textContent = "Add dater"; $("fCancel").hidden = true; $("fErr").textContent = ""; closeForm(); }
   $("fCancel").onclick = resetForm;
+  $("addToggle").onclick = function () { if ($("dForm").hidden) { openForm(); $("fName").focus(); } else resetForm(); };
   function num(id) { return parseInt($(id).value, 10); }
   $("dForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -872,11 +922,18 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     else if (!$("fAdult").checked) err = "Confirm the dater is 18 or older.";
     else if (/\d{2,}.*\b(st|street|ave|avenue|road|rd|dr|drive|ln|lane|blvd)\b/i.test(loc)) err = "Use the state only, no city or street address.";
     $("fErr").textContent = err; if (err) return;
-    var id = state.editing, old = id ? byId(id) : null;
+    var id = state.editing, old = id ? byId(id) : null, seatKey = id ? null : state.seatAfterAdd, newRef = null;
     queue(function () {
       if (id) { body.ts = (old && old.ts) || Date.now(); if (old && old.example) body.example = true; if (old && old.panelMs) { body.panelMs = old.panelMs; body.panelCount = old.panelCount || 0; } if (old && old.hotMs) { body.hotMs = old.hotMs; body.hotCount = old.hotCount || 0; } return state.db.collection("daters").doc(id).set(body); }
-      body.ts = Date.now(); return state.db.collection("daters").add(body);
-    }).then(function () { toast(id ? "Dater updated." : "Dater added."); });
+      body.ts = Date.now(); return state.db.collection("daters").add(body).then(function (r) { newRef = r; });
+    }).then(function () {
+      toast(id ? "Dater updated." : "Dater added.");
+      var nd = seatKey && newRef && byId(newRef.id); // added from the seat picker: put them straight into that seat
+      if (nd && !seatsNow()[seatKey]) {
+        state.selected = seatKey === "hot" ? null : seatKey; seatDater(nd, seatKey === "hot" ? "hot" : "panel");
+        document.querySelector(".stage").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
     resetForm();
   });
 
@@ -973,6 +1030,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     $("myQBox").hidden = m !== "viewer";
     $("adminLink").hidden = !window.claude.status().owner; // owners only
     $("signOut").hidden = false;
+    $("connPill").hidden = false; showConn(window.claude.connection ? window.claude.connection() : "connecting"); syncBar();
     $("tabs").hidden = m !== "host";
     if (m === "host") { var t0 = "d"; try { t0 = sessionStorage.getItem("sd-tab") || "d"; } catch (e) {} showTab(TABS[t0] ? t0 : "d"); }
     else { $("panelD").hidden = true; $("panelM").hidden = true; $("panelP").hidden = true; $("panelQ").hidden = m === "viewer"; }
@@ -984,7 +1042,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     }
   }
 
-  function renderAll() { renderStage(); renderDaters(); renderQuestions(); renderMatches(); renderStream(); renderStreams(); }
+  function renderAll() { renderStage(); renderDaters(); renderQuestions(); renderMatches(); renderStream(); renderStreams(); if (!$("pickModal").hidden) renderPicker(); }
 
   /* ---------- private question picker (viewers only, writes nothing) ---------- */
   var myBag = [], myLast = null;
@@ -1009,6 +1067,71 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     window.claude.signOut();
     location.reload();
   };
+
+  /* ---------- seat picker (tap an empty seat) ---------- */
+  function openPicker(key) {
+    state.pickFor = key;
+    $("pickTitle").textContent = "Choose someone for " + LABEL[key];
+    $("pickSearch").value = ""; renderPicker(); $("pickModal").hidden = false;
+    setTimeout(function () { $("pickSearch").focus(); }, 0);
+  }
+  function closePicker() { $("pickModal").hidden = true; state.pickFor = null; }
+  function renderPicker() {
+    var key = state.pickFor; if (!key) return;
+    var s = seatsNow(), hot = byId(s.hot), q = $("pickSearch").value.trim().toLowerCase();
+    var useFit = key !== "hot" && !!hot, rank = { mutual: 0, close: 1, nofit: 2 };
+    var items = state.daters.filter(function (d) { return !q || (d.name + " " + d.location).toLowerCase().indexOf(q) >= 0; }).map(function (d) {
+      return { d: d, f: useFit && hot.id !== d.id ? fit(hot, d) : null };
+    });
+    items.sort(function (a, b) {
+      if (useFit) { var ra = a.f ? rank[a.f.key] : 3, rb = b.f ? rank[b.f.key] : 3; if (ra !== rb) return ra - rb; }
+      return (b.d.ts || 0) - (a.d.ts || 0); // whoever joined most recently first
+    });
+    var box = $("pickList"); box.textContent = "";
+    if (!items.length) { box.appendChild(el("div", "empty", state.daters.length ? "No daters match that search." : "No daters yet. Use Add new dater.")); return; }
+    var MAXROWS = 60;
+    items.slice(0, MAXROWS).forEach(function (it) {
+      var d = it.d, sk = seatOf(d.id);
+      var b = el("button", "pickrow" + (sk ? " here" : "")); b.type = "button";
+      if (it.f) b.setAttribute("data-fit", it.f.key);
+      var dot = el("span", "dot" + (it.f ? " " + it.f.key : "")); dot.setAttribute("aria-hidden", "true");
+      var main = el("div"); main.appendChild(el("div", "t", d.name + ", " + d.age));
+      main.appendChild(el("div", "m", [d.location, whoText(d), "wants " + rangeText(d)].filter(Boolean).join(" \u00b7 ")));
+      b.appendChild(dot); b.appendChild(main);
+      b.appendChild(el("span", "tag", sk ? "In " + LABEL[sk] : it.f ? it.f.label : ""));
+      b.onclick = function () { pickDater(d); };
+      box.appendChild(b);
+    });
+    if (items.length > MAXROWS) box.appendChild(el("div", "note", "Showing " + MAXROWS + " of " + items.length + ". Type to search."));
+  }
+  function pickDater(d) {
+    var key = state.pickFor; closePicker();
+    state.selected = key === "hot" ? null : key; // panel-type seats are filled through the selected seat
+    seatDater(d, key === "hot" ? "hot" : "panel");
+  }
+  $("pickSearch").oninput = renderPicker;
+  $("pickClose").onclick = closePicker;
+  $("pickAdd").onclick = function () {
+    var k = state.pickFor; closePicker(); showTab("d"); openForm(); state.seatAfterAdd = k;
+    $("fName").focus(); $("dForm").scrollIntoView({ block: "center" });
+  };
+  $("pickModal").addEventListener("click", function (ev) { if (ev.target === $("pickModal")) closePicker(); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("pickModal").hidden) closePicker(); });
+
+  /* ---------- pinned question bar (shows only when the question card is out of view) ---------- */
+  var qSeen = true;
+  function syncBar() {
+    var show = state.mode !== "viewer" && !$("app").hidden && !qSeen;
+    $("liveBar").hidden = !show; document.body.classList.toggle("has-bar", show);
+  }
+  if ("IntersectionObserver" in window) new IntersectionObserver(function (es) { qSeen = es[0].isIntersecting; syncBar(); }).observe($("qtext").parentElement);
+  $("lbRandom").onclick = function () { $("randomQ").click(); };
+  $("lbBack").onclick = backQuestion;
+
+  /* ---------- connection pill ---------- */
+  var CONN = { connecting: "Connecting", live: "Live", reconnecting: "Reconnecting", offline: "Offline" };
+  function showConn(s) { $("connPill").setAttribute("data-state", s === "live" || s === "offline" ? s : "connecting"); $("connTxt").textContent = CONN[s] || "Connecting"; $("connPill").title = s === "live" ? "Connected. Changes appear instantly." : s === "offline" ? "Not connected. The page keeps retrying." : "Connecting..."; }
+  window.addEventListener("claude-state", function (e) { showConn(e.detail.state); });
 
   /* ---------- boot ---------- */
   function snapDocs(snap) { return snap.docs.map(function (d) { var o = Object.assign({}, d.data() || {}); o.id = d.id; return o; }); }

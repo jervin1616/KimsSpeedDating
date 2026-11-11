@@ -40,7 +40,7 @@
     <p id="rules"></p>
   </section>
   <section class="card" id="seenCard" hidden>
-    <h2>Signed in recently, not on any list</h2>
+    <h2>Signed in, not on the list</h2>
     <p id="seenNote"></p>
     <div id="seenList"></div>
   </section>
@@ -65,7 +65,7 @@
   function render(data) {
     me = data.you;
     $("addCard").hidden = false; $("listCard").hidden = false;
-    $("rules").textContent = "You are an owner. People set in the ROLES secret (the owners) are locked here; change them with npx wrangler secret put ROLES.";
+    $("rules").textContent = "You are an owner. Owners are locked on this page. They can only be changed by whoever manages this site's Cloudflare account.";
     renderSeen(data.seen || []);
     var list = $("list"); list.textContent = "";
     data.people.forEach(function (p) {
@@ -92,7 +92,7 @@
   }
   function renderSeen(seen) {
     $("seenCard").hidden = !seen.length;
-    $("seenNote").textContent = "These people signed in with Google but are not on the list, so they only get the default access. Add them to give more, or forget them to clear the entry.";
+    $("seenNote").textContent = "These people signed in with Google but are not on the list, so they only get the default access (watching). Add them to give more, or forget them to clear the entry.";
     var box = $("seenList"); box.textContent = "";
     seen.forEach(function (p) {
       var row = document.createElement("div"); row.className = "row";

@@ -1,4 +1,4 @@
-Test results 2026-11-11T00:51:48.328Z
+Test results 2026-11-11T05:42:11.737Z
 
 
 == Import script and export endpoint (round trip)
@@ -186,14 +186,40 @@ PASS  Viewer sees no Questions panel
 PASS  Contributor page subscribes to 3 feeds only (no daters, no matches)
 PASS  Viewer page subscribes to 3 feeds (seats, game, questions for the picker), never daters
 PASS  Editor page subscribes to 5 feeds
+PASS  the add-dater form starts collapsed behind an Add dater button
+PASS  tapping Add dater opens the form and the button becomes Close
+PASS  after saving, the form closes again
 PASS  Editor A adds a dater: Editor B sees it live
 PASS  ...and B's dater count went up by one
+PASS  a dater row shows Panel, Hot seat and More, with Edit and Remove tucked away
+PASS  More reveals Edit and Remove
+PASS  Remove still asks 'Confirm remove / Keep' first
+PASS  Keep leaves the dater in place
+PASS  More, Remove, Confirm really deletes the dater (here and on the server)
 PASS  Editor B seats that dater: Editor A sees them on the board live
 PASS  ...and the Contributor sees the seated dater on the board (display snapshot)
 PASS  ...and the Viewer sees it too
 PASS  Editor B moves them to the hot seat: Editor A sees it
 PASS  Editor A clears all seats: Editor B's board empties
 PASS  ...and so does the Viewer's
+PASS  tapping an empty seat opens the picker, titled with that seat
+PASS  with no hot seat the newest dater (whoever joined last) is on top
+PASS  typing in the search box narrows the list
+PASS  picking someone closes the picker and puts them in the seat that was tapped
+PASS  ...and the other Editor sees them there live
+PASS  tapping the empty hot seat opens the picker for the hot seat
+PASS  the hot seat list is newest first (no fit ordering)
+PASS  picking someone for the hot seat seats them there
+PASS  for a panel seat the list puts the best fits first (green, then yellow, then red)
+PASS  each row shows its fit (label) so you can tell at a glance
+PASS  a panel pick lands in the seat that was tapped (Seat 4), not the first empty one
+PASS  Add new dater from the picker closes it and opens the form
+PASS  a dater added from the picker goes straight into that seat (Seat 2)
+PASS  ...and is saved on the server and visible to the other Editor
+PASS  tapping a seat that already has someone does not open the picker (select, swap and Remove still work)
+PASS  Escape closes the picker without choosing anyone
+PASS  Contributors and Viewers cannot open the picker (hearts are read only for them)
+PASS  seats cleaned up by removing each dater from their seat
 PASS  Contributor presses Random question and gets a question
 PASS  Editor A sees the same question live
 PASS  Viewer sees the same question live
@@ -202,6 +228,16 @@ PASS  Contributor 'Back' restores the question that was cleared, for everyone
 PASS  Contributor has the Questions panel
 PASS  Contributor adds a question: the Editor's question total goes up by one, live
 PASS  ...and the new question exists on the server
+PASS  every role sees the connection pill saying Live
+PASS  on a phone all four tabs fit on one row
+PASS  on a phone the page does not scroll sideways
+PASS  on a phone the question is below the fold, so the pinned bar shows
+PASS  Random question from the pinned bar works like the main button
+PASS  the bar shows the current question
+PASS  the pinned bar hides itself when the real question card is on screen
+PASS  Viewers never get the pinned bar
+PASS  Contributors get the pinned bar on a phone
+PASS  on a phone the picker fits the screen and does not scroll sideways
 PASS  every signed-in role sees a Sign out button
 PASS  cancelling the 'Sign out?' question keeps you signed in
 PASS  signing out returns to the sign-in screen and clears the saved login
@@ -229,6 +265,9 @@ PASS  connection loss is noticed and the page says so
 PASS  a write while offline fails fast with the page's normal 'Could not save' message
 PASS  ...and the page's question snaps back to the last known server state (no half-applied change)
 PASS  stale screen: still showing the old question while offline
+PASS  while reconnecting the pill says Reconnecting (amber)
+PASS  after 10 seconds without a connection the pill turns red and says Offline
+PASS  the pill goes back to Live after reconnecting
 PASS  page reconnects by itself and re-syncs the question
 PASS  ...and re-syncs the question list (includes the one added during the outage)
 PASS  the page announced 'online' after resync
@@ -236,4 +275,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-215 passed, 0 failed, 215 total
+254 passed, 0 failed, 254 total

@@ -162,6 +162,7 @@
   function sessionLost() {
     session = null; saveSession(); authFailed = true; bootPromise = Promise.resolve(false);
     closeSocket(); failPending("unavailable");
+    setConn("offline");
     emit("auth");
   }
 
@@ -180,6 +181,12 @@
   var resyncLeft = 0;
   var everOpened = false;
   var everHello = false;
+  var connState = "connecting", everLive = false, connOffTimer = null;
+  function setConn(s) {
+    if (s === connState) return;
+    connState = s;
+    try { window.dispatchEvent(new CustomEvent("claude-state", { detail: { state: s } })); } catch (e) { /* old browser */ }
+  }
 
   function wsUrl() { return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/ws"; }
 
@@ -197,6 +204,7 @@
     ws.onopen = function () {
       if (sock !== ws) return;
       opened = true; state = "open"; everOpened = true; lastRx = Date.now();
+      everLive = true; clearTimeout(connOffTimer); connOffTimer = null; setConn("live");
       startHeartbeat();
       clearTimeout(stableTimer); stableTimer = setTimeout(function () { backoff = 500; }, 10000);
       var w = waiters; waiters = []; w.forEach(function (f) { f(true); });
@@ -237,6 +245,8 @@
   function onClosed(code, wasOpen) {
     sock = null; state = "closed";
     clearInterval(hbTimer);
+    setConn(everLive ? "reconnecting" : "connecting");
+    if (!connOffTimer) connOffTimer = setTimeout(function () { connOffTimer = null; if (connState !== "live") setConn("offline"); }, 10000);
     var w = waiters; waiters = []; w.forEach(function (f) { f(false); });
     failPending("unavailable");
     Object.keys(subs).forEach(function (k) { subs[k].ready = false; });
@@ -435,6 +445,7 @@
     status: function () { return { signedIn: !!session, email: session ? session.email : info.email, role: session ? session.role : "none", owner: !!(session && session.owner), noAccess: !!info.noAccess }; },
     signIn: signIn,
     signOut: signOut,
+    connection: function () { return connState; },
     authFetch: function (url, opts) {
       opts = Object.assign({}, opts); opts.headers = Object.assign({}, opts.headers, { Authorization: "Bearer " + (session ? session.token : "") });
       return fetch(url, opts);
