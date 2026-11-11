@@ -26,7 +26,7 @@
   .err{color:#ff9aa6}
 </style></head><body><main>
   <h1>Who can use Kim's Speed Dating</h1>
-  <p>Owners and editors only. People you add can sign in with the Google account for that email.</p>
+  <p>Owners only. People you add can sign in with the Google account for that email.</p>
   <div id="gsi"></div>
   <p id="msg" role="status"></p>
   <div><button id="signOut" type="button" hidden>Sign out</button></div>
@@ -60,8 +60,7 @@
   function render(data) {
     me = data.you;
     $("addCard").hidden = false; $("listCard").hidden = false;
-    $("editorOpt").disabled = !me.owner;
-    $("rules").textContent = me.owner ? "You are an owner: you can make editors, contributors and viewers." : "You are an editor: you can give or remove Contributor and Viewer. Only owners can make or change editors.";
+    $("rules").textContent = "You are an owner. People set in the ROLES secret (the owners) are locked here; change them with npx wrangler secret put ROLES.";
     var list = $("list"); list.textContent = "";
     data.people.forEach(function (p) {
       var row = document.createElement("div"); row.className = "row";
@@ -76,8 +75,7 @@
       } else {
         var sel = document.createElement("select"); sel.setAttribute("aria-label", "Role for " + p.email);
         ["viewer", "contributor", "editor"].forEach(function (r) { var o = document.createElement("option"); o.value = r; o.textContent = LABEL[r]; if (r === p.role) o.selected = true; sel.appendChild(o); });
-        var locked = !me.owner && p.role === "editor";
-        sel.disabled = locked;
+        var locked = false;
         sel.onchange = function () { change(p.email, sel.value); };
         var del = document.createElement("button"); del.type = "button"; del.className = "danger"; del.textContent = "Remove"; del.disabled = locked;
         del.onclick = function () { if (window.confirm("Remove " + p.email + "? They lose access right away.")) change(p.email, "none"); };
@@ -101,8 +99,8 @@
   function ready() {
     window.claude.use("user").then(function (u) {
       if (!u) return needSignIn();
-      return u.canEdit().then(function (ok) {
-        if (!ok) { say("This account is not an owner or editor, so it cannot manage access.", true); return; }
+      return Promise.resolve(window.claude.status().owner).then(function (ok) {
+        if (!ok) { say("This account is not an owner, so it cannot manage access.", true); return; }
         $("gsi").textContent = ""; $("signOut").hidden = false; say("Signed in as " + window.claude.status().email + "."); return load();
       });
     });

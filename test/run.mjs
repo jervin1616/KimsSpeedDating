@@ -387,8 +387,7 @@ try {
   check("a person listed as owner logs in as editor-level with owner true", loginRes.body.role === "editor" && loginRes.body.owner === true, loginRes.body);
   const lb = await rolesApi(sessions.editorA);
   check("owner can list people (secret entries are included and marked)", lb.status === 200 && lb.body.you.owner === true && lb.body.people.some((p) => p.email === EMAILS.editorB && p.source === "secret"), lb);
-  const lbE = await rolesApi(sessions.editorB);
-  check("a normal editor can list people but is not an owner", lbE.status === 200 && lbE.body.you.owner === false, lbE);
+  check("a normal Editor cannot use the admin API at all (403)", (await rolesApi(sessions.editorB)).status === 403 && (await rolesApi(sessions.editorB, "POST", { email: "x@example.com", role: "viewer" })).status === 403);
   check("Contributor cannot use the admin API (403)", (await rolesApi(sessions.contributor)).status === 403);
   check("Viewer cannot use the admin API (403)", (await rolesApi(sessions.viewer)).status === 403);
   check("no login: admin API refused (401)", (await rolesApi(null)).status === 401);
@@ -407,21 +406,20 @@ try {
   const daterDeny = await sw.sub("daters");
   check("the new Viewer cannot read daters", denied(daterDeny), daterDeny);
 
-  const upC = await rolesApi(sessions.editorB, "POST", { email: EMAILS.stranger, role: "contributor" });
-  check("a normal editor can promote a Viewer to Contributor", upC.status === 200, upC);
+  const upC = await rolesApi(sessions.editorA, "POST", { email: EMAILS.stranger, role: "contributor" });
+  check("owner promotes a Viewer to Contributor", upC.status === 200, upC);
   const live = await sw.wait((m) => m.t === "hello" && m.role === "contributor", 3000);
   check("their open page is told right away that its access changed", !!live, sw.msgs.filter((m) => m.t === "hello"));
   check("...and the new access applies to the open connection at once (can add questions now)", wOk(await sw.w("add", "questions", null, { ...dataFor.questions, text: "From the new contributor" })));
-  check("a normal editor cannot make anyone an Editor (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.stranger, role: "editor" })).status === 403);
-  check("a normal editor cannot make a brand new Editor either (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "editor" })).status === 403);
+  check("a normal Editor cannot make anyone an Editor (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.stranger, role: "editor" })).status === 403);
+  check("...nor a brand new Editor either (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "editor" })).status === 403);
   check("owner makes the helper an Editor (200)", (await rolesApi(sessions.editorA, "POST", { email: EMAILS.helper, role: "editor" })).status === 200);
   const hl = await login(EMAILS.helper);
   check("the helper signs in as an editor but not an owner", hl.status === 200 && hl.body.role === "editor" && hl.body.owner === false, hl.body);
   const hc = await connect(hl.session);
   check("the helper reads daters like any Editor", allowed(await hc.sub("daters")));
-  check("the helper (editor) can use the admin API but cannot make Editors (403)", (await rolesApi(hl.session, "POST", { email: EMAILS.uipick, role: "editor" })).status === 403);
-  check("the helper can add a Viewer", (await rolesApi(hl.session, "POST", { email: EMAILS.uipick, role: "viewer" })).status === 200);
-  check("a normal editor cannot demote or remove an Editor someone else made (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "viewer" })).status === 403 && (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "none" })).status === 403);
+  check("an Editor made on the page is still not an owner: the admin API refuses them (403)", (await rolesApi(hl.session)).status === 403 && (await rolesApi(hl.session, "POST", { email: EMAILS.uipick, role: "viewer" })).status === 403);
+  check("a normal Editor cannot demote or remove another Editor (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "viewer" })).status === 403 && (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "none" })).status === 403);
   const lockedChange = await rolesApi(sessions.editorA, "POST", { email: EMAILS.editorB, role: "viewer" });
   check("people set in the ROLES secret are locked, even for owners (409)", lockedChange.status === 409, lockedChange);
   check("...so nobody can remove an owner from the page (409)", (await rolesApi(sessions.editorA, "POST", { email: EMAILS.editorA, role: "none" })).status === 409);
@@ -564,8 +562,8 @@ try {
   await AD.fill("#email", EMAILS.uipick); await AD.selectOption("#role", "viewer"); await AD.click("#addForm button[type=submit]");
   check("owner adds a person on the page and they appear in the list", await until(async () => (await text(AD, "#list")).includes(EMAILS.uipick), 6000));
   check("...and the person can sign in as Viewer", (await login(EMAILS.uipick)).body && (await login(EMAILS.uipick)).body.role === "viewer");
-  check("a normal editor's page cannot pick Editor (option disabled) and says so", await until(async () => await ADE.locator("#editorOpt").isDisabled(), 6000) && /Only owners/.test(await text(ADE, "#rules")));
-  check("a Contributor on the admin page is told they cannot manage access", await until(async () => /not an owner or editor/.test(await text(ADK, "#msg")), 6000) && await ADK.locator("#listCard").isHidden());
+  check("a normal Editor on the admin page is told they are not an owner and sees no controls", await until(async () => /not an owner/.test(await text(ADE, "#msg")), 6000) && await ADE.locator("#listCard").isHidden() && await ADE.locator("#addCard").isHidden());
+  check("a Contributor on the admin page is told the same", await until(async () => /not an owner/.test(await text(ADK, "#msg")), 6000) && await ADK.locator("#listCard").isHidden());
   AD.once("dialog", (d) => d.accept());
   await AD.locator("#list .row", { hasText: EMAILS.uipick }).getByRole("button", { name: "Remove" }).click();
   check("owner removes them on the page and they disappear", await until(async () => !(await text(AD, "#list")).includes(EMAILS.uipick), 6000));

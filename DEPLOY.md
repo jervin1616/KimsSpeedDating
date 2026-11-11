@@ -153,8 +153,8 @@ What the roles mean:
 
 | Role | What they can do |
 |---|---|
-| `owner` | Everything an editor can do, plus making Editors on the access page (`/admin.html`). Owners can only be set here, in the secret |
-| `editor` | Everything: seat daters, edit daters, match log, past streams, questions, backups. Can add or remove Contributors and Viewers on `/admin.html` |
+| `owner` | Everything an editor can do, plus the access page (`/admin.html`) where roles are assigned. Owners can only be set here, in the secret |
+| `editor` | Everything: seat daters, edit daters, match log, past streams, questions, backups. Cannot manage access |
 | `contributor` | Add questions, ask and randomize questions. Cannot seat daters. Cannot read the daters list |
 | `viewer` | Watch the board and the current question, and use a private "Random question for me" button that does not change the stream. Cannot write anything |
 
@@ -289,16 +289,10 @@ If the connection drops mid-stream the page shows "Connection lost. Reconnecting
 Three places decide someone's role, strongest first:
 
 1. **The `ROLES` secret.** Owners live here, so nobody can be locked out by mistake. People here are locked on the access page.
-2. **The access page, `YOUR ADDRESS/admin.html`.** Owners and editors type an email, pick a role, and click Save. It takes effect immediately, even for people who are already on the app: their page tells them to reload, and anyone you remove is disconnected at once.
+2. **The access page, `YOUR ADDRESS/admin.html`.** Owners only (the server enforces it, not just the button). An owner types an email, picks a role, and clicks Save. It takes effect immediately, even for people who are already on the app: their page tells them to reload, and anyone you remove is disconnected at once.
 3. **`DEFAULT_ROLE`** in `wrangler.jsonc`, for any other Google account. It is `viewer` here, so anyone who signs in can watch and use the private question picker. It can only be `none`, `viewer` or `contributor`, never `editor`.
 
-Who may do what on the access page:
-
-| | Make Editors | Change or remove an Editor | Add or remove Contributors and Viewers | Change people in the secret |
-|---|---|---|---|---|
-| Owner | yes | yes | yes | no (edit the secret) |
-| Editor | no | no | yes | no |
-| Everyone else | no | no | no | no |
+Only owners can use the access page. Editors, Contributors and Viewers cannot, even if they type the address. Nobody can change people listed in the secret from the page (edit the secret for that).
 
 To change the owners or fix a locked person, run this and type the whole new list (it replaces the old one). Do it before a stream, not during one:
 
@@ -341,7 +335,7 @@ If a limit is ever hit, Cloudflare stops that kind of operation until midnight U
 | `public/db-shim.js` | Replaces the Claude runtime. Keeps the same calls the page already used |
 | `public/backup.html` | Editor-only page that downloads a backup |
 | `public/privacy.html` | Privacy page that Google requires for the sign-in app |
-| `public/admin.html` | Access page: owners and editors assign roles |
+| `public/admin.html` | Access page: owners assign roles |
 | `src/worker.js` | The API: sign-in, sessions, WebSocket door, export, import |
 | `src/auth.js` | Checks Google tokens, maps emails to roles, signs sessions |
 | `src/database.js` | The Durable Object: SQLite storage and live sync |

@@ -58,29 +58,24 @@ export class Database extends DurableObject {
     return this.resolve(email);
   }
 
-  // Actor must be an editor or owner. Returns { ok, ... } or { ok:false, code, message }.
+  // Only owners may use the access page. Returns { ok, ... } or { ok:false, code, message }.
   listRoles(actorEmail) {
     const actor = this.resolve(actorEmail);
-    if (actor.role !== "editor") return { ok: false, code: "forbidden", message: "Not allowed." };
+    if (!actor.owner) return { ok: false, code: "forbidden", message: "Only owners can manage access." };
     const assigned = this.sql.exec("SELECT email, role, by, ts FROM roles ORDER BY email").toArray().map((r) => ({ ...r, source: "admin" }));
     return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned] };
   }
 
   // role: "viewer" | "contributor" | "editor" | "none" (remove).
-  // Owners can do everything except change people listed in the ROLES secret.
-  // Other editors can only give or take away viewer and contributor, and cannot touch editors.
+  // Only owners may do this, and they cannot change people listed in the ROLES secret.
   changeRole(actorEmail, targetEmail, role) {
     const actor = this.resolve(actorEmail);
-    if (actor.role !== "editor") return { ok: false, code: "forbidden", message: "Not allowed." };
+    if (!actor.owner) return { ok: false, code: "forbidden", message: "Only owners can manage access." };
     const target = String(targetEmail || "").trim().toLowerCase();
     if (!validEmail(target)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
     if (!["viewer", "contributor", "editor", "none"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
     const current = this.resolve(target);
     if (current.source === "secret") return { ok: false, code: "locked", message: "That person is set in the ROLES secret and can only be changed there." };
-    if (!actor.owner) {
-      if (role === "editor") return { ok: false, code: "forbidden", message: "Only owners can make editors." };
-      if (current.source === "admin" && current.role === "editor") return { ok: false, code: "forbidden", message: "Only owners can change an editor." };
-    }
     const roles = this.loadRoles();
     if (role === "none") {
       this.sql.exec("DELETE FROM roles WHERE email = ?", target);

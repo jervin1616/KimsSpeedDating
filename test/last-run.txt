@@ -1,4 +1,4 @@
-Test results 2026-11-11T00:42:47.327Z
+Test results 2026-11-11T00:46:54.397Z
 
 
 == Import script and export endpoint (round trip)
@@ -119,7 +119,7 @@ PASS  an open connection accepts the refreshed session
 == Role assignment: owners, editors, the admin page API
 PASS  a person listed as owner logs in as editor-level with owner true
 PASS  owner can list people (secret entries are included and marked)
-PASS  a normal editor can list people but is not an owner
+PASS  a normal Editor cannot use the admin API at all (403)
 PASS  Contributor cannot use the admin API (403)
 PASS  Viewer cannot use the admin API (403)
 PASS  no login: admin API refused (401)
@@ -131,17 +131,16 @@ PASS  the new Viewer can now sign in and gets role viewer
 PASS  their WebSocket opens with role viewer
 PASS  the new Viewer can read questions but cannot write
 PASS  the new Viewer cannot read daters
-PASS  a normal editor can promote a Viewer to Contributor
+PASS  owner promotes a Viewer to Contributor
 PASS  their open page is told right away that its access changed
 PASS  ...and the new access applies to the open connection at once (can add questions now)
-PASS  a normal editor cannot make anyone an Editor (403)
-PASS  a normal editor cannot make a brand new Editor either (403)
+PASS  a normal Editor cannot make anyone an Editor (403)
+PASS  ...nor a brand new Editor either (403)
 PASS  owner makes the helper an Editor (200)
 PASS  the helper signs in as an editor but not an owner
 PASS  the helper reads daters like any Editor
-PASS  the helper (editor) can use the admin API but cannot make Editors (403)
-PASS  the helper can add a Viewer
-PASS  a normal editor cannot demote or remove an Editor someone else made (403)
+PASS  an Editor made on the page is still not an owner: the admin API refuses them (403)
+PASS  a normal Editor cannot demote or remove another Editor (403)
 PASS  people set in the ROLES secret are locked, even for owners (409)
 PASS  ...so nobody can remove an owner from the page (409)
 PASS  a bad email is rejected (400)
@@ -213,8 +212,8 @@ PASS  ...and the Editor's page still shows the stream's question, not the viewer
 PASS  admin page (owner) lists people, marks secret ones locked
 PASS  owner adds a person on the page and they appear in the list
 PASS  ...and the person can sign in as Viewer
-PASS  a normal editor's page cannot pick Editor (option disabled) and says so
-PASS  a Contributor on the admin page is told they cannot manage access
+PASS  a normal Editor on the admin page is told they are not an owner and sees no controls
+PASS  a Contributor on the admin page is told the same
 PASS  owner removes them on the page and they disappear
 PASS  ...and they can no longer sign in
 PASS  Editor page through the test proxy is live
@@ -229,4 +228,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-208 passed, 0 failed, 208 total
+207 passed, 0 failed, 207 total
