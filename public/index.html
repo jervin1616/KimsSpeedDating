@@ -196,6 +196,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
       <h1>Kim's Speed Dating</h1>
     </div>
     <span class="pill" id="role">Loading</span>
+    <a class="pill" id="adminLink" href="/admin.html" target="_blank" rel="noopener" style="text-decoration:none" hidden>Admin</a>
   </header>
   <div class="streambar host-only" id="streamBar" hidden>
     <span class="livechip" id="liveChip" hidden><i></i> LIVE <b id="liveClock" data-start="0">0:00</b></span>
@@ -967,6 +968,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     document.querySelectorAll(".host-only").forEach(function (e) { e.hidden = m !== "host"; });
     document.querySelectorAll(".contrib-only").forEach(function (e) { e.hidden = m === "viewer"; });
     $("myQBox").hidden = m !== "viewer";
+    $("adminLink").hidden = !window.claude.status().owner; // owners only
     $("tabs").hidden = m !== "host";
     if (m === "host") { var t0 = "d"; try { t0 = sessionStorage.getItem("sd-tab") || "d"; } catch (e) {} showTab(TABS[t0] ? t0 : "d"); }
     else { $("panelD").hidden = true; $("panelM").hidden = true; $("panelP").hidden = true; $("panelQ").hidden = m === "viewer"; }

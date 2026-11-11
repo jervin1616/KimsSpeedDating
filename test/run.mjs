@@ -482,6 +482,8 @@ try {
   check("Editor sees the imported daters", nDaters > 0, nDaters);
   check("both Editors see the same dater count", await until(async () => Number(await text(B, "#daterCount")) === nDaters));
   check("Contributor sees no Daters, Match log or Past streams panels and no tabs", await K.locator("#tabs").isHidden() && await K.locator("#panelD").isHidden() && await K.locator("#panelM").isHidden() && await K.locator("#panelP").isHidden());
+  check("the Admin button shows for the owner only (not a normal Editor, Contributor or Viewer)", await A.locator("#adminLink").isVisible() && await B.locator("#adminLink").isHidden() && await K.locator("#adminLink").isHidden() && await V.locator("#adminLink").isHidden());
+  check("the Admin button opens the access page in a new tab and keeps the console open", (await A.locator("#adminLink").getAttribute("href")) === "/admin.html" && (await A.locator("#adminLink").getAttribute("target")) === "_blank" && /noopener/.test(await A.locator("#adminLink").getAttribute("rel")));
   check("Contributor has Random question; Viewer does not", await K.locator("#randomQ").isVisible() && await V.locator("#randomQ").isHidden());
   check("Viewer sees no Questions panel", await V.locator("#panelQ").isHidden());
   const subsOf = async (p) => (await p.evaluate(() => window.claude._test.state())).subs;

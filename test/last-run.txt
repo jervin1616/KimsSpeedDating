@@ -1,4 +1,4 @@
-Test results 2026-11-11T00:21:23.741Z
+Test results 2026-11-11T00:28:57.190Z
 
 
 == Import script and export endpoint (round trip)
@@ -174,6 +174,8 @@ PASS  Viewer page opens in View only
 PASS  Editor sees the imported daters
 PASS  both Editors see the same dater count
 PASS  Contributor sees no Daters, Match log or Past streams panels and no tabs
+PASS  the Admin button shows for the owner only (not a normal Editor, Contributor or Viewer)
+PASS  the Admin button opens the access page in a new tab and keeps the console open
 PASS  Contributor has Random question; Viewer does not
 PASS  Viewer sees no Questions panel
 PASS  Contributor page subscribes to 3 feeds only (no daters, no matches)
@@ -220,4 +222,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-199 passed, 0 failed, 199 total
+201 passed, 0 failed, 201 total
