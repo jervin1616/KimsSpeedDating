@@ -1,4 +1,4 @@
-Test results 2026-11-11T07:26:34.333Z
+Test results 2026-11-11T07:58:42.871Z
 
 
 == Import script and export endpoint (round trip)
@@ -294,6 +294,15 @@ PASS  body text is easy to read on the page background
 PASS  secondary text is readable on cards and rows (at least 4.5 to 1)
 PASS  button text is readable on the glossy red buttons, even at the middle of the gradient
 PASS  no old plum colours are left on any page
+PASS  an install manifest is served with the name, start page and banner colours
+PASS  ...and every icon it lists exists and is a real PNG of the declared size (192, 512 and a maskable 512)
+PASS  the iPhone home screen icon is 180 by 180 and the tab icon is 32 by 32
+PASS  /favicon.ico exists (browsers ask for it by name)
+PASS  the link-preview card is a 1200 by 630 JPEG under 300 KB (Discord and others show it)
+PASS  every page links the icons, the manifest and the banner colour
+PASS  the main page has link-preview tags with a full https address for the card
+PASS  home screen icons are fully opaque (no see-through corners, which phones paint black)
+PASS  the maskable icon keeps its art in the middle and a dark red border, so round masks never cut the lettering
 PASS  on a short page (the sign-in screen) the glow fills the screen and does not restart halfway down
 PASS  the sign-in screen offers Google sign-in and says what viewers get
 PASS  admin.html also fills the screen without a repeat seam
@@ -356,4 +365,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-331 passed, 0 failed, 331 total
+340 passed, 0 failed, 340 total

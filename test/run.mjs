@@ -770,6 +770,28 @@ try {
   check("button text is readable on the glossy red buttons, even at the middle of the gradient", stops.length >= 2 && cr(th.btnColor, mid) >= 4.5, { stops, mid, ratio: stops.length ? cr(th.btnColor, mid) : 0 });
   const pages = {}; for (const f of ["index.html", "admin.html", "backup.html", "privacy.html"]) pages[f] = await (await fetch(BASE + "/" + f)).text();
   check("no old plum colours are left on any page", Object.values(pages).every((t) => !/#12030a|#4a1429|#ff4f9a|#260a17|#3b1a5c|#b58cff|#1a0610/i.test(t)));
+  // home screen icon, install manifest and link preview
+  const pngInfo = async (path) => { const r = await fetch(BASE + path); const b = Buffer.from(await r.arrayBuffer()); return { ok: r.status === 200, sig: b.subarray(0, 8).toString("hex"), w: b.readUInt32BE(16), h: b.readUInt32BE(20) }; };
+  const jpegSize = (b) => { let i = 2; while (i < b.length) { if (b[i] !== 0xff) { i++; continue; } const m = b[i + 1]; if (m >= 0xc0 && m <= 0xc3) return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) }; i += 2 + b.readUInt16BE(i + 2); } return null; };
+  const man = await (await fetch(BASE + "/manifest.webmanifest")).json();
+  check("an install manifest is served with the name, start page and banner colours", man.name === "Kim's Speed Dating" && man.short_name === "Speed Dating" && man.start_url === "/" && man.background_color === "#1b0203" && man.theme_color === "#1b0203", man);
+  const manIcons = []; for (const ic of man.icons) { const [w, h] = ic.sizes.split("x").map(Number); const i = await pngInfo(ic.src); manIcons.push(i.ok && i.sig === "89504e470d0a1a0a" && i.w === w && i.h === h); }
+  check("...and every icon it lists exists and is a real PNG of the declared size (192, 512 and a maskable 512)", manIcons.length === 3 && manIcons.every(Boolean) && man.icons.some((i) => i.purpose === "maskable"), manIcons);
+  const apple = await pngInfo("/icons/apple-touch-icon.png"), fav = await pngInfo("/icons/favicon-32.png");
+  check("the iPhone home screen icon is 180 by 180 and the tab icon is 32 by 32", apple.w === 180 && apple.h === 180 && fav.w === 32 && fav.h === 32, { apple, fav });
+  const ico = Buffer.from(await (await fetch(BASE + "/favicon.ico")).arrayBuffer());
+  check("/favicon.ico exists (browsers ask for it by name)", ico.subarray(0, 4).toString("hex") === "00000100" && ico.length > 1000);
+  const og = Buffer.from(await (await fetch(BASE + "/og.jpg")).arrayBuffer());
+  check("the link-preview card is a 1200 by 630 JPEG under 300 KB (Discord and others show it)", og[0] === 0xff && og[1] === 0xd8 && JSON.stringify(jpegSize(og)) === JSON.stringify({ h: 630, w: 1200 }) && og.length < 300 * 1024, { size: og.length, dims: jpegSize(og) });
+  check("every page links the icons, the manifest and the banner colour", ["index.html", "admin.html", "backup.html", "privacy.html"].every((f) => /rel="icon"/.test(pages[f]) && /rel="apple-touch-icon"/.test(pages[f]) && /rel="manifest"/.test(pages[f]) && /name="theme-color" content="#1b0203"/.test(pages[f])));
+  check("the main page has link-preview tags with a full https address for the card", /property="og:image" content="https:\/\/[^"]+\/og\.jpg"/.test(pages["index.html"]) && /property="og:title"/.test(pages["index.html"]) && /name="twitter:card" content="summary_large_image"/.test(pages["index.html"]));
+  const iconPx = await A.evaluate(async () => {
+    const sample = async (url) => { const bmp = await createImageBitmap(await (await fetch(url)).blob()); const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; const x = c.getContext("2d"); x.drawImage(bmp, 0, 0); const g = (a, b) => Array.from(x.getImageData(a, b, 1, 1).data); return { tl: g(2, 2), br: g(bmp.width - 3, bmp.height - 3), mid: g(bmp.width >> 1, bmp.height >> 1) }; };
+    return { apple: await sample("/icons/apple-touch-icon.png"), i512: await sample("/icons/icon-512.png"), mask: await sample("/icons/icon-maskable-512.png") };
+  });
+  check("home screen icons are fully opaque (no see-through corners, which phones paint black)", [iconPx.apple, iconPx.i512, iconPx.mask].every((s) => s.tl[3] === 255 && s.br[3] === 255), iconPx);
+  check("the maskable icon keeps its art in the middle and a dark red border, so round masks never cut the lettering", iconPx.mask.tl[0] < 80 && iconPx.mask.tl[1] < 40 && iconPx.mask.br[0] < 80 && (iconPx.mask.mid[0] + iconPx.mask.mid[1] + iconPx.mask.mid[2]) > (iconPx.mask.tl[0] + iconPx.mask.tl[1] + iconPx.mask.tl[2]) + 60, iconPx.mask);
+
   const gateCtx = await browser.newContext({ viewport: { width: 390, height: 844 } }); await gateCtx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
   const gatePg = await gateCtx.newPage(); await gatePg.goto(BASE + "/"); await gatePg.waitForSelector("#gate:not([hidden])");
   const gateInfo = await gatePg.evaluate(() => ({ bodyH: document.body.getBoundingClientRect().height, vh: innerHeight, rep: getComputedStyle(document.body).backgroundRepeat }));

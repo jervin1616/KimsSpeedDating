@@ -313,6 +313,17 @@ npx wrangler secret put ROLES
 
 ---
 
+## Home screen icon and link preview
+
+Your speed dating banner is the site's icon (`public/icons/`, cropped from the banner) and its link-preview card (`public/og.jpg`, the banner plus the title).
+
+- **iPhone:** open the site in Safari, tap Share, then **Add to Home Screen**.
+- **Android:** open it in Chrome, tap the three dots, then **Add to Home screen** (or **Install app**).
+- **Discord:** pasting the address now shows the card with the banner. Discord remembers previews, so if you change the card later paste the link with `?v=2` on the end to see the new one.
+- **Icons update slowly:** a phone keeps the icon it had when you added the site. Delete the home screen icon and add it again to pick up a new one.
+- **It opens like a normal web page, on purpose.** The manifest says `"display": "browser"`. Opening as a full-screen app (`"standalone"`) can break Google sign-in on iPhones, so test it on a real iPhone before switching.
+- **If the site's address ever changes** (a new Worker name or your own domain), edit the two lines `og:image` and `og:url` in `public/index.html`, because link previews need the full address.
+
 ## Tips for hosts using the console
 
 - **Seating:** tap an empty heart to open a picker. It lists the newest daters first, with search. For a panel seat the best fits (green) come first. Tap someone to seat them in the heart you tapped. **Add new dater** inside the picker opens the form, and when you save, the new dater goes straight into that seat. The Panel and Hot seat buttons on each dater still work.
