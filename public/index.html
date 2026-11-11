@@ -213,8 +213,8 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
   <p class="note" id="modeNote" hidden></p>
 
   <section class="gate" id="gate" hidden>
-    <h2>Host access only</h2>
-    <p class="note" id="gateMsg">Ask Kim to invite you as an Editor.</p>
+    <h2>Sign in</h2>
+    <p class="note" id="gateMsg">Sign in with Google to watch the board and get random questions.</p>
     <div id="gsi" style="display:flex;justify-content:center;margin-top:12px"></div>
   </section>
 
@@ -1018,7 +1018,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
       if (!db) {
         var st = window.claude.status();
         if (st.noAccess) gate("This Google account (" + st.email + ") is not on the list. Ask Kim to add it, or sign in with a different account.", "No access");
-        else gate("Sign in with Google to use the host console.", "Signed out");
+        else gate("Sign in with Google to watch the board and get random questions.", "Signed out");
         window.claude.signIn($("gsi"), function (res) { if (res.error) $("gateMsg").textContent = res.error; else start(); });
         return;
       }
