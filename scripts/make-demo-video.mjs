@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Records a short phone-sized tour of the VIEWER screen against a local copy of the app, using made-up people only.
 //   node scripts/make-demo-video.mjs            -> docs/discord/viewer-tour.mp4
+//   node scripts/make-demo-video.mjs --teaser   -> docs/discord/viewer-teaser.mp4 (about 25 s, "drops today")
 // Nothing real is touched: it starts its own throwaway local server and imports only the public question pack.
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -15,6 +16,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright"); // installed globally in this environment (not a project dependency)
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const TEASER = process.argv.includes("--teaser");
 const PORT = 8796, BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = crypto.randomBytes(32).toString("hex"), ADMIN = crypto.randomBytes(24).toString("hex");
 const b64u = (x) => Buffer.from(typeof x === "string" ? x : JSON.stringify(x)).toString("base64url");
@@ -59,19 +61,19 @@ const ctx = await browser.newContext({
   userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 });
 await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
-await ctx.addInitScript((sess) => {
-  try { localStorage.setItem("sd.session.v1", JSON.stringify(sess)); } catch (e) { /* ignore */ }
+await ctx.addInitScript(([sess, noTip]) => {
+  try { localStorage.setItem("sd.session.v1", JSON.stringify(sess)); if (noTip) localStorage.setItem("sd.installTip.until", String(Date.now() + 86400000)); } catch (e) { /* ignore */ }
   // captions, title cards and a ring that shows where a finger taps (only for the recording)
   const css = document.createElement("style");
   css.textContent = "#demoCap{pointer-events:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9999;background:rgba(20,2,3,.9);color:#fff;border:1px solid #ff4d6d;border-radius:14px;padding:12px 14px;font:600 17px/1.3 system-ui,sans-serif;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5);transition:opacity .3s}"
     + "#demoCard{position:fixed;inset:0;z-index:10000;background:radial-gradient(circle at 50% 30%,#4a0710,#1b0203 70%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;font-family:system-ui,sans-serif;transition:opacity .4s}"
-    + "#demoCard h1{font:700 46px/1.05 LogoFont,system-ui,sans-serif;margin:0;color:#fff;text-shadow:0 0 18px #ff2d55}#demoCard p{margin:0;font-size:19px;color:#ffd5dc}"
+    + "#demoCard h1{font:700 46px/1.05 LogoFont,system-ui,sans-serif;margin:0;color:#fff;text-shadow:0 0 18px #ff2d55}#demoCard p{margin:0;font-size:19px;color:#ffd5dc}#demoCard p:first-of-type{font-size:30px;font-weight:800;color:#ff8fa8;letter-spacing:.04em}"
     + ".demoTap{position:fixed;z-index:10001;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid #fff;background:rgba(255,77,109,.45);pointer-events:none;animation:demoTap .6s ease-out forwards}@keyframes demoTap{from{transform:scale(.4);opacity:1}to{transform:scale(1.5);opacity:0}}";
   document.addEventListener("DOMContentLoaded", () => document.head.appendChild(css));
   window.__cap = (t) => { let e = document.getElementById("demoCap"); if (!t) { if (e) e.remove(); return; } if (!e) { e = document.createElement("div"); e.id = "demoCap"; document.body.appendChild(e); } e.textContent = t; };
   window.__card = (title, sub, sub2) => { let e = document.getElementById("demoCard"); if (!title) { if (e) { e.style.opacity = 0; setTimeout(() => e.remove(), 450); } return; } if (!e) { e = document.createElement("div"); e.id = "demoCard"; document.body.appendChild(e); } e.innerHTML = ""; for (const [tag, txt] of [["h1", title], ["p", sub], ["p", sub2]]) if (txt) { const n = document.createElement(tag); n.textContent = txt; e.appendChild(n); } };
   document.addEventListener("pointerdown", (ev) => { const d = document.createElement("div"); d.className = "demoTap"; d.style.left = ev.clientX + "px"; d.style.top = ev.clientY + "px"; document.body.appendChild(d); setTimeout(() => d.remove(), 700); }, true);
-}, viewer);
+}, [viewer, TEASER]);
 const page = await ctx.newPage();
 // Playwright's own recorder is 1x only (soft on phones), so grab the screencast frames ourselves at full 2x size.
 const cdp = await ctx.newCDPSession(page);
@@ -91,10 +93,35 @@ const cap = async (t) => { capEvents.push({ wall: Date.now(), text: t || null })
 const card = (a, b, c) => page.evaluate(([x, y, z]) => window.__card(x, y, z), [a, b, c]);
 await page.goto(BASE + "/");
 await page.waitForSelector("#app:not([hidden])", { timeout: 20000 });
-await card("Kim's Speed Dating", "Your own question screen", "Free. Watch live and never run out of questions.");
-await sleep(3400);
-await card(); await sleep(500);
+if (!TEASER) {
+  await card("Kim's Speed Dating", "Your own question screen", "Free. Watch live and never run out of questions.");
+  await sleep(3400);
+  await card(); await sleep(500);
+}
 
+if (TEASER) {
+// the teaser: board, private question, categories, then "drops today"
+await card("Kim's Speed Dating", "DROPS TODAY", "Your own question screen. Free. Sign in with Google. 18+ only.");
+await sleep(3000); await card(); await sleep(500);
+await cap("1. Watch the board live: who is in the hot seat and who is on the panel");
+await sleep(1500);
+seat("hot", P("Jordan", 28, "NC", "M \u00b7 Straight", ["Wants 24-34"], "hot", "")); await sleep(1100);
+seat("s1", P("Ava", 26, "TX", "W \u00b7 Straight", ["Wants 25-35"], "mutual", "Fits both")); await sleep(850);
+seat("s2", P("Riley", 24, "OH", "W \u00b7 Bi", ["Men 24-30", "Women 22-28"], "close", "Off by 2 yrs")); await sleep(850);
+seat("s3", P("Sam", 36, "CA", "W \u00b7 Straight", ["Wants 30-42"], "nofit", "Off by 5 yrs")); await sleep(850);
+seat("s4", P("Taylor", 29, "GA", "W \u00b7 Straight", ["Wants 26-36"], "mutual", "Fits both")); await sleep(850);
+seat("s5", P("Casey", 27, "VA", "W \u00b7 Straight", ["Wants 24-34"], "close", "Off by 1 yr")); await sleep(2200);
+await cap("2. Tap Random question for me. Only you see it");
+await page.locator("#myQBox").scrollIntoViewIfNeeded(); await sleep(1200);
+for (let i = 0; i < 2; i++) { await page.tap("#myQBtn"); await sleep(1900); }
+await cap("3. Pick a category to narrow it down");
+const ring = async (sel) => page.evaluate((s) => { const e = document.querySelector(s); e.style.outline = "3px solid #ffd166"; e.style.borderRadius = "8px"; setTimeout(() => { e.style.outline = ""; }, 1200); }, sel);
+await ring("#myCat"); await sleep(1000);
+for (const k of ["wyr", "flirty"]) { await page.selectOption("#myCat", k); await sleep(1900); }
+await cap("Drops today. Watch this channel for the link");
+await card("Kim's Speed Dating", "DROPS TODAY", "Watch this channel for the link.");
+await sleep(3400);
+} else {
 // 1. add to home screen first
 await cap("1. Add it to your home screen like an app");
 await sleep(1500); await page.tap("#installBtn"); await sleep(4200);
@@ -137,6 +164,7 @@ await page.evaluate(() => window.scrollTo({ top: 400, behavior: "smooth" })); aw
 ask("If you could have dinner with anyone, who would it be?"); await sleep(3200);
 await cap(); await card("Kim's Speed Dating", "Free. Sign in with Google.", "18+ only. The link is pinned in the server.");
 await sleep(3500);
+}
 await cdp.send("Page.stopScreencast").catch(() => {});
 await ctx.close(); await browser.close();
 
@@ -171,7 +199,7 @@ await art.close();
 
 // ---- put it all together: video inside the phone, caption under the phone
 mkdirSync(join(ROOT, "docs", "discord"), { recursive: true });
-const out = join(ROOT, "docs", "discord", "viewer-tour.mp4");
+const out = join(ROOT, "docs", "discord", TEASER ? "viewer-teaser.mp4" : "viewer-tour.mp4");
 const inputs = ["-f", "concat", "-safe", "0", "-i", join(frameDir, "list.txt"), "-loop", "1", "-i", join(assets, "bg.png"), "-loop", "1", "-i", join(assets, "bezel.png")];
 spans.forEach((_, i) => inputs.push("-loop", "1", "-i", join(assets, `cap${i}.png`)));
 let g = `[0:v]fps=30,scale=${SW}:${SH}:flags=lanczos[v];[1:v][v]overlay=${SX}:${SY}[a];[a][2:v]overlay=0:0[b0]`;

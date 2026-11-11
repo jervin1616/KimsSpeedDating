@@ -36,3 +36,11 @@ The viewer screen is live. Link in the pinned post. Stream starts at 5 PM Easter
 ## Video caption (for docs/discord/viewer-tour.mp4)
 
 Quick tour of the viewer screen 💘 Watch the board live, tap **Random question for me** (only you see it), narrow it by category, and add it to your home screen. Free, sign in with Google, 18+. Link is pinned.
+
+## "Drops today" teaser (docs/discord/viewer-teaser.mp4, 26 seconds)
+
+**Drops today 👀 your own question button**
+
+Watch the board live on your phone, tap **Random question for me** (only you see it), and pick a category. Free, Google sign-in, 18+.
+
+Watch this channel for the link. 💘
