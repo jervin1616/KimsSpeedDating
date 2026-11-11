@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kim's Speed Dating access</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;padding:24px 16px 48px;background:#12030a;color:#fff1f4;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+  h1{font-size:22px;margin:0}
+  h2{font-size:16px;margin:0 0 8px}
+  p{margin:0;color:#c99aa8}
+  .card{background:#260a17;border:1px solid #4a1429;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border:1px solid #4a1429;border-radius:10px;padding:8px 10px;background:#1a0610}
+  .row .who{min-width:0;overflow-wrap:anywhere}
+  .row .meta{color:#c99aa8;font-size:12px}
+  input,select,button{font:inherit;color:inherit;border-radius:10px;border:1px solid #4a1429;background:#170510;padding:8px 10px;min-height:40px}
+  input{flex:1 1 220px;min-width:0}
+  button{cursor:pointer;background:#33101f}
+  button.primary{background:#ff4f9a;border-color:#ff4f9a;color:#1a0510;font-weight:700}
+  button.danger{border-color:#7a1222;color:#ff9aa6}
+  button:disabled,select:disabled{opacity:.5;cursor:not-allowed}
+  .form{display:flex;flex-wrap:wrap;gap:8px}
+  .lock{font-size:12px;color:#ffb347;border:1px solid #ffb347;border-radius:999px;padding:1px 8px;white-space:nowrap}
+  #msg{min-height:1.4em;color:#fff1f4}
+  .err{color:#ff9aa6}
+</style></head><body><main>
+  <h1>Who can use Kim's Speed Dating</h1>
+  <p>Owners and editors only. People you add can sign in with the Google account for that email.</p>
+  <div id="gsi"></div>
+  <p id="msg" role="status"></p>
+  <section class="card" id="addCard" hidden>
+    <h2>Add or change someone</h2>
+    <form class="form" id="addForm">
+      <input id="email" type="email" required placeholder="their-google-email@gmail.com" autocomplete="off" aria-label="Email">
+      <select id="role" aria-label="Role"><option value="viewer">Viewer (watch only)</option><option value="contributor">Contributor (questions)</option><option value="editor" id="editorOpt">Editor (everything)</option></select>
+      <button class="primary" type="submit">Save</button>
+    </form>
+    <p id="rules"></p>
+  </section>
+  <section class="card" id="listCard" hidden>
+    <h2>People</h2>
+    <div id="list"></div>
+  </section>
+</main>
+<script src="/db-shim.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var me = null;
+  function say(t, bad) { $("msg").textContent = t || ""; $("msg").className = bad ? "err" : ""; }
+  function api(method, body) {
+    return window.claude.authFetch("/api/roles", { method: method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.message || "Something went wrong (" + r.status + ")."); return j; }); });
+  }
+  function ago(ts) { return ts ? new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; }
+  var LABEL = { owner: "Owner", editor: "Editor", contributor: "Contributor", viewer: "Viewer" };
+
+  function render(data) {
+    me = data.you;
+    $("addCard").hidden = false; $("listCard").hidden = false;
+    $("editorOpt").disabled = !me.owner;
+    $("rules").textContent = me.owner ? "You are an owner: you can make editors, contributors and viewers." : "You are an editor: you can give or remove Contributor and Viewer. Only owners can make or change editors.";
+    var list = $("list"); list.textContent = "";
+    data.people.forEach(function (p) {
+      var row = document.createElement("div"); row.className = "row";
+      var who = document.createElement("div"); who.className = "who";
+      who.appendChild(document.createTextNode(p.email));
+      var meta = document.createElement("div"); meta.className = "meta";
+      meta.textContent = p.source === "secret" ? "Set in the ROLES secret" : "Added by " + p.by + " " + ago(p.ts);
+      who.appendChild(meta); row.appendChild(who);
+      var right = document.createElement("div"); right.className = "form";
+      if (p.source === "secret") {
+        var l = document.createElement("span"); l.className = "lock"; l.textContent = LABEL[p.role] + " (locked)"; right.appendChild(l);
+      } else {
+        var sel = document.createElement("select"); sel.setAttribute("aria-label", "Role for " + p.email);
+        ["viewer", "contributor", "editor"].forEach(function (r) { var o = document.createElement("option"); o.value = r; o.textContent = LABEL[r]; if (r === p.role) o.selected = true; sel.appendChild(o); });
+        var locked = !me.owner && p.role === "editor";
+        sel.disabled = locked;
+        sel.onchange = function () { change(p.email, sel.value); };
+        var del = document.createElement("button"); del.type = "button"; del.className = "danger"; del.textContent = "Remove"; del.disabled = locked;
+        del.onclick = function () { if (window.confirm("Remove " + p.email + "? They lose access right away.")) change(p.email, "none"); };
+        right.appendChild(sel); right.appendChild(del);
+      }
+      row.appendChild(right); list.appendChild(row);
+    });
+  }
+  function load() { return api("GET").then(render).catch(function (e) { say(e.message, true); }); }
+  function change(email, role) {
+    say("Saving...");
+    return api("POST", { email: email, role: role }).then(function () { say(role === "none" ? "Removed " + email + "." : "Saved " + email + " as " + LABEL[role] + "."); return load(); })
+      .catch(function (e) { say(e.message, true); return load(); });
+  }
+  $("addForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var email = $("email").value.trim().toLowerCase();
+    change(email, $("role").value).then(function () { $("email").value = ""; });
+  };
+
+  function ready() {
+    window.claude.use("user").then(function (u) {
+      if (!u) return needSignIn();
+      return u.canEdit().then(function (ok) {
+        if (!ok) { say("This account is not an owner or editor, so it cannot manage access.", true); return; }
+        $("gsi").textContent = ""; say("Signed in as " + window.claude.status().email + "."); return load();
+      });
+    });
+  }
+  function needSignIn() {
+    var st = window.claude.status();
+    say(st.noAccess ? "This Google account (" + st.email + ") is not on the list." : "Sign in with Google to continue.");
+    window.claude.signIn($("gsi"), function (r) { if (r.error) say(r.error, true); else ready(); });
+  }
+  window.addEventListener("claude-conn", function (e) { if (e.detail && e.detail.state === "role") ready(); });
+  ready();
+})();
+</script></body></html>

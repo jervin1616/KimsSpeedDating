@@ -33,7 +33,7 @@ export function parseRoles(raw) {
   const put = (email, role) => {
     email = String(email || "").trim().toLowerCase();
     role = String(role || "").trim().toLowerCase();
-    if (email && (role === "editor" || role === "contributor" || role === "viewer")) map.set(email, role);
+    if (email && (role === "owner" || role === "editor" || role === "contributor" || role === "viewer")) map.set(email, role);
   };
   const text = String(raw || "").trim();
   if (text.startsWith("{")) {
@@ -57,9 +57,25 @@ export function defaultRole(env) {
   return r === "viewer" || r === "contributor" ? r : "none";
 }
 
-export function roleFor(env, email) {
-  const role = parseRoles(env.ROLES).get(String(email || "").toLowerCase());
-  return role || defaultRole(env);
+// Who someone is, from the three places a role can come from, strongest source first:
+//   1. the ROLES secret (owners live here, so nobody can be locked out by the admin page)
+//   2. roles an owner or editor assigned on the admin page (stored in the database)
+//   3. DEFAULT_ROLE for any other signed-in Google account
+// An owner has the "editor" level everywhere plus the right to manage roles.
+export function resolveRole(env, email, dbRole) {
+  const e = String(email || "").toLowerCase();
+  const s = parseRoles(env.ROLES).get(e);
+  if (s) return { role: s === "owner" ? "editor" : s, owner: s === "owner", source: "secret" };
+  if (dbRole === "editor" || dbRole === "contributor" || dbRole === "viewer") return { role: dbRole, owner: false, source: "admin" };
+  return { role: defaultRole(env), owner: false, source: "default" };
+}
+
+export function secretEntries(env) {
+  return [...parseRoles(env.ROLES).entries()].map(([email, role]) => ({ email, role, source: "secret" }));
+}
+
+export function validEmail(e) {
+  return typeof e === "string" && e.length <= 254 && /^[^\s@,;=]+@[^\s@,;=]+\.[^\s@,;=]+$/.test(e);
 }
 
 /* ---------- Google ID token ---------- */

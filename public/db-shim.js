@@ -65,7 +65,7 @@
     return fetch("/api/session", { headers: { Authorization: "Bearer " + session.token }, cache: "no-store" }).then(function (r) {
       if (r.ok) {
         return r.json().then(function (j) {
-          session.role = j.role; session.email = j.email; session.exp = j.exp; saveSession();
+          session.role = j.role; session.owner = !!j.owner; session.email = j.email; session.exp = j.exp; saveSession();
           return true;
         });
       }
@@ -109,7 +109,7 @@
             .then(function (res) { return res.json().then(function (j) { return { status: res.status, body: j }; }); })
             .then(function (x) {
               if (x.status === 200) {
-                session = { token: x.body.token, exp: x.body.exp, email: x.body.email, role: x.body.role };
+                session = { token: x.body.token, exp: x.body.exp, email: x.body.email, role: x.body.role, owner: !!x.body.owner };
                 saveSession(); info = { email: x.body.email, noAccess: false };
                 bootPromise = Promise.resolve(true); authFailed = false; startRefreshTimer(); connectIfNeeded();
                 done({ ok: true, role: session.role, email: session.email });
@@ -148,7 +148,7 @@
     fetch("/api/refresh", { method: "POST", headers: { Authorization: "Bearer " + session.token }, cache: "no-store" }).then(function (r) {
       if (r.ok) {
         return r.json().then(function (j) {
-          session.token = j.token; session.exp = j.exp; session.role = j.role; saveSession();
+          session.token = j.token; session.exp = j.exp; session.role = j.role; session.owner = !!j.owner; saveSession();
           if (state === "open" && sock) { try { sock.send(JSON.stringify({ t: "auth", token: j.token })); } catch (e) { /* reconnect will pick it up */ } }
           startRefreshTimer();
         });
@@ -178,6 +178,7 @@
   var waiters = [];
   var resyncLeft = 0;
   var everOpened = false;
+  var everHello = false;
 
   function wsUrl() { return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/ws"; }
 
@@ -302,7 +303,12 @@
     var m;
     try { m = JSON.parse(data); } catch (e) { return; }
     if (m.t === "hello") {
-      if (session && m.role && session.role !== m.role) { session.role = m.role; saveSession(); }
+      if (session && m.role && (session.role !== m.role || !!session.owner !== !!m.owner)) {
+        var changed = everHello;
+        session.role = m.role; session.owner = !!m.owner; saveSession();
+        if (changed) emit("role"); // someone changed this person's access while the page was open
+      }
+      everHello = true;
     } else if (m.t === "snap") {
       var sub = subs[m.sid];
       if (sub) {
@@ -425,7 +431,7 @@
         return null;
       });
     },
-    status: function () { return { signedIn: !!session, email: session ? session.email : info.email, role: session ? session.role : "none", noAccess: !!info.noAccess }; },
+    status: function () { return { signedIn: !!session, email: session ? session.email : info.email, role: session ? session.role : "none", owner: !!(session && session.owner), noAccess: !!info.noAccess }; },
     signIn: signIn,
     signOut: signOut,
     authFetch: function (url, opts) {

@@ -237,6 +237,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
         <div class="qt" id="qtext">No question picked yet.</div>
         <div class="by" id="qby"></div>
       </div>
+      <div class="qbox" id="myQBox" hidden>
+        <div class="lbl">Your own question</div>
+        <div class="qt" id="myQText">Tap the button for a random question.</div>
+        <div class="by">Only you see this. It does not change the question on the stream.</div>
+        <div class="toolbar"><button class="primary" id="myQBtn" type="button">Random question for me</button></div>
+      </div>
       <div class="toolbar">
         <button class="primary contrib-only" id="randomQ">Random question</button>
         <button class="ghost contrib-only" id="backQ" hidden>Back</button>
@@ -960,6 +966,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     var m = state.mode;
     document.querySelectorAll(".host-only").forEach(function (e) { e.hidden = m !== "host"; });
     document.querySelectorAll(".contrib-only").forEach(function (e) { e.hidden = m === "viewer"; });
+    $("myQBox").hidden = m !== "viewer";
     $("tabs").hidden = m !== "host";
     if (m === "host") { var t0 = "d"; try { t0 = sessionStorage.getItem("sd-tab") || "d"; } catch (e) {} showTab(TABS[t0] ? t0 : "d"); }
     else { $("panelD").hidden = true; $("panelM").hidden = true; $("panelP").hidden = true; $("panelQ").hidden = m === "viewer"; }
@@ -972,6 +979,23 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
   }
 
   function renderAll() { renderStage(); renderDaters(); renderQuestions(); renderMatches(); renderStream(); renderStreams(); }
+
+  /* ---------- private question picker (viewers only, writes nothing) ---------- */
+  var myBag = [], myLast = null;
+  function pickMine() {
+    var byId = {}; state.questions.forEach(function (q) { if (q.text) byId[q.id] = q; });
+    var ids = Object.keys(byId);
+    if (!ids.length) { $("myQText").textContent = "No questions yet."; return; }
+    myBag = myBag.filter(function (id) { return byId[id]; });
+    if (!myBag.length) {
+      myBag = ids;
+      for (var i = myBag.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = myBag[i]; myBag[i] = myBag[j]; myBag[j] = t; }
+      if (myBag.length > 1 && myBag[myBag.length - 1] === myLast) { var t2 = myBag[0]; myBag[0] = myBag[myBag.length - 1]; myBag[myBag.length - 1] = t2; }
+    }
+    myLast = myBag.pop();
+    $("myQText").textContent = byId[myLast].text;
+  }
+  $("myQBtn").onclick = pickMine;
 
   /* ---------- boot ---------- */
   function snapDocs(snap) { return snap.docs.map(function (d) { var o = Object.assign({}, d.data() || {}); o.id = d.id; return o; }); }
@@ -998,7 +1022,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
           db.collection("daters").onSnapshot(function (s) { state.daters = snapDocs(s); state.gotDaters = true; renderAll(); syncViews(); }, function () {});
           db.collection("matches").onSnapshot(function (s) { state.matches = snapDocs(s); renderMatches(); }, function () {});
         }
-        if (mode !== "viewer") db.collection("questions").onSnapshot(function (s) { state.questions = snapDocs(s); renderQuestions(); }, function () {});
+        db.collection("questions").onSnapshot(function (s) { state.questions = snapDocs(s); renderQuestions(); }, function () {});
         db.collection("seats").onSnapshot(function (s) {
           var m = {}, v = {}, u = {}, sn = {}, docs = {};
           SEATS.forEach(function (k) { docs[k] = emptySig(k); });
@@ -1016,6 +1040,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     if (s === "offline") toast("Connection lost. Reconnecting...");
     else if (s === "online") toast("Back online. Board refreshed.");
     else if (s === "auth") toast("Signed out. Reload the page to sign in again.");
+    else if (s === "role") toast("Your access was changed. Reload the page.");
   });
   if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(start); else start();
 })();

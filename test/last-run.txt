@@ -1,4 +1,4 @@
-Test results 2026-11-10T23:25:30.391Z
+Test results 2026-11-11T00:21:23.741Z
 
 
 == Import script and export endpoint (round trip)
@@ -116,6 +116,56 @@ PASS  ...and other users still get the change after the wake-up
 PASS  session refresh returns a new token
 PASS  an open connection accepts the refreshed session
 
+== Role assignment: owners, editors, the admin page API
+PASS  a person listed as owner logs in as editor-level with owner true
+PASS  owner can list people (secret entries are included and marked)
+PASS  a normal editor can list people but is not an owner
+PASS  Contributor cannot use the admin API (403)
+PASS  Viewer cannot use the admin API (403)
+PASS  no login: admin API refused (401)
+PASS  forged session: admin API refused (401)
+PASS  admin POST from a wrong Origin is refused (403)
+PASS  before being added, an unlisted account gets no access (403)
+PASS  owner adds the stranger as Viewer (email is lower-cased)
+PASS  the new Viewer can now sign in and gets role viewer
+PASS  their WebSocket opens with role viewer
+PASS  the new Viewer can read questions but cannot write
+PASS  the new Viewer cannot read daters
+PASS  a normal editor can promote a Viewer to Contributor
+PASS  their open page is told right away that its access changed
+PASS  ...and the new access applies to the open connection at once (can add questions now)
+PASS  a normal editor cannot make anyone an Editor (403)
+PASS  a normal editor cannot make a brand new Editor either (403)
+PASS  owner makes the helper an Editor (200)
+PASS  the helper signs in as an editor but not an owner
+PASS  the helper reads daters like any Editor
+PASS  the helper (editor) can use the admin API but cannot make Editors (403)
+PASS  the helper can add a Viewer
+PASS  a normal editor cannot demote or remove an Editor someone else made (403)
+PASS  people set in the ROLES secret are locked, even for owners (409)
+PASS  ...so nobody can remove an owner from the page (409)
+PASS  a bad email is rejected (400)
+PASS  an unknown role is rejected (400)
+PASS  an email with list separators is rejected (400)
+PASS  the list records who added whom
+PASS  an Editor assigned on the page can download the export
+PASS  owner removes the stranger
+PASS  their open connection is closed at once (4403)
+PASS  they can no longer sign in (403)
+PASS  their old, still valid session token is refused at the door (403)
+PASS  removing the helper closes their connection too
+
+== Role rules in code (default role, owner, precedence)
+PASS  DEFAULT_ROLE can be none, viewer or contributor
+PASS  DEFAULT_ROLE can never make strangers editors or owners
+PASS  ROLES accepts commas, semicolons, new lines and any letter case
+PASS  ROLES also accepts a JSON object
+PASS  owner resolves to editor level with owner true
+PASS  the secret beats a role assigned on the page
+PASS  an assigned role beats the default
+PASS  unlisted and unassigned falls back to DEFAULT_ROLE
+PASS  email checks reject junk
+
 == Browser: three roles, live sync, reconnect
 PASS  Editor page opens in Host view
 PASS  second Editor page opens in Host view
@@ -127,7 +177,7 @@ PASS  Contributor sees no Daters, Match log or Past streams panels and no tabs
 PASS  Contributor has Random question; Viewer does not
 PASS  Viewer sees no Questions panel
 PASS  Contributor page subscribes to 3 feeds only (no daters, no matches)
-PASS  Viewer page subscribes to 2 feeds only (seats and game)
+PASS  Viewer page subscribes to 3 feeds (seats, game, questions for the picker), never daters
 PASS  Editor page subscribes to 5 feeds
 PASS  Editor A adds a dater: Editor B sees it live
 PASS  ...and B's dater count went up by one
@@ -145,6 +195,19 @@ PASS  Contributor 'Back' restores the question that was cleared, for everyone
 PASS  Contributor has the Questions panel
 PASS  Contributor adds a question: the Editor's question total goes up by one, live
 PASS  ...and the new question exists on the server
+PASS  Viewer sees the private question picker; Editor, Contributor do not
+PASS  the picker shows real questions from the list
+PASS  ...never the same question twice in a row, and no repeats until every question was shown
+PASS  the picker writes nothing: ask counts unchanged on the server
+PASS  ...and the stream's current question is unchanged
+PASS  ...and the Editor's page still shows the stream's question, not the viewer's pick
+PASS  admin page (owner) lists people, marks secret ones locked
+PASS  owner adds a person on the page and they appear in the list
+PASS  ...and the person can sign in as Viewer
+PASS  a normal editor's page cannot pick Editor (option disabled) and says so
+PASS  a Contributor on the admin page is told they cannot manage access
+PASS  owner removes them on the page and they disappear
+PASS  ...and they can no longer sign in
 PASS  Editor page through the test proxy is live
 PASS  connection loss is noticed and the page says so
 PASS  a write while offline fails fast with the page's normal 'Could not save' message
@@ -157,4 +220,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-140 passed, 0 failed, 140 total
+199 passed, 0 failed, 199 total

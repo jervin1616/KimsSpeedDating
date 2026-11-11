@@ -144,20 +144,23 @@ npx wrangler secret put ROLES
 When it asks for the value, type one line like this, using the real Google email addresses:
 
 ```
-kim@gmail.com=editor,mod1@gmail.com=contributor,mod2@gmail.com=contributor,fan@gmail.com=viewer
+you@gmail.com=owner,kim@gmail.com=owner,eddey@gmail.com=owner,mod1@gmail.com=contributor
 ```
+
+Put the three people who may create Editors (you, Kim and Eddey) as `owner`. Everyone else is added later on the access page, so the secret only needs the owners.
 
 What the roles mean:
 
 | Role | What they can do |
 |---|---|
-| `editor` | Everything: seat daters, edit daters, match log, past streams, questions, backups |
+| `owner` | Everything an editor can do, plus making Editors on the access page (`/admin.html`). Owners can only be set here, in the secret |
+| `editor` | Everything: seat daters, edit daters, match log, past streams, questions, backups. Can add or remove Contributors and Viewers on `/admin.html` |
 | `contributor` | Add questions, ask and randomize questions. Cannot seat daters. Cannot read the daters list |
-| `viewer` | Watch the board and the current question. Cannot write anything |
+| `viewer` | Watch the board and the current question, and use a private "Random question for me" button that does not change the stream. Cannot write anything |
 
 Rules: separate people with commas, write `email=role` with no spaces around `=`.
 Use the exact address the person signs in with. Gmail dots and `+` tricks do not match, so `k.im@gmail.com` is not `kim@gmail.com`.
-Anyone who is not on the list gets no access at all (this is the default role `none`).
+Anyone who signs in with a Google account but is not on the list gets the default role, which in this project is `viewer` (set in `wrangler.jsonc`). Change `"DEFAULT_ROLE"` to `"none"` and redeploy if you want unlisted people locked out completely.
 
 **7c. The import key (needed only for the import in step 9).** Make a value and keep it visible for the next steps.
 
@@ -281,15 +284,27 @@ If the connection drops mid-stream the page shows "Connection lost. Reconnecting
 
 ---
 
-## Changing the mod list later
+## Who can use the app, and how to change it
+
+Three places decide someone's role, strongest first:
+
+1. **The `ROLES` secret.** Owners live here, so nobody can be locked out by mistake. People here are locked on the access page.
+2. **The access page, `YOUR ADDRESS/admin.html`.** Owners and editors type an email, pick a role, and click Save. It takes effect immediately, even for people who are already on the app: their page tells them to reload, and anyone you remove is disconnected at once.
+3. **`DEFAULT_ROLE`** in `wrangler.jsonc`, for any other Google account. It is `viewer` here, so anyone who signs in can watch and use the private question picker. It can only be `none`, `viewer` or `contributor`, never `editor`.
+
+Who may do what on the access page:
+
+| | Make Editors | Change or remove an Editor | Add or remove Contributors and Viewers | Change people in the secret |
+|---|---|---|---|---|
+| Owner | yes | yes | yes | no (edit the secret) |
+| Editor | no | no | yes | no |
+| Everyone else | no | no | no | no |
+
+To change the owners or fix a locked person, run this and type the whole new list (it replaces the old one). Do it before a stream, not during one:
 
 ```bash
 npx wrangler secret put ROLES
 ```
-
-Type the whole new list (it replaces the old one). Do it before a stream, not during one.
-To let any signed-in Google account watch as a viewer, set `"DEFAULT_ROLE": "viewer"` in `wrangler.jsonc` and run `npx wrangler deploy`.
-The default role can only be `none`, `viewer` or `contributor`, never `editor`.
 
 ---
 
@@ -316,10 +331,11 @@ If a limit is ever hit, Cloudflare stops that kind of operation until midnight U
 
 | Path | What it is |
 |---|---|
-| `public/index.html` | The page. Same as before except sign-in text and a small Google button on the sign-in screen, and "connection lost / back online" messages |
+| `public/index.html` | The page. Same as before except sign-in text and a small Google button on the sign-in screen, "connection lost / back online" messages, and a private question picker that only Viewers see |
 | `public/db-shim.js` | Replaces the Claude runtime. Keeps the same calls the page already used |
 | `public/backup.html` | Editor-only page that downloads a backup |
 | `public/privacy.html` | Privacy page that Google requires for the sign-in app |
+| `public/admin.html` | Access page: owners and editors assign roles |
 | `src/worker.js` | The API: sign-in, sessions, WebSocket door, export, import |
 | `src/auth.js` | Checks Google tokens, maps emails to roles, signs sessions |
 | `src/database.js` | The Durable Object: SQLite storage and live sync |
@@ -338,7 +354,7 @@ If a limit is ever hit, Cloudflare stops that kind of operation until midnight U
 | `matches` | Editor | Editor |
 | `seats` (including past stream summaries) | Anyone signed in with a role | Editor |
 | `game` (the one document `question`) | Anyone signed in with a role | Contributor or higher |
-| `questions` | Anyone signed in with a role | Contributor or higher |
+| `questions` | Anyone signed in with a role (includes the chat handles that came with each question) | Contributor or higher |
 | anything else | rejected | rejected |
 
 Roles go Editor, then Contributor, then Viewer (read only). People not on the list have no role and get nothing.
@@ -355,7 +371,7 @@ Removing someone from `ROLES` takes effect on their next action.
 npm test
 ```
 
-This starts the app locally, imports your `data` folder (or sample data if there is none), runs about 140 checks with three kinds of user
+This starts the app locally, imports your `data` folder (or sample data if there is none), runs about 200 checks with three kinds of user
 in real browser windows, and writes the result to `test/last-run.txt`.
 The one thing it cannot test is the real Google button, because that needs your real Client ID and address (step 11 covers it).
 
@@ -365,7 +381,7 @@ The one thing it cannot test is the real Google button, because that needs your 
 |---|---|
 | Sign in button says "Sign-in is not set up yet" | Step 6 and step 8: Client ID missing from `wrangler.jsonc` or not deployed |
 | Google says "origin not allowed" or "Error 400: origin_mismatch" | The address in step 5 item 7 must match exactly. Wait a few minutes after saving |
-| "This Google account is not on the list" | Add the exact email to `ROLES` (step 7b) |
+| "This Google account is not on the list" | Only appears if `DEFAULT_ROLE` is `none`. Add the email on `/admin.html`, or set the default to `viewer` |
 | Google says only test users can sign in | Step 5 item 6: publish the app, or add the person as a test user |
 | Everything loads but nothing saves | Check `SESSION_SECRET` was set (step 7a), then `npx wrangler deploy` |
 | `npx wrangler secret put` says no Worker exists | Do step 4 first |

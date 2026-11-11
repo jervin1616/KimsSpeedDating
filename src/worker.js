@@ -1,5 +1,5 @@
 // Worker: serves the API. Static files (the page) are served by Cloudflare assets and are free.
-import { verifyGoogleToken, roleFor, mintSession, verifySession, canRefresh, safeEqual } from "./auth.js";
+import { verifyGoogleToken, mintSession, verifySession, canRefresh, safeEqual } from "./auth.js";
 import { LEVEL } from "./rules.js";
 
 export { Database } from "./database.js";
@@ -35,7 +35,8 @@ function database(env) {
 async function sessionFromRequest(env, request) {
   const s = await verifySession(env, bearer(request));
   if (!s) return null;
-  return { ...s, role: roleFor(env, s.email) };
+  const who = await database(env).whoami(s.email);
+  return { ...s, role: who.role, owner: who.owner };
 }
 
 export default {
@@ -58,17 +59,17 @@ export default {
         } catch (e) {
           return json({ error: "invalid_token", message: e.message }, 401);
         }
-        const role = roleFor(env, who.email);
-        if (role === "none") return json({ error: "no_access", email: who.email }, 403);
+        const me = await database(env).whoami(who.email);
+        if (me.role === "none") return json({ error: "no_access", email: who.email }, 403);
         const s = await mintSession(env, who.email);
-        return json({ token: s.token, exp: s.exp, email: who.email, role });
+        return json({ token: s.token, exp: s.exp, email: who.email, role: me.role, owner: me.owner });
       }
 
       if (path === "/api/session" && request.method === "GET") {
         const s = await sessionFromRequest(env, request);
         if (!s) return json({ error: "unauthorized" }, 401);
         if (s.role === "none") return json({ error: "no_access", email: s.email }, 403);
-        return json({ email: s.email, role: s.role, exp: s.exp });
+        return json({ email: s.email, role: s.role, owner: s.owner, exp: s.exp });
       }
 
       if (path === "/api/refresh" && request.method === "POST") {
@@ -76,7 +77,7 @@ export default {
         const s = await sessionFromRequest(env, request);
         if (!s || s.role === "none" || !canRefresh(s)) return json({ error: "unauthorized" }, 401);
         const n = await mintSession(env, s.email, s.iat);
-        return json({ token: n.token, exp: n.exp, email: s.email, role: s.role });
+        return json({ token: n.token, exp: n.exp, email: s.email, role: s.role, owner: s.owner });
       }
 
       if (path === "/api/ws") {
@@ -87,11 +88,27 @@ export default {
         const token = protocols.find((p) => p && p !== "kim-v1");
         const s = await verifySession(env, token);
         if (!s) return new Response("Not signed in.", { status: 401 });
-        if (roleFor(env, s.email) === "none") return new Response("No access.", { status: 403 });
         const headers = new Headers(request.headers);
         headers.set("x-user-email", s.email);
         headers.set("x-session-exp", String(s.exp));
         return database(env).fetch(new Request(request.url, { method: "GET", headers }));
+      }
+
+      if (path === "/api/roles") {
+        // The admin page: owners and editors manage who can use the app (see DEPLOY.md).
+        if (request.method !== "GET" && request.method !== "POST") return json({ error: "not_found" }, 404);
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        let r;
+        if (request.method === "GET") r = await database(env).listRoles(s.email);
+        else {
+          let body;
+          try { body = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+          r = await database(env).changeRole(s.email, body && body.email, body && body.role);
+        }
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : r.code === "locked" ? 409 : 400);
       }
 
       if (path === "/api/export" && request.method === "GET") {

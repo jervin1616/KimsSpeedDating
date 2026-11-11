@@ -5,12 +5,13 @@ import {
   RULES, MAX_MESSAGE_BYTES, RuleError, isKnownCollection, validDocId, canRead, canWrite,
   parsePath, validateDoc, newId,
 } from "./rules.js";
-import { roleFor, verifySession } from "./auth.js";
+import { resolveRole, secretEntries, validEmail, verifySession } from "./auth.js";
 
 const MAX_SOCKETS = 40;
 const BUCKET_SIZE = 200; // write/read messages allowed in a burst
 const BUCKET_REFILL_PER_SEC = 50;
 const MAX_VIOLATIONS = 200; // then the connection is closed
+const MAX_ASSIGNED_ROLES = 300;
 
 export class Database extends DurableObject {
   constructor(ctx, env) {
@@ -19,9 +20,79 @@ export class Database extends DurableObject {
     this.sql.exec(
       "CREATE TABLE IF NOT EXISTS docs (coll TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (coll, id)) WITHOUT ROWID"
     );
+    this.sql.exec("CREATE TABLE IF NOT EXISTS roles (email TEXT PRIMARY KEY, role TEXT NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL) WITHOUT ROWID");
+    this.dbRoles = null; // loaded on first use after each wake-up (a handful of rows)
     // Heartbeats are answered without waking the object, so they cost nothing.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
     this.buckets = new WeakMap();
+  }
+
+  /* ---------- roles ---------- */
+
+  loadRoles() {
+    if (!this.dbRoles) {
+      this.dbRoles = new Map();
+      for (const r of this.sql.exec("SELECT email, role FROM roles").toArray()) this.dbRoles.set(r.email, r.role);
+    }
+    return this.dbRoles;
+  }
+
+  // { role, owner, source } for any email.
+  resolve(email) {
+    const e = String(email || "").toLowerCase();
+    return resolveRole(this.env, e, this.loadRoles().get(e));
+  }
+
+  // Called after an owner or editor changes someone's role: tell or disconnect their open pages.
+  onRolesChanged(email) {
+    const r = this.resolve(email);
+    for (const ws of this.ctx.getWebSockets()) {
+      const att = ws.deserializeAttachment();
+      if (!att || att.email !== email) continue;
+      if (r.role === "none") { try { ws.close(4403, "No access."); } catch (e) { /* gone */ } }
+      else this.send(ws, { t: "hello", role: r.role, owner: r.owner, email });
+    }
+  }
+
+  whoami(email) {
+    return this.resolve(email);
+  }
+
+  // Actor must be an editor or owner. Returns { ok, ... } or { ok:false, code, message }.
+  listRoles(actorEmail) {
+    const actor = this.resolve(actorEmail);
+    if (actor.role !== "editor") return { ok: false, code: "forbidden", message: "Not allowed." };
+    const assigned = this.sql.exec("SELECT email, role, by, ts FROM roles ORDER BY email").toArray().map((r) => ({ ...r, source: "admin" }));
+    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned] };
+  }
+
+  // role: "viewer" | "contributor" | "editor" | "none" (remove).
+  // Owners can do everything except change people listed in the ROLES secret.
+  // Other editors can only give or take away viewer and contributor, and cannot touch editors.
+  changeRole(actorEmail, targetEmail, role) {
+    const actor = this.resolve(actorEmail);
+    if (actor.role !== "editor") return { ok: false, code: "forbidden", message: "Not allowed." };
+    const target = String(targetEmail || "").trim().toLowerCase();
+    if (!validEmail(target)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
+    if (!["viewer", "contributor", "editor", "none"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
+    const current = this.resolve(target);
+    if (current.source === "secret") return { ok: false, code: "locked", message: "That person is set in the ROLES secret and can only be changed there." };
+    if (!actor.owner) {
+      if (role === "editor") return { ok: false, code: "forbidden", message: "Only owners can make editors." };
+      if (current.source === "admin" && current.role === "editor") return { ok: false, code: "forbidden", message: "Only owners can change an editor." };
+    }
+    const roles = this.loadRoles();
+    if (role === "none") {
+      this.sql.exec("DELETE FROM roles WHERE email = ?", target);
+      roles.delete(target);
+    } else {
+      if (!roles.has(target) && roles.size >= MAX_ASSIGNED_ROLES) return { ok: false, code: "full", message: "The list is full." };
+      this.sql.exec("INSERT INTO roles (email, role, by, ts) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO UPDATE SET role = excluded.role, by = excluded.by, ts = excluded.ts",
+        target, role, actorEmail, Date.now());
+      roles.set(target, role);
+    }
+    this.onRolesChanged(target);
+    return { ok: true, email: target, role };
   }
 
   /* ---------- WebSocket entry ---------- */
@@ -32,14 +103,15 @@ export class Database extends DurableObject {
     const exp = Number(request.headers.get("x-session-exp"));
     if (!email || !exp) return new Response("Bad request.", { status: 400 });
     if (this.ctx.getWebSockets().length >= MAX_SOCKETS) return new Response("Too many connections.", { status: 503 });
-    const role = roleFor(this.env, email);
+    const me = this.resolve(email);
+    const role = me.role;
     if (role === "none") return new Response("No access.", { status: 403 });
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ email, exp, colls: [] });
-    server.send(JSON.stringify({ t: "hello", role, email }));
+    server.send(JSON.stringify({ t: "hello", role, owner: me.owner, email }));
     return new Response(null, { status: 101, webSocket: client, headers: { "Sec-WebSocket-Protocol": "kim-v1" } });
   }
 
@@ -60,7 +132,7 @@ export class Database extends DurableObject {
     if (message.length > MAX_MESSAGE_BYTES) { ws.close(1009, "Message too big."); return; }
     const now = Math.floor(Date.now() / 1000);
     if (!att.exp || att.exp <= now) { ws.close(4401, "Session expired."); return; }
-    const role = roleFor(this.env, att.email);
+    const role = this.resolve(att.email).role;
     if (role === "none") { ws.close(4403, "No access."); return; }
 
     const limited = this.take(ws);
@@ -208,7 +280,7 @@ export class Database extends DurableObject {
     for (const ws of this.ctx.getWebSockets()) {
       const att = ws.deserializeAttachment();
       if (!att || !att.colls || !att.colls.includes(coll) || att.exp <= now) continue;
-      if (!canRead(roleFor(this.env, att.email), coll)) continue;
+      if (!canRead(this.resolve(att.email).role, coll)) continue;
       this.send(ws, out);
     }
   }

@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { resolveRole, defaultRole, parseRoles, validEmail } from "../src/auth.js";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
@@ -25,8 +26,9 @@ const ADMIN_KEY = crypto.randomBytes(24).toString("hex");
 const EMAILS = {
   editorA: "editor.a@example.com", editorB: "editor.b@example.com",
   contributor: "mod@example.com", viewer: "viewer@example.com", stranger: "stranger@example.com",
+  helper: "helper@example.com", uipick: "uipick@example.com",
 };
-const ROLES = `${EMAILS.editorA}=editor;${EMAILS.editorB}=editor;${EMAILS.contributor}=contributor;${EMAILS.viewer}=viewer`;
+const ROLES = `${EMAILS.editorA}=owner;${EMAILS.editorB}=editor;${EMAILS.contributor}=contributor;${EMAILS.viewer}=viewer`;
 
 /* ---------- tiny test runner ---------- */
 const results = [];
@@ -375,16 +377,97 @@ try {
   idle.close();
   for (const c of Object.values(C)) c.close();
 
+  /* ===== roles admin ===== */
+  group("Role assignment: owners, editors, the admin page API");
+  const rolesApi = async (session, method = "GET", body, extra = {}) => {
+    const r = await fetch(BASE + "/api/roles", { method, headers: { Authorization: "Bearer " + (session ? session.token : "none"), "content-type": "application/json", ...extra }, body: body ? JSON.stringify(body) : undefined });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const loginRes = await login(EMAILS.editorA);
+  check("a person listed as owner logs in as editor-level with owner true", loginRes.body.role === "editor" && loginRes.body.owner === true, loginRes.body);
+  const lb = await rolesApi(sessions.editorA);
+  check("owner can list people (secret entries are included and marked)", lb.status === 200 && lb.body.you.owner === true && lb.body.people.some((p) => p.email === EMAILS.editorB && p.source === "secret"), lb);
+  const lbE = await rolesApi(sessions.editorB);
+  check("a normal editor can list people but is not an owner", lbE.status === 200 && lbE.body.you.owner === false, lbE);
+  check("Contributor cannot use the admin API (403)", (await rolesApi(sessions.contributor)).status === 403);
+  check("Viewer cannot use the admin API (403)", (await rolesApi(sessions.viewer)).status === 403);
+  check("no login: admin API refused (401)", (await rolesApi(null)).status === 401);
+  check("forged session: admin API refused (401)", (await rolesApi({ token: ourSession(EMAILS.editorA, { secret: "z".repeat(40) }) })).status === 401);
+  check("admin POST from a wrong Origin is refused (403)", (await rolesApi(sessions.editorA, "POST", { email: EMAILS.newbie || "n@example.com", role: "viewer" }, { Origin: "https://evil.example.com" })).status === 403);
+
+  check("before being added, an unlisted account gets no access (403)", (await login(EMAILS.stranger)).status === 403);
+  const addV = await rolesApi(sessions.editorA, "POST", { email: EMAILS.stranger.toUpperCase(), role: "viewer" });
+  check("owner adds the stranger as Viewer (email is lower-cased)", addV.status === 200 && addV.body.email === EMAILS.stranger, addV);
+  const sl = await login(EMAILS.stranger);
+  check("the new Viewer can now sign in and gets role viewer", sl.status === 200 && sl.body.role === "viewer" && sl.body.owner === false, sl.body);
+  const sw = await connect(sl.session);
+  const swHello = await sw.wait((m) => m.t === "hello");
+  check("their WebSocket opens with role viewer", sw.status.ok && swHello && swHello.role === "viewer", swHello);
+  check("the new Viewer can read questions but cannot write", allowed(await sw.sub("questions")) && wDenied(await sw.w("add", "questions", null, dataFor.questions)));
+  const daterDeny = await sw.sub("daters");
+  check("the new Viewer cannot read daters", denied(daterDeny), daterDeny);
+
+  const upC = await rolesApi(sessions.editorB, "POST", { email: EMAILS.stranger, role: "contributor" });
+  check("a normal editor can promote a Viewer to Contributor", upC.status === 200, upC);
+  const live = await sw.wait((m) => m.t === "hello" && m.role === "contributor", 3000);
+  check("their open page is told right away that its access changed", !!live, sw.msgs.filter((m) => m.t === "hello"));
+  check("...and the new access applies to the open connection at once (can add questions now)", wOk(await sw.w("add", "questions", null, { ...dataFor.questions, text: "From the new contributor" })));
+  check("a normal editor cannot make anyone an Editor (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.stranger, role: "editor" })).status === 403);
+  check("a normal editor cannot make a brand new Editor either (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "editor" })).status === 403);
+  check("owner makes the helper an Editor (200)", (await rolesApi(sessions.editorA, "POST", { email: EMAILS.helper, role: "editor" })).status === 200);
+  const hl = await login(EMAILS.helper);
+  check("the helper signs in as an editor but not an owner", hl.status === 200 && hl.body.role === "editor" && hl.body.owner === false, hl.body);
+  const hc = await connect(hl.session);
+  check("the helper reads daters like any Editor", allowed(await hc.sub("daters")));
+  check("the helper (editor) can use the admin API but cannot make Editors (403)", (await rolesApi(hl.session, "POST", { email: EMAILS.uipick, role: "editor" })).status === 403);
+  check("the helper can add a Viewer", (await rolesApi(hl.session, "POST", { email: EMAILS.uipick, role: "viewer" })).status === 200);
+  check("a normal editor cannot demote or remove an Editor someone else made (403)", (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "viewer" })).status === 403 && (await rolesApi(sessions.editorB, "POST", { email: EMAILS.helper, role: "none" })).status === 403);
+  const lockedChange = await rolesApi(sessions.editorA, "POST", { email: EMAILS.editorB, role: "viewer" });
+  check("people set in the ROLES secret are locked, even for owners (409)", lockedChange.status === 409, lockedChange);
+  check("...so nobody can remove an owner from the page (409)", (await rolesApi(sessions.editorA, "POST", { email: EMAILS.editorA, role: "none" })).status === 409);
+  check("a bad email is rejected (400)", (await rolesApi(sessions.editorA, "POST", { email: "not-an-email", role: "viewer" })).status === 400);
+  check("an unknown role is rejected (400)", (await rolesApi(sessions.editorA, "POST", { email: "x@example.com", role: "admin" })).status === 400);
+  check("an email with list separators is rejected (400)", (await rolesApi(sessions.editorA, "POST", { email: "a@example.com,b@example.com", role: "viewer" })).status === 400);
+  const listAfter = await rolesApi(sessions.editorA);
+  const helperRow = listAfter.body.people.find((p) => p.email === EMAILS.helper);
+  check("the list records who added whom", helperRow && helperRow.by === EMAILS.editorA && helperRow.role === "editor" && helperRow.source === "admin", helperRow);
+  const exH = await fetch(BASE + "/api/export", { headers: { Authorization: "Bearer " + hl.session.token } });
+  check("an Editor assigned on the page can download the export", exH.status === 200, exH.status);
+
+  const rm = await rolesApi(sessions.editorA, "POST", { email: EMAILS.stranger, role: "none" });
+  check("owner removes the stranger", rm.status === 200, rm);
+  await sleep(500);
+  check("their open connection is closed at once (4403)", sw.closed === 4403, sw.closed);
+  check("they can no longer sign in (403)", (await login(EMAILS.stranger)).status === 403);
+  check("their old, still valid session token is refused at the door (403)", (await connect(sl.session)).status.status === 403);
+  await rolesApi(sessions.editorA, "POST", { email: EMAILS.helper, role: "none" });
+  await sleep(400);
+  check("removing the helper closes their connection too", hc.closed === 4403, hc.closed);
+  await rolesApi(sessions.editorA, "POST", { email: EMAILS.uipick, role: "none" });
+  sw.close(); hc.close();
+
+  group("Role rules in code (default role, owner, precedence)");
+  check("DEFAULT_ROLE can be none, viewer or contributor", defaultRole({}) === "none" && defaultRole({ DEFAULT_ROLE: "viewer" }) === "viewer" && defaultRole({ DEFAULT_ROLE: "contributor" }) === "contributor");
+  check("DEFAULT_ROLE can never make strangers editors or owners", defaultRole({ DEFAULT_ROLE: "editor" }) === "none" && defaultRole({ DEFAULT_ROLE: "owner" }) === "none" && defaultRole({ DEFAULT_ROLE: "EDITOR " }) === "none");
+  const envR = { ROLES: "Boss@x.com=owner, ed@x.com=editor ; c@x.com=contributor\nv@x.com=viewer", DEFAULT_ROLE: "viewer" };
+  check("ROLES accepts commas, semicolons, new lines and any letter case", ["boss@x.com", "ed@x.com", "c@x.com", "v@x.com"].every((e) => parseRoles(envR.ROLES).has(e)));
+  check("ROLES also accepts a JSON object", parseRoles('{"a@x.com":"editor","b@x.com":"nonsense"}').get("a@x.com") === "editor" && !parseRoles('{"a@x.com":"editor","b@x.com":"nonsense"}').has("b@x.com"));
+  check("owner resolves to editor level with owner true", JSON.stringify(resolveRole(envR, "BOSS@x.com")) === JSON.stringify({ role: "editor", owner: true, source: "secret" }));
+  check("the secret beats a role assigned on the page", resolveRole(envR, "v@x.com", "editor").role === "viewer");
+  check("an assigned role beats the default", resolveRole(envR, "new@x.com", "contributor").role === "contributor");
+  check("unlisted and unassigned falls back to DEFAULT_ROLE", resolveRole(envR, "new@x.com").role === "viewer" && resolveRole({}, "new@x.com").role === "none");
+  check("email checks reject junk", validEmail("a@b.co") && !validEmail("a@b") && !validEmail("a b@c.com") && !validEmail("a@b.com,c@d.com") && !validEmail("a=b@c.com") && !validEmail(5));
+
   /* ===== browser ===== */
   group("Browser: three roles, live sync, reconnect");
   browser = await chromium.launch();
-  const mkPage = async (session, base = BASE) => {
+  const mkPage = async (session, base = BASE, path = "/") => {
     const ctx = await browser.newContext({ viewport: { width: 1100, height: 1300 } });
     await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
     await ctx.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } window.__ev = []; window.addEventListener("claude-conn", (e) => window.__ev.push(e.detail.state)); }, ["sd.session.v1", JSON.stringify(session)]);
     const page = await ctx.newPage();
     page.errors = []; page.on("pageerror", (e) => page.errors.push(e.message));
-    await page.goto(base + "/");
+    await page.goto(base + path);
     return page;
   };
   const text = (p, sel) => p.locator(sel).innerText();
@@ -403,7 +486,7 @@ try {
   check("Viewer sees no Questions panel", await V.locator("#panelQ").isHidden());
   const subsOf = async (p) => (await p.evaluate(() => window.claude._test.state())).subs;
   check("Contributor page subscribes to 3 feeds only (no daters, no matches)", (await subsOf(K)) === 3, await subsOf(K));
-  check("Viewer page subscribes to 2 feeds only (seats and game)", (await subsOf(V)) === 2, await subsOf(V));
+  check("Viewer page subscribes to 3 feeds (seats, game, questions for the picker), never daters", (await subsOf(V)) === 3, await subsOf(V));
   check("Editor page subscribes to 5 feeds", (await subsOf(A)) === 5, await subsOf(A));
 
   // two Editors, both directions
@@ -442,6 +525,35 @@ try {
   check("Contributor adds a question: the Editor's question total goes up by one, live", await until(async () => Number(/(\d+) total/i.exec(await text(A, "#totalCount"))[1]) === totalA0 + 1, 5000), totalA0);
   check("...and the new question exists on the server", !!(await until(async () => (await viaWs.sub("questions")).docs.some((d) => d.data.text === "Added by a mod live?"), 4000)));
 
+  // viewer's private picker
+  check("Viewer sees the private question picker; Editor, Contributor do not", await V.locator("#myQBox").isVisible() && await A.locator("#myQBox").isHidden() && await K.locator("#myQBox").isHidden());
+  const before = await connect(sessions.editorA); const qBefore = await before.sub("questions"); const gBefore = await before.sub("game/question");
+  const allTexts = new Set(qBefore.docs.map((d) => d.data.text));
+  const seenPick = [];
+  for (let i = 0; i < 6; i++) { await V.click("#myQBtn"); seenPick.push(await text(V, "#myQText")); }
+  check("the picker shows real questions from the list", seenPick.every((t) => allTexts.has(t)), seenPick);
+  check("...never the same question twice in a row, and no repeats until every question was shown", seenPick.every((t, i) => i === 0 || t !== seenPick[i - 1]) && new Set(seenPick).size === seenPick.length, seenPick);
+  await sleep(500);
+  const qAfter = await before.sub("questions"); const gAfter = await before.sub("game/question");
+  const sumAsk = (snap) => snap.docs.reduce((n, d) => n + (d.data.askCount || 0) + (d.data.lastAsked || 0), 0);
+  check("the picker writes nothing: ask counts unchanged on the server", sumAsk(qBefore) === sumAsk(qAfter), { b: sumAsk(qBefore), a: sumAsk(qAfter) });
+  check("...and the stream's current question is unchanged", JSON.stringify(gBefore.docs) === JSON.stringify(gAfter.docs));
+  check("...and the Editor's page still shows the stream's question, not the viewer's pick", (await text(A, "#qtext")) !== seenPick[seenPick.length - 1] || allTexts.size < 2);
+  before.close();
+
+  // admin page in a real browser
+  const AD = await mkPage(sessions.editorA, BASE, "/admin.html"); const ADE = await mkPage(sessions.editorB, BASE, "/admin.html"); const ADK = await mkPage(sessions.contributor, BASE, "/admin.html");
+  check("admin page (owner) lists people, marks secret ones locked", await until(async () => { const t = await text(AD, "#list"); return t.includes(EMAILS.editorB) && /locked/i.test(t); }, 6000));
+  await AD.fill("#email", EMAILS.uipick); await AD.selectOption("#role", "viewer"); await AD.click("#addForm button[type=submit]");
+  check("owner adds a person on the page and they appear in the list", await until(async () => (await text(AD, "#list")).includes(EMAILS.uipick), 6000));
+  check("...and the person can sign in as Viewer", (await login(EMAILS.uipick)).body && (await login(EMAILS.uipick)).body.role === "viewer");
+  check("a normal editor's page cannot pick Editor (option disabled) and says so", await until(async () => await ADE.locator("#editorOpt").isDisabled(), 6000) && /Only owners/.test(await text(ADE, "#rules")));
+  check("a Contributor on the admin page is told they cannot manage access", await until(async () => /not an owner or editor/.test(await text(ADK, "#msg")), 6000) && await ADK.locator("#listCard").isHidden());
+  AD.once("dialog", (d) => d.accept());
+  await AD.locator("#list .row", { hasText: EMAILS.uipick }).getByRole("button", { name: "Remove" }).click();
+  check("owner removes them on the page and they disappear", await until(async () => !(await text(AD, "#list")).includes(EMAILS.uipick), 6000));
+  check("...and they can no longer sign in", (await login(EMAILS.uipick)).status === 403);
+
   // reconnect
   const P = await mkPage(sessions.editorA, PROXY_BASE);
   check("Editor page through the test proxy is live", await until(async () => (await roleOf(P)) === "Host view" && Number(await text(P, "#daterCount")) > 0));
@@ -471,7 +583,7 @@ try {
   check("5 abrupt drops in a row: the page reconnected every time", okDrops === 5, okDrops);
   viaWs.close();
 
-  const errs = [A, B, K, V, P].flatMap((p) => p.errors);
+  const errs = [A, B, K, V, P, AD, ADE, ADK].flatMap((p) => p.errors);
   check("no JavaScript errors on any page during the whole run", errs.length === 0, errs);
 } catch (e) {
   console.error(e);
