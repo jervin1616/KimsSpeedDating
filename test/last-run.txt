@@ -1,4 +1,4 @@
-Test results 2026-11-11T06:54:36.239Z
+Test results 2026-11-11T07:26:34.333Z
 
 
 == Import script and export endpoint (round trip)
@@ -316,14 +316,30 @@ PASS  ...and the Editor's page still shows the stream's question, not the viewer
 PASS  the admin page explains what each role can do and what an unlisted person gets
 PASS  the role help is not shown to people who cannot manage access
 PASS  admin page (owner) lists people, marks secret ones locked
-PASS  owner adds a person on the page and they appear in the list
+PASS  owner adds a viewer on the page and they appear in the Viewers section
 PASS  ...and the person can sign in as Viewer
 PASS  a normal Editor on the admin page is told they are not an owner and sees no controls
 PASS  a Contributor on the admin page is told the same
 PASS  the page lists people who signed in recently
-PASS  clicking Add moves them into People with the chosen role
+PASS  clicking Add moves them into the Viewers section
 PASS  owner removes them on the page and they disappear
 PASS  ...and they can no longer sign in
+PASS  people with more than watch-only access are in their own section at the top (owners, editors, contributors)
+PASS  ...with a count that matches
+PASS  viewers are in a section of their own, below that, and never mixed into the staff list
+PASS  ...and the Viewers section sits below the staff section
+PASS  changing a viewer to Contributor moves them up into the staff section
+PASS  ...and the change shows up under Recent changes with an Undo
+PASS  ...and an Undo button appears right at the top of the page
+PASS  one tap on that Undo puts them back in the Viewers section
+PASS  ...and on the server they are a Viewer again
+PASS  older entries for the same person no longer offer Undo (it says they changed again)
+PASS  an accidental Remove disappears from the list...
+PASS  ...but Recent changes says who was removed and what they were
+PASS  ...and they cannot sign in while removed
+PASS  Undo brings them straight back as a Contributor in the staff section
+PASS  the history records who did what (server side)
+PASS  only owners can read that history (403 for an Editor and a Contributor)
 PASS  Editor page through the test proxy is live
 PASS  connection loss is noticed and the page says so
 PASS  a write while offline fails fast with the page's normal 'Could not save' message
@@ -340,4 +356,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-315 passed, 0 failed, 315 total
+331 passed, 0 failed, 331 total

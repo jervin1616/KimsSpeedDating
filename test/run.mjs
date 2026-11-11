@@ -814,24 +814,58 @@ try {
   const AD = await mkPage(sessions.editorA, BASE, "/admin.html"); const ADE = await mkPage(sessions.editorB, BASE, "/admin.html"); const ADK = await mkPage(sessions.contributor, BASE, "/admin.html");
   check("the admin page explains what each role can do and what an unlisted person gets", await until(async () => { const t = await text(AD, "#helpCard"); return ["Owner", "Editor", "Contributor", "Viewer"].every((r) => t.includes(r)) && /gets no access/.test(await text(AD, "#defaultNote")); }, 6000), await text(AD, "#helpCard"));
   check("the role help is not shown to people who cannot manage access", await ADK.locator("#helpCard").isHidden() && await ADE.locator("#helpCard").isHidden());
-  check("admin page (owner) lists people, marks secret ones locked", await until(async () => { const t = await text(AD, "#list"); return t.includes(EMAILS.editorB) && /locked/i.test(t); }, 6000));
+  check("admin page (owner) lists people, marks secret ones locked", await until(async () => { const t = await text(AD, "#staffList"); return t.includes(EMAILS.editorB) && /locked/i.test(t); }, 6000));
   await AD.fill("#email", EMAILS.uipick); await AD.selectOption("#role", "viewer"); await AD.click("#addForm button[type=submit]");
-  check("owner adds a person on the page and they appear in the list", await until(async () => (await text(AD, "#list")).includes(EMAILS.uipick), 6000));
+  check("owner adds a viewer on the page and they appear in the Viewers section", await until(async () => (await text(AD, "#viewerList")).includes(EMAILS.uipick), 6000));
   check("...and the person can sign in as Viewer", (await login(EMAILS.uipick)).body && (await login(EMAILS.uipick)).body.role === "viewer");
-  check("a normal Editor on the admin page is told they are not an owner and sees no controls", await until(async () => /not an owner/.test(await text(ADE, "#msg")), 6000) && await ADE.locator("#listCard").isHidden() && await ADE.locator("#addCard").isHidden());
+  check("a normal Editor on the admin page is told they are not an owner and sees no controls", await until(async () => /not an owner/.test(await text(ADE, "#msg")), 6000) && await ADE.locator("#listCard").isHidden() && await ADE.locator("#viewerCard").isHidden() && await ADE.locator("#logCard").isHidden() && await ADE.locator("#addCard").isHidden());
   check("a Contributor on the admin page is told the same", await until(async () => /not an owner/.test(await text(ADK, "#msg")), 6000) && await ADK.locator("#listCard").isHidden());
   await login("pending@example.com");
   await AD.reload();
   check("the page lists people who signed in recently", await until(async () => (await text(AD, "#seenList")).includes("pending@example.com"), 6000));
   await AD.locator("#seenList .row", { hasText: "pending@example.com" }).getByRole("button", { name: "Add" }).click();
-  check("clicking Add moves them into People with the chosen role", await until(async () => (await text(AD, "#list")).includes("pending@example.com") && !(await text(AD, "#seenList")).includes("pending@example.com"), 6000));
+  check("clicking Add moves them into the Viewers section", await until(async () => (await text(AD, "#viewerList")).includes("pending@example.com") && !(await text(AD, "#seenList")).includes("pending@example.com"), 6000));
   AD.once("dialog", (d) => d.accept());
-  await AD.locator("#list .row", { hasText: "pending@example.com" }).getByRole("button", { name: "Remove" }).click();
-  await until(async () => !(await text(AD, "#list")).includes("pending@example.com"), 6000);
+  await AD.locator("#viewerList .row", { hasText: "pending@example.com" }).getByRole("button", { name: "Remove" }).click();
+  await until(async () => !(await text(AD, "#viewerList")).includes("pending@example.com"), 6000);
   AD.once("dialog", (d) => d.accept());
-  await AD.locator("#list .row", { hasText: EMAILS.uipick }).getByRole("button", { name: "Remove" }).click();
-  check("owner removes them on the page and they disappear", await until(async () => !(await text(AD, "#list")).includes(EMAILS.uipick), 6000));
+  await AD.locator("#viewerList .row", { hasText: EMAILS.uipick }).getByRole("button", { name: "Remove" }).click();
+  check("owner removes them on the page and they disappear", await until(async () => !(await text(AD, "#viewerList")).includes(EMAILS.uipick), 6000));
   check("...and they can no longer sign in", (await login(EMAILS.uipick)).status === 403);
+
+  // sections and one-tap undo
+  const mk = { mod: "modx@example.com", ed: "edx@example.com", v1: "vw1@example.com", v2: "vw2@example.com" };
+  const adminApi = (email, role) => rolesApi(sessions.editorA, "POST", { email, role });
+  await adminApi(mk.mod, "contributor"); await adminApi(mk.ed, "editor"); await adminApi(mk.v1, "viewer"); await adminApi(mk.v2, "viewer");
+  await AD.reload();
+  const staffCount = (await rolesApi(sessions.editorA)).body.people.filter((p) => p.role !== "viewer").length;
+  check("people with more than watch-only access are in their own section at the top (owners, editors, contributors)", await until(async () => { const t = await text(AD, "#staffList"); return t.includes(mk.mod) && t.includes(mk.ed) && t.includes(EMAILS.editorA) && !t.includes(mk.v1) && /owners \(1\)/i.test(t) && /editors \(/i.test(t) && /contributors \(/i.test(t); }, 6000), await text(AD, "#staffList"));
+  check("...with a count that matches", Number(await text(AD, "#staffCount")) === staffCount, { shown: await text(AD, "#staffCount"), staffCount });
+  check("viewers are in a section of their own, below that, and never mixed into the staff list", await until(async () => { const t = await text(AD, "#viewerList"); return t.includes(mk.v1) && t.includes(mk.v2) && t.includes(EMAILS.viewer) && !t.includes(mk.mod) && !t.includes(mk.ed); }, 6000));
+  const ys = await AD.evaluate(() => ({ staff: document.getElementById("listCard").getBoundingClientRect().top, viewers: document.getElementById("viewerCard").getBoundingClientRect().top }));
+  check("...and the Viewers section sits below the staff section", ys.viewers > ys.staff, ys);
+
+  await AD.locator("#viewerList .row", { hasText: mk.v1 }).locator("select").selectOption("contributor");
+  check("changing a viewer to Contributor moves them up into the staff section", await until(async () => (await text(AD, "#staffList")).includes(mk.v1) && !(await text(AD, "#viewerList")).includes(mk.v1), 6000));
+  check("...and the change shows up under Recent changes with an Undo", await until(async () => { const r = AD.locator("#logList .row", { hasText: mk.v1 }).first(); return (await r.count()) && /Viewer to Contributor/.test(await r.innerText()) && await r.getByRole("button", { name: /Undo/ }).isVisible(); }, 6000));
+  check("...and an Undo button appears right at the top of the page", await AD.locator("#undoBtn").isVisible() && /back to Viewer/.test(await AD.locator("#undoBtn").innerText()));
+  await AD.click("#undoBtn");
+  check("one tap on that Undo puts them back in the Viewers section", await until(async () => (await text(AD, "#viewerList")).includes(mk.v1) && !(await text(AD, "#staffList")).includes(mk.v1), 6000));
+  const v1Role = (await rolesApi(sessions.editorA)).body.people.find((p) => p.email === mk.v1);
+  check("...and on the server they are a Viewer again", v1Role && v1Role.role === "viewer", v1Role);
+  check("older entries for the same person no longer offer Undo (it says they changed again)", await until(async () => /Changed again since/.test(await text(AD, "#logList")), 6000));
+
+  AD.once("dialog", (d) => d.accept());
+  await AD.locator("#staffList .row", { hasText: mk.mod }).getByRole("button", { name: "Remove" }).click();
+  check("an accidental Remove disappears from the list...", await until(async () => !(await text(AD, "#staffList")).includes(mk.mod), 6000));
+  check("...but Recent changes says who was removed and what they were", await until(async () => { const r = AD.locator("#logList .row", { hasText: mk.mod }).first(); return (await r.count()) && /Removed \(was Contributor\)/.test(await r.innerText()); }, 6000));
+  check("...and they cannot sign in while removed", (await rolesApi(sessions.editorA)).body.people.every((p) => p.email !== mk.mod));
+  await AD.locator("#logList .row", { hasText: mk.mod }).first().getByRole("button", { name: /Undo/ }).click();
+  check("Undo brings them straight back as a Contributor in the staff section", await until(async () => (await text(AD, "#staffList")).includes(mk.mod), 6000) && (await rolesApi(sessions.editorA)).body.people.find((p) => p.email === mk.mod).role === "contributor");
+  const apiLog = (await rolesApi(sessions.editorA)).body.log;
+  check("the history records who did what (server side)", apiLog.length >= 4 && apiLog[0].actor === EMAILS.editorA && apiLog[0].email === mk.mod && apiLog[0].from_role === "none" && apiLog[0].to_role === "contributor", apiLog.slice(0, 2));
+  check("only owners can read that history (403 for an Editor and a Contributor)", (await rolesApi(sessions.editorB)).status === 403 && (await rolesApi(sessions.contributor)).status === 403);
+  for (const e of Object.values(mk)) await adminApi(e, "none");
 
   // reconnect
   const P = await mkPage(sessions.editorA, PROXY_BASE);

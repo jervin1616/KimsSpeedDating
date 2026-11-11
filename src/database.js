@@ -30,6 +30,7 @@ export class Database extends DurableObject {
     );
     this.sql.exec("CREATE TABLE IF NOT EXISTS roles (email TEXT PRIMARY KEY, role TEXT NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS seen (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL) WITHOUT ROWID");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS role_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, actor TEXT NOT NULL, email TEXT NOT NULL, from_role TEXT NOT NULL, to_role TEXT NOT NULL)");
     this.dbRoles = null; // loaded on first use after each wake-up (a handful of rows)
     // Heartbeats are answered without waking the object, so they cost nothing.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -144,7 +145,8 @@ export class Database extends DurableObject {
     const assigned = this.sql.exec("SELECT email, role, by, ts FROM roles ORDER BY email").toArray().map((r) => ({ ...r, source: "admin" }));
     const seen = this.sql.exec("SELECT email, first, last, n FROM seen ORDER BY last DESC LIMIT 100").toArray()
       .filter((r) => this.resolve(r.email).source === "default");
-    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, defaultRole: defaultRole(this.env) };
+    const log = this.sql.exec("SELECT id, ts, actor, email, from_role, to_role FROM role_log ORDER BY id DESC LIMIT 25").toArray();
+    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, log, defaultRole: defaultRole(this.env) };
   }
 
   // role: "viewer" | "contributor" | "editor" | "none" (remove) | "forget" (delete from the recent sign-ins).
@@ -171,6 +173,11 @@ export class Database extends DurableObject {
       this.sql.exec("INSERT INTO roles (email, role, by, ts) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO UPDATE SET role = excluded.role, by = excluded.by, ts = excluded.ts",
         target, role, actorEmail, Date.now());
       roles.set(target, role);
+    }
+    const before = current.source === "admin" ? current.role : "none";
+    if (before !== role) { // remember it so the owner can undo a mistake with one tap
+      this.sql.exec("INSERT INTO role_log (ts, actor, email, from_role, to_role) VALUES (?, ?, ?, ?, ?)", Date.now(), actorEmail, target, before, role);
+      this.sql.exec("DELETE FROM role_log WHERE id <= (SELECT MAX(id) FROM role_log) - 100");
     }
     this.onRolesChanged(target);
     return { ok: true, email: target, role };

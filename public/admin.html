@@ -24,7 +24,12 @@
   dl{margin:0;display:flex;flex-direction:column;gap:10px}
   dt{font-weight:700}
   dd{margin:2px 0 0;color:#ecd0cb}
-  .lock{font-size:12px;color:#ffb347;border:1px solid #ffb347;border-radius:999px;padding:1px 8px;white-space:nowrap}
+  .sub{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#d9a39b;margin:10px 0 4px}
+  .sub:first-child{margin-top:0}
+  .count{font-size:12px;color:#d9a39b;border:1px solid #6e1518;border-radius:999px;padding:1px 9px;margin-left:6px;font-weight:600}
+  #undoRow{display:flex;gap:8px;align-items:center}
+  .row .why{color:#c98a86;font-size:12px}
+    .lock{font-size:12px;color:#ffb347;border:1px solid #ffb347;border-radius:999px;padding:1px 8px;white-space:nowrap}
   #msg{min-height:1.4em;color:#f9e8e3}
   .err{color:#ff9aa6}
 </style></head><body><main>
@@ -32,6 +37,7 @@
   <p>Owners only. People you add can sign in with the Google account for that email.</p>
   <div id="gsi"></div>
   <p id="msg" role="status"></p>
+  <div id="undoRow" hidden><button id="undoBtn" type="button" class="primary"></button></div>
   <div><button id="signOut" type="button" hidden>Sign out</button></div>
   <section class="card" id="addCard" hidden>
     <h2>Add or change someone</h2>
@@ -41,6 +47,21 @@
       <button class="primary" type="submit">Save</button>
     </form>
     <p id="rules"></p>
+  </section>
+  <section class="card" id="listCard" hidden>
+    <h2>Owners, editors and contributors <span class="count" id="staffCount">0</span></h2>
+    <p>People with more than watch-only access.</p>
+    <div id="staffList"></div>
+  </section>
+  <section class="card" id="logCard" hidden>
+    <h2>Recent changes</h2>
+    <p>Changed someone by accident? Tap <b>Undo</b> and they go straight back.</p>
+    <div id="logList"></div>
+  </section>
+  <section class="card" id="viewerCard" hidden>
+    <h2>Viewers <span class="count" id="viewerCount">0</span></h2>
+    <p id="viewerNote">People you added as watch-only.</p>
+    <div id="viewerList"></div>
   </section>
   <section class="card" id="seenCard" hidden>
     <h2>Signed in, not on the list</h2>
@@ -57,10 +78,6 @@
     </dl>
     <p id="defaultNote"></p>
   </section>
-  <section class="card" id="listCard" hidden>
-    <h2>People</h2>
-    <div id="list"></div>
-  </section>
 </main>
 <script src="/db-shim.js"></script>
 <script>
@@ -75,35 +92,90 @@
   function ago(ts) { return ts ? new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; }
   var LABEL = { owner: "Owner", editor: "Editor", contributor: "Contributor", viewer: "Viewer" };
 
+  var roleMap = new Map();
+  var RANK = { owner: 0, editor: 1, contributor: 2, viewer: 3 };
+  function personRow(p) {
+    var row = document.createElement("div"); row.className = "row";
+    var who = document.createElement("div"); who.className = "who";
+    who.appendChild(document.createTextNode(p.email));
+    var meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = p.source === "secret" ? "Set in the ROLES secret" : "Last changed by " + p.by + " " + ago(p.ts);
+    who.appendChild(meta); row.appendChild(who);
+    var right = document.createElement("div"); right.className = "form";
+    if (p.source === "secret") {
+      var l = document.createElement("span"); l.className = "lock"; l.textContent = LABEL[p.role] + " (locked)"; right.appendChild(l);
+    } else {
+      var sel = document.createElement("select"); sel.setAttribute("aria-label", "Role for " + p.email);
+      ["viewer", "contributor", "editor"].forEach(function (r) { var o = document.createElement("option"); o.value = r; o.textContent = LABEL[r]; if (r === p.role) o.selected = true; sel.appendChild(o); });
+      sel.onchange = function () { change(p.email, sel.value); };
+      var del = document.createElement("button"); del.type = "button"; del.className = "danger"; del.textContent = "Remove";
+      del.onclick = function () { if (window.confirm("Remove " + p.email + "? They lose access right away. You can undo it from Recent changes.")) change(p.email, "none"); };
+      right.appendChild(sel); right.appendChild(del);
+    }
+    row.appendChild(right);
+    return row;
+  }
+  function byRoleThenEmail(a, b) { return (RANK[a.role] - RANK[b.role]) || (a.email < b.email ? -1 : 1); }
+
   function render(data) {
     me = data.you;
-    $("addCard").hidden = false; $("listCard").hidden = false; $("helpCard").hidden = false;
-    $("defaultNote").textContent = "Anyone else who signs in with Google " + ({ none: "gets no access.", viewer: "can watch as a Viewer.", contributor: "is a Contributor." }[data.defaultRole] || "gets no access.");
+    roleMap = new Map(data.people.map(function (p) { return [p.email, p.role]; }));
+    $("addCard").hidden = false; $("listCard").hidden = false; $("viewerCard").hidden = false; $("helpCard").hidden = false;
+    var def = { none: "gets no access.", viewer: "can watch as a Viewer.", contributor: "is a Contributor." }[data.defaultRole] || "gets no access.";
+    $("defaultNote").textContent = "Anyone else who signs in with Google " + def;
     $("rules").textContent = "You are an owner. Owners are locked on this page. They can only be changed by whoever manages this site's Cloudflare account.";
     renderSeen(data.seen || []);
-    var list = $("list"); list.textContent = "";
-    data.people.forEach(function (p) {
+    renderLog(data.log || []);
+
+    // above: everyone with more than watch-only access, grouped by role
+    var staff = data.people.filter(function (p) { return p.role !== "viewer"; }).sort(byRoleThenEmail);
+    $("staffCount").textContent = staff.length;
+    var sl = $("staffList"); sl.textContent = "";
+    [["owner", "Owners"], ["editor", "Editors"], ["contributor", "Contributors"]].forEach(function (g) {
+      var members = staff.filter(function (p) { return p.role === g[0]; });
+      if (!members.length) return;
+      var h = document.createElement("div"); h.className = "sub"; h.textContent = g[1] + " (" + members.length + ")"; sl.appendChild(h);
+      members.forEach(function (p) { sl.appendChild(personRow(p)); });
+    });
+    if (!staff.length) { var e = document.createElement("p"); e.textContent = "Nobody yet."; sl.appendChild(e); }
+
+    // their own section: viewers
+    var viewers = data.people.filter(function (p) { return p.role === "viewer"; }).sort(byRoleThenEmail);
+    $("viewerCount").textContent = viewers.length;
+    $("viewerNote").textContent = data.defaultRole === "viewer" ? "People you added as watch-only. Anyone else who signs in with Google can also watch, so they only appear here if you added them." : "People you added as watch-only.";
+    var vl = $("viewerList"); vl.textContent = "";
+    viewers.forEach(function (p) { vl.appendChild(personRow(p)); });
+    if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
+  }
+
+  function labelOf(r) { return LABEL[r] || r; }
+  function renderLog(log) {
+    $("logCard").hidden = !log.length;
+    var box = $("logList"); box.textContent = "";
+    var seenEmail = {};
+    log.forEach(function (e) {
+      var latest = !seenEmail[e.email]; seenEmail[e.email] = true;
+      var cur = roleMap.get(e.email) || "none";
+      var canUndo = latest && cur === e.to_role;
       var row = document.createElement("div"); row.className = "row";
       var who = document.createElement("div"); who.className = "who";
-      who.appendChild(document.createTextNode(p.email));
+      who.appendChild(document.createTextNode(e.email));
+      var what = e.to_role === "none" ? "Removed (was " + labelOf(e.from_role) + ")" : e.from_role === "none" ? "Added as " + labelOf(e.to_role) : labelOf(e.from_role) + " to " + labelOf(e.to_role);
       var meta = document.createElement("div"); meta.className = "meta";
-      meta.textContent = p.source === "secret" ? "Set in the ROLES secret" : "Added by " + p.by + " " + ago(p.ts);
-      who.appendChild(meta); row.appendChild(who);
-      var right = document.createElement("div"); right.className = "form";
-      if (p.source === "secret") {
-        var l = document.createElement("span"); l.className = "lock"; l.textContent = LABEL[p.role] + " (locked)"; right.appendChild(l);
-      } else {
-        var sel = document.createElement("select"); sel.setAttribute("aria-label", "Role for " + p.email);
-        ["viewer", "contributor", "editor"].forEach(function (r) { var o = document.createElement("option"); o.value = r; o.textContent = LABEL[r]; if (r === p.role) o.selected = true; sel.appendChild(o); });
-        var locked = false;
-        sel.onchange = function () { change(p.email, sel.value); };
-        var del = document.createElement("button"); del.type = "button"; del.className = "danger"; del.textContent = "Remove"; del.disabled = locked;
-        del.onclick = function () { if (window.confirm("Remove " + p.email + "? They lose access right away.")) change(p.email, "none"); };
-        right.appendChild(sel); right.appendChild(del);
+      meta.textContent = what + " by " + e.actor + ", " + ago(e.ts);
+      who.appendChild(meta);
+      if (!canUndo) { var w = document.createElement("div"); w.className = "why"; w.textContent = "Changed again since, so no Undo here"; who.appendChild(w); }
+      row.appendChild(who);
+      if (canUndo) {
+        var b = document.createElement("button"); b.type = "button"; b.textContent = "Undo";
+        b.setAttribute("aria-label", "Undo: " + e.email + ", " + what);
+        b.onclick = function () { change(e.email, e.from_role, true); };
+        var right = document.createElement("div"); right.className = "form"; right.appendChild(b); row.appendChild(right);
       }
-      row.appendChild(right); list.appendChild(row);
+      box.appendChild(row);
     });
   }
+
   function renderSeen(seen) {
     $("seenCard").hidden = !seen.length;
     $("seenNote").textContent = "These people signed in with Google but are not on the list, so they only get the default access (watching). Add them to give more, or forget them to clear the entry.";
@@ -127,10 +199,22 @@
     });
   }
   function load() { return api("GET").then(render).catch(function (e) { say(e.message, true); }); }
-  function change(email, role) {
-    say("Saving...");
-    return api("POST", { email: email, role: role }).then(function () { say(role === "forget" ? "Forgot " + email + "." : role === "none" ? "Removed " + email + "." : "Saved " + email + " as " + LABEL[role] + "."); return load(); })
-      .catch(function (e) { say(e.message, true); return load(); });
+  var undoTimer = null;
+  function hideUndo() { clearTimeout(undoTimer); $("undoRow").hidden = true; }
+  function showUndo(email, prev) {
+    var b = $("undoBtn");
+    b.textContent = prev === "none" ? "Undo: take " + email + " off the list again" : "Undo: put " + email + " back to " + labelOf(prev);
+    b.onclick = function () { change(email, prev, true); };
+    $("undoRow").hidden = false; clearTimeout(undoTimer); undoTimer = setTimeout(hideUndo, 20000);
+  }
+  function change(email, role, isUndo) {
+    var prev = roleMap.get(email) || "none";
+    hideUndo(); say("Saving...");
+    return api("POST", { email: email, role: role }).then(function () {
+      say(isUndo ? "Undone: " + email + (role === "none" ? " is off the list." : " is back to " + labelOf(role) + ".") : role === "forget" ? "Forgot " + email + "." : role === "none" ? "Removed " + email + "." : "Saved " + email + " as " + LABEL[role] + ".");
+      if (!isUndo && role !== "forget" && prev !== role) showUndo(email, prev);
+      return load();
+    }).catch(function (e) { say(e.message, true); return load(); });
   }
   $("addForm").onsubmit = function (ev) {
     ev.preventDefault();
