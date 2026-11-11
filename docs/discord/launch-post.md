@@ -32,3 +32,7 @@ Please use a **second device** (like your phone while you stream on your compute
 ## Short ping (for @everyone or a reminder an hour before)
 
 The viewer screen is live. Link in the pinned post. Stream starts at 5 PM Eastern, and if you're on the panel, please use a second device or write your questions down first. 💘
+
+## Video caption (for docs/discord/viewer-tour.mp4)
+
+Quick tour of the viewer screen 💘 Watch the board live, tap **Random question for me** (only you see it), narrow it by category, and add it to your home screen. Free, sign in with Google, 18+. Link is pinned.
