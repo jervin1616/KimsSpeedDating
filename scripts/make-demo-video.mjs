@@ -76,14 +76,18 @@ const page = await ctx.newPage();
 // Playwright's own recorder is 1x only (soft on phones), so grab the screencast frames ourselves at full 2x size.
 const cdp = await ctx.newCDPSession(page);
 const frames = []; let fi = 0;
+let firstWall = 0, firstT = 0, lastT = 0;
 cdp.on("Page.screencastFrame", (f) => {
+  if (!frames.length) { firstWall = Date.now(); firstT = f.metadata.timestamp; }
+  lastT = f.metadata.timestamp;
   const name = "f" + String(fi++).padStart(6, "0") + ".jpg";
   writeFileSync(join(frameDir, name), Buffer.from(f.data, "base64"));
   frames.push({ name, t: f.metadata.timestamp });
   cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {});
 });
 await cdp.send("Page.startScreencast", { format: "jpeg", quality: 92, maxWidth: SIZE.width * 2, maxHeight: SIZE.height * 2, everyNthFrame: 1 });
-const cap = (t) => page.evaluate((x) => window.__cap(x), t);
+const capEvents = []; // { wall, text } , drawn under the phone later (text null = clear)
+const cap = async (t) => { capEvents.push({ wall: Date.now(), text: t || null }); };
 const card = (a, b, c) => page.evaluate(([x, y, z]) => window.__card(x, y, z), [a, b, c]);
 await page.goto(BASE + "/");
 await page.waitForSelector("#app:not([hidden])", { timeout: 20000 });
@@ -137,10 +141,39 @@ let list = "";
 frames.forEach((f, i) => { const next = frames[i + 1]; list += `file '${f.name}'\nduration ${(next ? Math.max(0.01, next.t - f.t) : 0.6).toFixed(4)}\n`; });
 list += `file '${frames[frames.length - 1].name}'\n`;
 writeFileSync(join(frameDir, "list.txt"), list);
-console.log(frames.length + " frames");
+const D = lastT - firstT + 0.6;
+console.log(frames.length + " frames, " + D.toFixed(1) + " s");
+
+// ---- the picture around the phone: background, phone frame, and one caption image per caption
+const W = 1080, H = 1920, BX = 189, BY = 70, BW = 702, BH = 1459, RING = 26; // phone body and its bezel
+const SX = BX + RING, SY = BY + RING, SW = BW - 2 * RING, SH = BH - 2 * RING; // screen
+const assets = join(dir, "assets"); mkdirSync(assets);
+const art = await chromium.launch(); const ap = await art.newPage({ viewport: { width: W, height: H } });
+const snap = async (html, file, box, transparent) => { await ap.setContent(html, { waitUntil: "load" }); await ap.screenshot({ path: join(assets, file), omitBackground: !!transparent, ...(box ? { clip: box } : {}) }); };
+let sparks = ""; { let r = 7; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 70; i++) sparks += `<i style="left:${(rnd() * W).toFixed(0)}px;top:${(rnd() * H).toFixed(0)}px;width:${(2 + rnd() * 4).toFixed(1)}px;height:${(2 + rnd() * 4).toFixed(1)}px;opacity:${(0.2 + rnd() * 0.5).toFixed(2)}"></i>`; }
+const base = `*{box-sizing:border-box;margin:0}body{width:${W}px;height:${H}px;position:relative;overflow:hidden;font-family:system-ui,"Segoe UI",Roboto,Arial,sans-serif}`;
+await snap(`<style>${base}body{background:radial-gradient(circle at 50% 28%,#5a0a14 0%,#2a0508 55%,#140102 100%)}i{position:absolute;border-radius:50%;background:#ff7a93}.glow{position:absolute;left:${BX - 40}px;top:${BY - 30}px;width:${BW + 80}px;height:${BH + 60}px;border-radius:130px;background:rgba(255,45,85,.35);filter:blur(60px)}</style><body>${sparks}<div class="glow"></div></body>`, "bg.png");
+await snap(`<style>${base}body{background:transparent}.ph{position:absolute;left:${BX}px;top:${BY}px;width:${BW}px;height:${BH}px;border-radius:92px;border:${RING}px solid #0d0d11;box-shadow:0 0 0 4px #5b5b66,0 0 0 7px #26262d}.isl{position:absolute;left:${(W - 96) / 2}px;top:${SY + 8}px;width:96px;height:26px;border-radius:13px;background:#000}.b{position:absolute;background:#3a3a44;border-radius:4px}</style><body><div class="ph"></div><div class="isl"></div><div class="b" style="left:${BX - 11}px;top:${BY + 250}px;width:7px;height:80px"></div><div class="b" style="left:${BX - 11}px;top:${BY + 350}px;width:7px;height:120px"></div><div class="b" style="left:${BX - 11}px;top:${BY + 490}px;width:7px;height:120px"></div><div class="b" style="left:${BX + BW + 4}px;top:${BY + 380}px;width:7px;height:170px"></div></body>`, "bezel.png", null, true);
+// captions: collapse the events into on/off spans
+const spans = []; const t0 = firstWall;
+capEvents.forEach((e, i) => { if (!e.text) return; const start = Math.max(0, (e.wall - t0) / 1000), end = i + 1 < capEvents.length ? (capEvents[i + 1].wall - t0) / 1000 : D; spans.push({ start, end: Math.min(end, D), text: e.text }); });
+const CY = BY + BH + 36, CH = H - CY - 40;
+for (let i = 0; i < spans.length; i++) {
+  const m = /^(\d)\.\s*(.*)$/.exec(spans[i].text), num = m ? m[1] : "", body = m ? m[2] : spans[i].text;
+  const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  await snap(`<style>${base}body{background:transparent;width:${W}px;height:${CH}px}.c{position:absolute;left:60px;right:60px;top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:22px;gap:14px;text-align:center}.n{width:58px;height:58px;border-radius:50%;background:#ff2d55;color:#fff;font:800 32px/58px system-ui,sans-serif;box-shadow:0 0 20px #ff2d55}.t{color:#fff;font:700 52px/1.18 system-ui,"Segoe UI",Roboto,Arial,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.6)}</style><body><div class="c">${num ? `<div class="n">${num}</div>` : ""}<div class="t">${esc(body)}</div></div></body>`, `cap${i}.png`, { x: 0, y: 0, width: W, height: CH }, true);
+}
+await art.close();
+
+// ---- put it all together: video inside the phone, caption under the phone
 mkdirSync(join(ROOT, "docs", "discord"), { recursive: true });
 const out = join(ROOT, "docs", "discord", "viewer-tour.mp4");
-const ff = spawnSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", join(frameDir, "list.txt"), "-vf", "fps=30,scale=780:1688:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-crf", "25", "-preset", "slow", "-movflags", "+faststart", "-an", out], { encoding: "utf8" });
-if (ff.status !== 0) { console.error(ff.stderr.slice(-800)); stop(); process.exit(1); }
+const inputs = ["-f", "concat", "-safe", "0", "-i", join(frameDir, "list.txt"), "-loop", "1", "-i", join(assets, "bg.png"), "-loop", "1", "-i", join(assets, "bezel.png")];
+spans.forEach((_, i) => inputs.push("-loop", "1", "-i", join(assets, `cap${i}.png`)));
+let g = `[0:v]fps=30,scale=${SW}:${SH}:flags=lanczos[v];[1:v][v]overlay=${SX}:${SY}[a];[a][2:v]overlay=0:0[b0]`;
+spans.forEach((sp, i) => { g += `;[b${i}][${3 + i}:v]overlay=0:${CY}:enable='between(t,${sp.start.toFixed(2)},${sp.end.toFixed(2)})'[b${i + 1}]`; });
+g += `;[b${spans.length}]format=yuv420p[o]`;
+const ff = spawnSync("ffmpeg", ["-y", ...inputs, "-filter_complex", g, "-map", "[o]", "-t", D.toFixed(2), "-c:v", "libx264", "-crf", "24", "-preset", "slow", "-movflags", "+faststart", "-an", out], { encoding: "utf8" });
+if (ff.status !== 0) { console.error(ff.stderr.slice(-1200)); stop(); process.exit(1); }
 console.log("wrote " + out);
 stop(); rmSync(dir, { recursive: true, force: true }); process.exit(0);
