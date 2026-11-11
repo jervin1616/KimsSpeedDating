@@ -321,8 +321,23 @@ Your speed dating banner is the site's icon (`public/icons/`, cropped from the b
 - **Android:** open it in Chrome, tap the three dots, then **Add to Home screen** (or **Install app**).
 - **Discord:** pasting the address now shows the card with the banner. Discord remembers previews, so if you change the card later paste the link with `?v=2` on the end to see the new one.
 - **Icons update slowly:** a phone keeps the icon it had when you added the site. Delete the home screen icon and add it again to pick up a new one.
-- **It opens like a normal web page, on purpose.** The manifest says `"display": "browser"`. Opening as a full-screen app (`"standalone"`) can break Google sign-in on iPhones, so test it on a real iPhone before switching.
+- **It opens as a full screen app** (no browser bar), because the manifest says `"display": "standalone"`. Google sign-in inside a home screen app can misbehave on iPhones, so **try it on a test copy first** (next section). If sign-in fails there, change `"standalone"` back to `"browser"` in `public/manifest.webmanifest`, redeploy, and delete and re-add the icon.
+- **An "Install the app" card appears in the browser.** On an iPhone it says to tap Share, then Add to Home Screen. On Android it says to use the menu, and shows a real **Install** button when the browser offers one. It never shows once the app is installed, "Not now" hides it for 30 days, and it stays hidden on laptops unless the browser itself offers to install.
+- **No Back button in app mode.** The admin, backup and privacy pages have a "Back to the board" link at the top, and the Admin pill opens in the same window.
 - **If the site's address ever changes** (a new Worker name or your own domain), edit the two lines `og:image` and `og:url` in `public/index.html`, because link previews need the full address.
+
+## Try it on a test copy first (free)
+
+A test copy is a second Worker with its own address and its own empty database. Your live site is not touched.
+
+1. Deploy it: `npx wrangler deploy --name kims-speed-dating-test`. It prints an address like `https://kims-speed-dating-test.YOURNAME.workers.dev`.
+2. In Google Cloud, open your OAuth client (Google Auth Platform, Clients) and **add that address** under Authorized JavaScript origins. Save.
+3. Give the test copy its secrets (same values or new ones): `npx wrangler secret put SESSION_SECRET --name kims-speed-dating-test` and the same for `ROLES`.
+4. On your phone, open the test address, add it to the home screen, open the new icon, and sign in.
+5. Check: sign-in works and **stays signed in** after you close and reopen the app; the board updates live; the bottom bar is not hidden by the phone's home bar; the Admin pill works and the Back link returns; Sign out works.
+6. When you are happy, deploy the live one with plain `npx wrangler deploy`. To remove the test copy, delete it on the Cloudflare dashboard (Workers & Pages).
+
+The test copy shares your account's free daily allowance with the live site, so keep tests short.
 
 ## Tips for hosts using the console
 

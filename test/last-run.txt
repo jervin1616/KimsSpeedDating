@@ -1,4 +1,4 @@
-Test results 2026-11-11T07:58:42.871Z
+Test results 2026-11-11T08:06:20.661Z
 
 
 == Import script and export endpoint (round trip)
@@ -299,6 +299,8 @@ PASS  ...and every icon it lists exists and is a real PNG of the declared size (
 PASS  the iPhone home screen icon is 180 by 180 and the tab icon is 32 by 32
 PASS  /favicon.ico exists (browsers ask for it by name)
 PASS  the link-preview card is a 1200 by 630 JPEG under 300 KB (Discord and others show it)
+PASS  the site is set up to open as a full screen home screen app (manifest display and iPhone tags)
+PASS  admin, backup and privacy pages have a 'Back to the board' link (a home screen app has no Back button)
 PASS  every page links the icons, the manifest and the banner colour
 PASS  the main page has link-preview tags with a full https address for the card
 PASS  home screen icons are fully opaque (no see-through corners, which phones paint black)
@@ -309,6 +311,18 @@ PASS  admin.html also fills the screen without a repeat seam
 PASS  backup.html also fills the screen without a repeat seam
 PASS  privacy.html also fills the screen without a repeat seam
 PASS  the admin, backup and privacy pages use the same red-black palette and sparkle
+PASS  as a home screen app the Admin link opens in the same window (no new tab to get lost in)
+PASS  ...while in a normal browser tab it still opens in a new tab so the console stays open
+PASS  on an iPhone browser a card tells people to Share, then Add to Home Screen
+PASS  'Not now' hides it...
+PASS  ...and it stays hidden after a reload (remembered for 30 days)
+PASS  on an Android browser it says to use the menu, then Add to Home screen or Install app
+PASS  when the browser offers a real install prompt, an Install button appears
+PASS  ...tapping it opens the browser's install prompt and then hides the card
+PASS  once it is installed and opened from the home screen, the hint never shows
+PASS  on a laptop browser the hint stays hidden (nothing to explain)
+PASS  ...unless the browser itself offers to install it, then an Install button shows
+PASS  it does not show on the sign-in screen, only after signing in
 PASS  every signed-in role sees a Sign out button
 PASS  cancelling the 'Sign out?' question keeps you signed in
 PASS  signing out returns to the sign-in screen and clears the saved login
@@ -365,4 +379,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-340 passed, 0 failed, 340 total
+354 passed, 0 failed, 354 total

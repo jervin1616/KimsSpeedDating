@@ -4,7 +4,7 @@
   "description": "Watch the board live and get a random question.",
   "start_url": "/",
   "scope": "/",
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#1b0203",
   "theme_color": "#1b0203",
   "icons": [

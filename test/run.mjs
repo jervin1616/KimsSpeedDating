@@ -783,6 +783,8 @@ try {
   check("/favicon.ico exists (browsers ask for it by name)", ico.subarray(0, 4).toString("hex") === "00000100" && ico.length > 1000);
   const og = Buffer.from(await (await fetch(BASE + "/og.jpg")).arrayBuffer());
   check("the link-preview card is a 1200 by 630 JPEG under 300 KB (Discord and others show it)", og[0] === 0xff && og[1] === 0xd8 && JSON.stringify(jpegSize(og)) === JSON.stringify({ h: 630, w: 1200 }) && og.length < 300 * 1024, { size: og.length, dims: jpegSize(og) });
+  check("the site is set up to open as a full screen home screen app (manifest display and iPhone tags)", man.display === "standalone" && /name="apple-mobile-web-app-capable" content="yes"/.test(pages["index.html"]) && /name="mobile-web-app-capable" content="yes"/.test(pages["index.html"]) && /apple-mobile-web-app-status-bar-style" content="black"/.test(pages["index.html"]), man.display);
+  check("admin, backup and privacy pages have a 'Back to the board' link (a home screen app has no Back button)", ["admin.html", "backup.html", "privacy.html"].every((f) => /<a class="back" href="\/">/.test(pages[f])));
   check("every page links the icons, the manifest and the banner colour", ["index.html", "admin.html", "backup.html", "privacy.html"].every((f) => /rel="icon"/.test(pages[f]) && /rel="apple-touch-icon"/.test(pages[f]) && /rel="manifest"/.test(pages[f]) && /name="theme-color" content="#1b0203"/.test(pages[f])));
   check("the main page has link-preview tags with a full https address for the card", /property="og:image" content="https:\/\/[^"]+\/og\.jpg"/.test(pages["index.html"]) && /property="og:title"/.test(pages["index.html"]) && /name="twitter:card" content="summary_large_image"/.test(pages["index.html"]));
   const iconPx = await A.evaluate(async () => {
@@ -800,6 +802,52 @@ try {
   await gateCtx.close();
   for (const f of ["admin.html", "backup.html", "privacy.html"]) check(`${f} also fills the screen without a repeat seam`, /no-repeat/.test(pages[f]) && /min-height:100vh/.test(pages[f]));
   check("the admin, backup and privacy pages use the same red-black palette and sparkle", ["admin.html", "backup.html", "privacy.html"].every((f) => pages[f].includes("#1b0203") && (pages[f].match(/radial-gradient/g) || []).length >= 5));
+
+  // opened as a home screen app: the Admin link stays in the same window
+  const saCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await saCtx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
+  await saCtx.addInitScript(([k, v]) => { Object.defineProperty(navigator, "standalone", { value: true }); try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }, ["sd.session.v1", JSON.stringify(sessions.editorA)]);
+  const saPg = await saCtx.newPage(); await saPg.goto(BASE + "/"); await saPg.waitForSelector("#adminLink:not([hidden])", { timeout: 8000 });
+  check("as a home screen app the Admin link opens in the same window (no new tab to get lost in)", (await saPg.locator("#adminLink").getAttribute("target")) === null);
+  check("...while in a normal browser tab it still opens in a new tab so the console stays open", (await A.locator("#adminLink").getAttribute("target")) === "_blank");
+  await saCtx.close();
+
+  // "Install the app" hint
+  const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+  const ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+  const tipPage = async (opts = {}) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, ...(opts.ua ? { userAgent: opts.ua } : {}) });
+    await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
+    await ctx.addInitScript(([k, v, standalone, signedIn]) => { if (standalone) Object.defineProperty(navigator, "standalone", { value: true }); try { if (signedIn) localStorage.setItem(k, v); } catch (e) { /* ignore */ } }, ["sd.session.v1", JSON.stringify(sessions.contributor), !!opts.standalone, opts.signedIn !== false]);
+    const pg = await ctx.newPage(); await pg.goto(BASE + "/");
+    if (opts.signedIn !== false) { await until(async () => (await roleOf(pg)) === "Limited view", 8000); await sleep(400); }
+    return { ctx, pg };
+  };
+  let t1 = await tipPage({ ua: IPHONE });
+  check("on an iPhone browser a card tells people to Share, then Add to Home Screen", await t1.pg.locator("#installTip").isVisible() && /Share.*Add to Home Screen/.test(await t1.pg.locator("#installHow").innerText()) && await t1.pg.locator("#installBtn").isHidden());
+  await t1.pg.click("#installNo");
+  check("'Not now' hides it...", await t1.pg.locator("#installTip").isHidden());
+  await t1.pg.reload(); await until(async () => (await roleOf(t1.pg)) === "Limited view", 8000); await sleep(400);
+  check("...and it stays hidden after a reload (remembered for 30 days)", await t1.pg.locator("#installTip").isHidden());
+  await t1.ctx.close();
+  let t2 = await tipPage({ ua: ANDROID });
+  check("on an Android browser it says to use the menu, then Add to Home screen or Install app", await t2.pg.locator("#installTip").isVisible() && /menu.*Add to Home screen or Install app/.test(await t2.pg.locator("#installHow").innerText()) && await t2.pg.locator("#installBtn").isHidden());
+  await t2.pg.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = () => { window.__prompted = true; }; e.userChoice = Promise.resolve({ outcome: "accepted" }); window.dispatchEvent(e); });
+  check("when the browser offers a real install prompt, an Install button appears", await t2.pg.locator("#installBtn").isVisible());
+  await t2.pg.click("#installBtn");
+  check("...tapping it opens the browser's install prompt and then hides the card", await until(async () => (await t2.pg.evaluate(() => window.__prompted === true)) && await t2.pg.locator("#installTip").isHidden(), 4000));
+  await t2.ctx.close();
+  let t3 = await tipPage({ ua: IPHONE, standalone: true });
+  check("once it is installed and opened from the home screen, the hint never shows", await t3.pg.locator("#installTip").isHidden());
+  await t3.ctx.close();
+  let t4 = await tipPage({});
+  check("on a laptop browser the hint stays hidden (nothing to explain)", await t4.pg.locator("#installTip").isHidden());
+  await t4.pg.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = () => {}; e.userChoice = Promise.resolve({}); window.dispatchEvent(e); });
+  check("...unless the browser itself offers to install it, then an Install button shows", await t4.pg.locator("#installTip").isVisible() && await t4.pg.locator("#installBtn").isVisible());
+  await t4.ctx.close();
+  let t5 = await tipPage({ ua: IPHONE, signedIn: false });
+  check("it does not show on the sign-in screen, only after signing in", await t5.pg.locator("#gate").isVisible() && await t5.pg.locator("#installTip").isHidden());
+  await t5.ctx.close();
 
   // sign out
   check("every signed-in role sees a Sign out button", (await Promise.all([A, B, K, V].map((p) => p.locator("#signOut").isVisible()))).every(Boolean));
