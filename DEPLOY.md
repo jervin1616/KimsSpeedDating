@@ -345,6 +345,7 @@ If a limit is ever hit, Cloudflare stops that kind of operation until midnight U
 | `public/index.html` | The page. Same as before except sign-in text and a small Google button on the sign-in screen, "connection lost / back online" messages, and a private question picker that only Viewers see |
 | `public/db-shim.js` | Replaces the Claude runtime. Keeps the same calls the page already used |
 | `public/backup.html` | Editor-only page that downloads a backup |
+| `public/fonts/` | The headline font (Lobster Two Bold Italic, free under the SIL Open Font License, license text included) |
 | `public/privacy.html` | Privacy page that Google requires for the sign-in app |
 | `public/admin.html` | Access page: owners assign roles |
 | `src/worker.js` | The API: sign-in, sessions, WebSocket door, export, import |

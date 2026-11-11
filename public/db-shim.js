@@ -245,8 +245,8 @@
   function onClosed(code, wasOpen) {
     sock = null; state = "closed";
     clearInterval(hbTimer);
-    setConn(everLive ? "reconnecting" : "connecting");
-    if (!connOffTimer) connOffTimer = setTimeout(function () { connOffTimer = null; if (connState !== "live") setConn("offline"); }, 10000);
+    if (connState !== "offline") setConn(everLive ? "reconnecting" : "connecting"); // once red, stay red until live again
+    if (!connOffTimer && connState !== "offline") connOffTimer = setTimeout(function () { connOffTimer = null; if (connState !== "live") setConn("offline"); }, 10000);
     var w = waiters; waiters = []; w.forEach(function (f) { f(false); });
     failPending("unavailable");
     Object.keys(subs).forEach(function (k) { subs[k].ready = false; });

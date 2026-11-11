@@ -1,4 +1,4 @@
-Test results 2026-11-11T05:48:04.547Z
+Test results 2026-11-11T06:17:34.534Z
 
 
 == Import script and export endpoint (round trip)
@@ -247,6 +247,12 @@ PASS  ...and the bar goes back to Match
 PASS  the logged match names the hot seat dater and the pick
 PASS  seats cleaned up
 PASS  on a phone the picker fits the screen and does not scroll sideways
+PASS  the headline is the banner-style lettering and still reads 'Kim's Speed Dating' to screen readers
+PASS  the headline font file is served by the site itself
+PASS  the font's license text is included
+PASS  the font really loaded in the browser (not a fallback)
+PASS  the headline is sized sensibly on laptop and phone and fits the screen
+PASS  the headline fits inside its box (nothing clipped or spilling)
 PASS  every signed-in role sees a Sign out button
 PASS  cancelling the 'Sign out?' question keeps you signed in
 PASS  signing out returns to the sign-in screen and clears the saved login
@@ -276,6 +282,7 @@ PASS  ...and the page's question snaps back to the last known server state (no h
 PASS  stale screen: still showing the old question while offline
 PASS  while reconnecting the pill says Reconnecting (amber)
 PASS  after 10 seconds without a connection the pill turns red and says Offline
+PASS  while still down the red Offline pill stays red (it does not flicker back to Reconnecting)
 PASS  the pill goes back to Live after reconnecting
 PASS  page reconnects by itself and re-syncs the question
 PASS  ...and re-syncs the question list (includes the one added during the outage)
@@ -284,4 +291,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-263 passed, 0 failed, 263 total
+270 passed, 0 failed, 270 total

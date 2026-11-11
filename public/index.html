@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Kim's Speed Dating</title>
+<link rel="preload" href="/fonts/lobster-two-700-italic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pacifico&family=Figtree:wght@400;500;600;700&display=swap">
@@ -40,6 +41,9 @@ body {
 #modeNote { text-align: center; }
 h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(2rem, 7vw, 3.2rem); margin: 0; text-shadow: 0 0 24px rgba(255,79,154,.55); text-wrap: balance; line-height: 1.1; }
 .sub { color: var(--muted); margin: 4px 0 0; }
+/* Headline lettering: same words, banner-style outline and gloss. The font file is hosted with the site (public/fonts). */
+@font-face { font-family: "LogoFont"; src: url("/fonts/lobster-two-700-italic.woff2") format("woff2"); font-weight: 700; font-style: italic; font-display: block; }
+.logo { display: block; width: clamp(260px, 88vw, 520px); height: auto; overflow: visible; text-shadow: none; }
 header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: center; text-align: center; }
 .pill { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); white-space: nowrap; }
 
@@ -217,7 +221,21 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 <div class="wrap">
   <header>
     <div>
-      <h1>Kim's Speed Dating</h1>
+      <h1>
+        <svg class="logo" viewBox="-34 -134 845.7 193" role="img" aria-label="Kim's Speed Dating">
+          <defs>
+            <linearGradient id="lgFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6a85"/><stop offset=".42" stop-color="#d8143f"/><stop offset=".78" stop-color="#9c0e31"/><stop offset="1" stop-color="#e92a70"/></linearGradient>
+            <linearGradient id="lgShine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".38" stop-color="#fff" stop-opacity=".08"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+            <filter id="lgBlur" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="7"/></filter>
+            <text id="lgText" x="0" y="0" font-family="LogoFont, 'Brush Script MT', cursive" font-weight="700" font-style="italic" font-size="100">Kim's Speed Dating</text>
+          </defs>
+          <use href="#lgText" fill="#ff2f7d" stroke="#ff2f7d" stroke-width="40" stroke-linejoin="round" filter="url(#lgBlur)" opacity=".9"/>
+          <use href="#lgText" fill="#a80f43" stroke="#a80f43" stroke-width="27" stroke-linejoin="round"/>
+          <use href="#lgText" fill="#fff4f4" stroke="#fff4f4" stroke-width="21" stroke-linejoin="round"/>
+          <use href="#lgText" fill="url(#lgFill)" stroke="#8a0d2e" stroke-width="1.6" stroke-linejoin="round"/>
+          <use href="#lgText" fill="url(#lgShine)"/>
+        </svg>
+      </h1>
     </div>
     <span class="pill" id="role">Loading</span>
     <span class="pill" id="connPill" data-state="connecting" hidden><i class="cd"></i><span id="connTxt">Connecting</span></span>

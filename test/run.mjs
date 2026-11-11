@@ -657,6 +657,15 @@ try {
   check("on a phone the picker fits the screen and does not scroll sideways", box && box.y >= 0 && box.y + box.height <= 844 && box.x >= 0 && box.x + box.width <= 390 && !(await PH.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), box);
   await PH.keyboard.press("Escape"); await PH.locator("#rTop .heart").nth(2).click();
 
+  // headline lettering
+  check("the headline is the banner-style lettering and still reads 'Kim's Speed Dating' to screen readers", (await A.locator("h1 svg.logo").getAttribute("aria-label")) === "Kim's Speed Dating" && (await A.locator("h1 svg.logo").getAttribute("role")) === "img");
+  check("the headline font file is served by the site itself", await (async () => { const r = await fetch(BASE + "/fonts/lobster-two-700-italic.woff2"); return r.status === 200 && /font\/woff2/.test(r.headers.get("content-type") || "") && /immutable/.test(r.headers.get("cache-control") || ""); })());
+  check("the font's license text is included", (await (await fetch(BASE + "/fonts/Lobster-Two-OFL-license.txt")).text()).includes("SIL Open Font License"));
+  check("the font really loaded in the browser (not a fallback)", await A.evaluate(async () => { await document.fonts.load('italic 700 100px LogoFont', 'Kim'); return document.fonts.check('italic 700 100px LogoFont'); }));
+  const logoBox = await A.locator("h1 svg.logo").boundingBox(), logoPhone = await PH.locator("h1 svg.logo").boundingBox();
+  check("the headline is sized sensibly on laptop and phone and fits the screen", logoBox.width > 400 && logoBox.width <= 521 && logoPhone.width >= 260 && logoPhone.width <= 390 - 32 + 1, { laptop: logoBox.width, phone: logoPhone.width });
+  check("the headline fits inside its box (nothing clipped or spilling)", await A.evaluate(() => { const t = document.getElementById("lgText").getBBox(), vb = document.querySelector("svg.logo").viewBox.baseVal; return t.x >= vb.x && t.x + t.width <= vb.x + vb.width && t.y >= vb.y && t.y + t.height <= vb.y + vb.height; }));
+
   // sign out
   check("every signed-in role sees a Sign out button", (await Promise.all([A, B, K, V].map((p) => p.locator("#signOut").isVisible()))).every(Boolean));
   const V2 = await mkPage(sessions.viewer);
@@ -724,6 +733,8 @@ try {
   check("stale screen: still showing the old question while offline", (await text(P, "#qtext")) !== "Changed during the outage");
   check("while reconnecting the pill says Reconnecting (amber)", await until(async () => (await P.locator("#connTxt").textContent()) === "Reconnecting", 5000), await P.locator("#connTxt").textContent());
   check("after 10 seconds without a connection the pill turns red and says Offline", await until(async () => (await P.locator("#connTxt").textContent()) === "Offline" && (await P.locator("#connPill").getAttribute("data-state")) === "offline", 14000), await P.locator("#connTxt").textContent());
+  const wobble = []; for (let i = 0; i < 12; i++) { wobble.push(await P.locator("#connTxt").textContent()); await sleep(500); }
+  check("while still down the red Offline pill stays red (it does not flicker back to Reconnecting)", wobble.every((w) => w === "Offline"), wobble);
   proxy.restore();
   check("the pill goes back to Live after reconnecting", await until(async () => (await P.locator("#connTxt").textContent()) === "Live", 25000));
   check("page reconnects by itself and re-syncs the question", await until(async () => (await text(P, "#qtext")) === "Changed during the outage", 25000), await text(P, "#qtext"));
