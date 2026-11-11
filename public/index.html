@@ -198,6 +198,16 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
 .installtip .it-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .installtip .it-text span { color: var(--muted); font-size: 13px; }
 .installtip .it-actions { display: flex; gap: 6px; flex: none; }
+.howov { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.7); display: flex; align-items: flex-end; justify-content: center; padding: 12px; }
+.howov[hidden] { display: none; }
+.how { width: 100%; max-width: 460px; max-height: 90vh; overflow: auto; background: #240306; border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.how h2 { margin: 0 0 10px; font-size: 20px; }
+.how-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.how-tabs button[aria-selected="true"] { background: var(--line); color: #fff; }
+.how-steps { margin: 0; padding-left: 22px; } .how-steps li { margin: 8px 0; line-height: 1.4; }
+.how-steps[hidden] { display: none; }
+.how-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+@media (min-width: 560px) { .howov { align-items: center; } }
 @media (max-width: 460px) { .installtip { flex-wrap: wrap; } .installtip .it-text { flex-basis: calc(100% - 60px); } .installtip .it-actions { width: 100%; justify-content: flex-end; } }
 #connPill:not([data-state="live"]) { cursor: pointer; }
 /* quiet when all is well: just the green dot. The word appears only when something is wrong. */
@@ -242,6 +252,8 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 .row.nodot { grid-template-columns: minmax(0, 1fr) auto; }
 .empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
 .note { color: var(--muted); font-size: 13px; margin: 0; }
+.note a, .legal a { color: #ff8fa8; }
+.legal { text-align: center; font-size: 12px; color: var(--muted); padding: 18px 12px 28px; }
 .toast .undo { margin-left: 6px; border: 0; background: rgba(26,5,16,.12); color: #1a0510; font-weight: 800; padding: 2px 10px; border-radius: 999px; min-height: 0; }
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: #1a0510; padding: 10px 16px; border-radius: 999px; font-weight: 600; max-width: calc(100% - 32px); z-index: 10; }
 .tag-ex { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--flame); border: 1px solid var(--flame); border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
@@ -293,13 +305,40 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   <div class="installtip" id="installTip" hidden>
     <img src="/icons/apple-touch-icon.png" alt="" width="48" height="48">
     <div class="it-text"><b>Install the app</b><span id="installHow"></span></div>
-    <div class="it-actions"><button class="primary small" id="installBtn" type="button" hidden>Install</button><button class="ghost small" id="installNo" type="button">Not now</button></div>
+    <div class="it-actions"><button class="primary small" id="installBtn" type="button">Add</button><button class="ghost small" id="installNo" type="button">Not now</button></div>
+  </div>
+
+  <div class="howov" id="howOv" hidden role="dialog" aria-modal="true" aria-labelledby="howTitle">
+    <div class="how">
+      <h2 id="howTitle">Add to your home screen</h2>
+      <div class="how-tabs" role="tablist">
+        <button type="button" class="ghost small" id="howTabIos" role="tab">iPhone</button>
+        <button type="button" class="ghost small" id="howTabAndroid" role="tab">Android</button>
+      </div>
+      <ol id="howIos" class="how-steps">
+        <li>Open this page in <b>Safari</b>. (Other browsers on iPhone may not show the option.)</li>
+        <li>Tap the <b>Share</b> button. It is the square with an arrow pointing up, at the bottom of the screen.</li>
+        <li>Scroll down the list and tap <b>Add to Home Screen</b>.</li>
+        <li>Tap <b>Add</b> in the top right corner.</li>
+        <li>Find the Kim's Speed Dating icon on your home screen and tap it. It opens full screen like an app.</li>
+      </ol>
+      <ol id="howAndroid" class="how-steps">
+        <li>Open this page in <b>Chrome</b>.</li>
+        <li>Tap the <b>menu</b> (three dots) in the top right corner.</li>
+        <li>Tap <b>Install app</b> or <b>Add to Home screen</b>.</li>
+        <li>Tap <b>Install</b> (or <b>Add</b>) to confirm.</li>
+        <li>Find the Kim's Speed Dating icon on your home screen or in your app list and tap it.</li>
+      </ol>
+      <p class="note" id="howMissing" hidden>Do not see the option? Make sure you are not in a private or incognito tab, and that you signed in on this page first.</p>
+      <div class="how-actions"><button class="primary" id="howInstall" type="button" hidden>Install now</button><button class="ghost" id="howClose" type="button">Got it</button></div>
+    </div>
   </div>
 
   <section class="gate" id="gate" hidden>
     <h2>Sign in</h2>
     <p class="note" id="gateMsg">Sign in with Google to watch the board and get random questions.</p>
     <div id="gsi" style="display:flex;justify-content:center;margin-top:12px"></div>
+    <p class="note" style="margin-top:12px;text-align:center">You must be 18 or older. By signing in you agree to the <a href="/terms.html">Terms of Use</a> and the <a href="/privacy.html">Privacy Policy</a>.</p>
   </section>
 
   <div id="app" class="wrap" hidden>
@@ -1139,17 +1178,30 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     var tip = $("installTip"), p = platform();
     var show = !isStandalone() && !tipSnoozed() && !$("app").hidden && (p !== "desktop" || !!installPrompt);
     tip.hidden = !show; if (!show) return;
-    $("installBtn").hidden = !installPrompt;
-    $("installHow").textContent = installPrompt ? "Add it to your home screen for one-tap access."
-      : p === "ios" ? "Tap Share (the square with an arrow), then Add to Home Screen."
-      : "Tap the menu (three dots), then Add to Home screen or Install app.";
+    $("installHow").textContent = "Add it to your home screen for one-tap, full screen access.";
   }
   function snoozeTip() { try { localStorage.setItem(TIP_KEY, String(Date.now() + 30 * 86400000)); } catch (e) { /* ignore */ } }
+  function showHow(which) {
+    var ios = which === "ios";
+    $("howIos").hidden = !ios; $("howAndroid").hidden = ios;
+    $("howTabIos").setAttribute("aria-selected", ios ? "true" : "false");
+    $("howTabAndroid").setAttribute("aria-selected", ios ? "false" : "true");
+    $("howInstall").hidden = !(installPrompt && !ios);
+    $("howMissing").hidden = false;
+  }
+  function openHow() { var p = platform(); if (p === "desktop" && installPrompt) { $("howInstall").onclick(); return; } showHow(p === "android" ? "android" : "ios"); $("howOv").hidden = false; $("howClose").focus(); }
+  function closeHow() { $("howOv").hidden = true; }
+  $("howTabIos").onclick = function () { showHow("ios"); };
+  $("howTabAndroid").onclick = function () { showHow("android"); };
+  $("howClose").onclick = closeHow;
+  $("howOv").onclick = function (e) { if (e.target === $("howOv")) closeHow(); };
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("howOv").hidden) closeHow(); });
   $("installNo").onclick = function () { snoozeTip(); syncInstallTip(); };
-  $("installBtn").onclick = function () {
+  $("installBtn").onclick = openHow;
+  $("howInstall").onclick = function () {
     if (!installPrompt) return;
     var ev = installPrompt; ev.prompt();
-    Promise.resolve(ev.userChoice).then(function (c) { installPrompt = null; if (c && c.outcome === "accepted") snoozeTip(); syncInstallTip(); }, function () { installPrompt = null; syncInstallTip(); });
+    Promise.resolve(ev.userChoice).then(function (c) { installPrompt = null; if (c && c.outcome === "accepted") { snoozeTip(); closeHow(); } syncInstallTip(); }, function () { installPrompt = null; syncInstallTip(); });
   };
   window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); installPrompt = e; syncInstallTip(); });
   window.addEventListener("appinstalled", function () { installPrompt = null; snoozeTip(); syncInstallTip(); });
@@ -1283,4 +1335,5 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 })();
 </script>
 
+<footer class="legal"><a href="/privacy.html">Privacy</a> <span aria-hidden="true">&middot;</span> <a href="/terms.html">Terms</a> <span aria-hidden="true">&middot;</span> <a href="/security.html">Security</a></footer>
 </body></html>

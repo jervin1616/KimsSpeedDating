@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1b0203">
+<title>Security - Kim's Speed Dating</title>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;padding:24px 16px 48px;background-color:#1b0203;background-image:radial-gradient(1200px 620px at 50% -10%,#5e0a12 0%,transparent 62%),radial-gradient(circle at 12% 22%,rgba(255,150,170,.7) 0 1px,transparent 2.2px),radial-gradient(circle at 63% 41%,rgba(255,200,170,.55) 0 1.3px,transparent 2.6px),radial-gradient(circle at 81% 12%,rgba(255,110,150,.6) 0 1.1px,transparent 2.3px),radial-gradient(circle at 38% 78%,rgba(255,170,190,.5) 0 1px,transparent 2px);background-size:auto,150px 170px,230px 210px,310px 260px,190px 230px;background-repeat:no-repeat,repeat,repeat,repeat,repeat;min-height:100vh;box-sizing:border-box;color:#f9e8e3;font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:640px;margin:0 auto}
+  .back{display:inline-block;color:#ff8fa8;text-decoration:none;font-weight:600}
+  h1{font-size:24px;margin:0 0 4px}
+  h2{font-size:17px;margin:24px 0 6px}
+  p,li{color:#ecd0cb;margin:6px 0}
+  a{color:#ff8fa8}
+  .small{color:#d9a39b;font-size:14px}
+
+  h2{font-size:18px;margin:26px 0 6px}
+  ul{margin:6px 0 6px 0;padding-left:22px}
+  li{margin:5px 0;color:#ecd0cb}
+  .nav{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 14px;font-size:14px}
+  .nav a{color:#ff8fa8;text-decoration:none}
+  .nav a[aria-current]{color:#f9e8e3;font-weight:700}
+  .box{border:1px solid #6e1518;background:#240306;border-radius:12px;padding:10px 14px;margin:14px 0}
+</style></head><body><main>
+<a class="back" href="/">&larr; Back to the board</a>
+<div class="nav"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/security.html" aria-current="page">Security</a></div>
+
+<h1>Security</h1>
+<p class="small">Last updated: November 11, 2026</p>
+<p>This page explains how we protect the service and what to do if you find a problem.</p>
+
+<h2>How we protect it</h2>
+<ul>
+  <li><b>Sign-in through Google.</b> We never see or store your password. We check that each Google sign-in is genuine and meant for this service before we let anyone in.</li>
+  <li><b>Access is checked on the server, every time.</b> What you can see and change depends on your role. Hiding a button is never the only protection, so changing something in your browser does not unlock anything.</li>
+  <li><b>Daters and the match log are only available to hosts.</b> Helpers and viewers cannot read them, even by trying.</li>
+  <li><b>Encrypted in transit.</b> Everything between your device and the service uses HTTPS.</li>
+  <li><b>Limits against abuse.</b> There are caps on message size, document size and message rate, and a cap on how many viewers can connect at once. Hosts and helpers keep reserved places so a crowd cannot lock them out.</li>
+  <li><b>Careful handling of what people type.</b> Names, questions and handles are always shown as plain text, never run as code.</li>
+  <li><b>Secrets are kept out of the code.</b> Keys and the access list are stored as protected settings, not in the website files.</li>
+  <li><b>Changes are recorded.</b> Changes to who has access are logged, and an owner can undo a mistake.</li>
+</ul>
+
+<h2>What you can do</h2>
+<ul>
+  <li>Sign out when you use a shared or borrowed device.</li>
+  <li>Do not share links or screenshots that show your browser's stored sign-in details.</li>
+  <li>Do not post personal details about other people.</li>
+</ul>
+
+<h2>Found a problem?</h2>
+<div class="box"><p>Please tell the host <b>privately</b>, by direct message in the community Discord server or through the host's usual contact. Please do not post it publicly until it has been fixed. Tell us what you saw, where, and how to repeat it. We welcome good-faith reports and will look into them as quickly as we can.</p></div>
+<p>When you test, please use your own account and your own data only. Do not try to read or change other people's information, do not send large amounts of traffic, and do not interrupt a live stream.</p>
+
+<h2>Limits of this page</h2>
+<p>We work to keep the service secure, but no system is perfectly secure and we have not had an independent security audit. We cannot promise it will never be attacked or fail. If something goes wrong that affects your information, we will tell the people affected through the community Discord server as soon as we reasonably can.</p>
+
+</main></body></html>

@@ -768,7 +768,7 @@ try {
   check("secondary text is readable on cards and rows (at least 4.5 to 1)", cr(th.rowMuted, th.rowBg) >= 4.5, cr(th.rowMuted, th.rowBg));
   const stops = (th.btnImg.match(/rgb\([^)]*\)/g) || []); const mid = stops.length >= 2 ? "rgb(" + [0, 1, 2].map((i) => Math.round((rgbOf(stops[0])[i] + rgbOf(stops[1])[i]) / 2)).join(",") + ")" : "";
   check("button text is readable on the glossy red buttons, even at the middle of the gradient", stops.length >= 2 && cr(th.btnColor, mid) >= 4.5, { stops, mid, ratio: stops.length ? cr(th.btnColor, mid) : 0 });
-  const pages = {}; for (const f of ["index.html", "admin.html", "backup.html", "privacy.html"]) pages[f] = await (await fetch(BASE + "/" + f)).text();
+  const pages = {}; for (const f of ["index.html", "admin.html", "backup.html", "privacy.html", "terms.html", "security.html"]) pages[f] = await (await fetch(BASE + "/" + f)).text();
   check("no old plum colours are left on any page", Object.values(pages).every((t) => !/#12030a|#4a1429|#ff4f9a|#260a17|#3b1a5c|#b58cff|#1a0610/i.test(t)));
   // home screen icon, install manifest and link preview
   const pngInfo = async (path) => { const r = await fetch(BASE + path); const b = Buffer.from(await r.arrayBuffer()); return { ok: r.status === 200, sig: b.subarray(0, 8).toString("hex"), w: b.readUInt32BE(16), h: b.readUInt32BE(20) }; };
@@ -784,8 +784,15 @@ try {
   const og = Buffer.from(await (await fetch(BASE + "/og.jpg")).arrayBuffer());
   check("the link-preview card is a 1200 by 630 JPEG under 300 KB (Discord and others show it)", og[0] === 0xff && og[1] === 0xd8 && JSON.stringify(jpegSize(og)) === JSON.stringify({ h: 630, w: 1200 }) && og.length < 300 * 1024, { size: og.length, dims: jpegSize(og) });
   check("the site is set up to open as a full screen home screen app (manifest display and iPhone tags)", man.display === "standalone" && /name="apple-mobile-web-app-capable" content="yes"/.test(pages["index.html"]) && /name="mobile-web-app-capable" content="yes"/.test(pages["index.html"]) && /apple-mobile-web-app-status-bar-style" content="black"/.test(pages["index.html"]), man.display);
-  check("admin, backup and privacy pages have a 'Back to the board' link (a home screen app has no Back button)", ["admin.html", "backup.html", "privacy.html"].every((f) => /<a class="back" href="\/">/.test(pages[f])));
-  check("every page links the icons, the manifest and the banner colour", ["index.html", "admin.html", "backup.html", "privacy.html"].every((f) => /rel="icon"/.test(pages[f]) && /rel="apple-touch-icon"/.test(pages[f]) && /rel="manifest"/.test(pages[f]) && /name="theme-color" content="#1b0203"/.test(pages[f])));
+  check("admin, backup and privacy pages have a 'Back to the board' link (a home screen app has no Back button)", ["admin.html", "backup.html", "privacy.html", "terms.html", "security.html"].every((f) => /<a class="back" href="\/">/.test(pages[f])));
+  // policies
+  const rolesTxt = readFileSync("src/worker.js", "utf8") + readFileSync("src/database.js", "utf8");
+  check("terms and security pages are served and match the privacy page look", ["terms.html", "security.html"].every((f) => pages[f].includes("<h1>") && pages[f].includes("#1b0203")));
+  check("the three policy pages link to each other", ["privacy.html", "terms.html", "security.html"].every((f) => ["privacy", "terms", "security"].every((n) => pages[f].includes(`href="/${n}.html"`))));
+  check("the sign-in screen asks for 18+ and links Terms and Privacy; every screen has a footer with all three", /18 or older[^<]*<a href="\/terms.html">[^<]*<\/a> and the <a href="\/privacy.html"/.test(pages["index.html"]) && /<footer class="legal">[\s\S]*privacy\.html[\s\S]*terms\.html[\s\S]*security\.html/.test(pages["index.html"]));
+  check("policies contain no em dashes and say 18 or older", ["privacy.html", "terms.html", "security.html"].every((f) => !pages[f].includes("\u2014")) && /18 or older/.test(pages["terms.html"]) && /18 or older/.test(pages["privacy.html"]));
+  check("policy numbers match the code (300 sign-ins, 100 changes, 12 hours, 7 days)", /300/.test(pages["privacy.html"]) && /100 changes/.test(pages["privacy.html"]) && /12 hours/.test(pages["privacy.html"]) && /7 days/.test(pages["privacy.html"]) && /300/.test(rolesTxt) && /100/.test(rolesTxt));
+  check("every page links the icons, the manifest and the banner colour", ["index.html", "admin.html", "backup.html", "privacy.html", "terms.html", "security.html"].every((f) => /rel="icon"/.test(pages[f]) && /rel="apple-touch-icon"/.test(pages[f]) && /rel="manifest"/.test(pages[f]) && /name="theme-color" content="#1b0203"/.test(pages[f])));
   check("the main page has link-preview tags with a full https address for the card", /property="og:image" content="https:\/\/[^"]+\/og\.jpg"/.test(pages["index.html"]) && /property="og:title"/.test(pages["index.html"]) && /name="twitter:card" content="summary_large_image"/.test(pages["index.html"]));
   const iconPx = await A.evaluate(async () => {
     const sample = async (url) => { const bmp = await createImageBitmap(await (await fetch(url)).blob()); const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; const x = c.getContext("2d"); x.drawImage(bmp, 0, 0); const g = (a, b) => Array.from(x.getImageData(a, b, 1, 1).data); return { tl: g(2, 2), br: g(bmp.width - 3, bmp.height - 3), mid: g(bmp.width >> 1, bmp.height >> 1) }; };
@@ -824,18 +831,27 @@ try {
     return { ctx, pg };
   };
   let t1 = await tipPage({ ua: IPHONE });
-  check("on an iPhone browser a card tells people to Share, then Add to Home Screen", await t1.pg.locator("#installTip").isVisible() && /Share.*Add to Home Screen/.test(await t1.pg.locator("#installHow").innerText()) && await t1.pg.locator("#installBtn").isHidden());
+  check("on an iPhone browser a card offers an Add button", await t1.pg.locator("#installTip").isVisible() && await t1.pg.locator("#installBtn").isVisible() && await t1.pg.locator("#howOv").isHidden());
+  await t1.pg.click("#installBtn");
+  check("tapping Add opens a step by step guide for iPhone (Safari, Share, Add to Home Screen, Add)", await t1.pg.locator("#howOv").isVisible() && await t1.pg.locator("#howIos").isVisible() && await t1.pg.locator("#howAndroid").isHidden() && /Safari/.test(await t1.pg.locator("#howIos").innerText()) && /Share/.test(await t1.pg.locator("#howIos").innerText()) && /Add to Home Screen/.test(await t1.pg.locator("#howIos").innerText()) && (await t1.pg.locator("#howIos li").count()) === 5);
+  await t1.pg.click("#howTabAndroid");
+  check("the guide has an Android tab with its own steps", await t1.pg.locator("#howAndroid").isVisible() && await t1.pg.locator("#howIos").isHidden() && /three dots/.test(await t1.pg.locator("#howAndroid").innerText()));
+  check("the guide fits a phone screen without sideways scroll", await t1.pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await t1.pg.click("#howClose");
+  check("Got it closes the guide", await t1.pg.locator("#howOv").isHidden() && await t1.pg.locator("#installTip").isVisible());
   await t1.pg.click("#installNo");
   check("'Not now' hides it...", await t1.pg.locator("#installTip").isHidden());
   await t1.pg.reload(); await until(async () => (await roleOf(t1.pg)) === "Limited view", 8000); await sleep(400);
   check("...and it stays hidden after a reload (remembered for 30 days)", await t1.pg.locator("#installTip").isHidden());
   await t1.ctx.close();
   let t2 = await tipPage({ ua: ANDROID });
-  check("on an Android browser it says to use the menu, then Add to Home screen or Install app", await t2.pg.locator("#installTip").isVisible() && /menu.*Add to Home screen or Install app/.test(await t2.pg.locator("#installHow").innerText()) && await t2.pg.locator("#installBtn").isHidden());
-  await t2.pg.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = () => { window.__prompted = true; }; e.userChoice = Promise.resolve({ outcome: "accepted" }); window.dispatchEvent(e); });
-  check("when the browser offers a real install prompt, an Install button appears", await t2.pg.locator("#installBtn").isVisible());
   await t2.pg.click("#installBtn");
-  check("...tapping it opens the browser's install prompt and then hides the card", await until(async () => (await t2.pg.evaluate(() => window.__prompted === true)) && await t2.pg.locator("#installTip").isHidden(), 4000));
+  check("on Android the guide opens on the Android steps", await t2.pg.locator("#howAndroid").isVisible() && await t2.pg.locator("#howIos").isHidden() && await t2.pg.locator("#howInstall").isHidden());
+  await t2.pg.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = () => { window.__prompted = true; }; e.userChoice = Promise.resolve({ outcome: "accepted" }); window.dispatchEvent(e); });
+  await t2.pg.click("#howClose"); await t2.pg.click("#installBtn");
+  check("when the browser offers a real install prompt, an Install now button appears in the guide", await t2.pg.locator("#howInstall").isVisible());
+  await t2.pg.click("#howInstall");
+  check("...tapping it opens the browser's install prompt, closes the guide and hides the card", await until(async () => (await t2.pg.evaluate(() => window.__prompted === true)) && await t2.pg.locator("#installTip").isHidden() && await t2.pg.locator("#howOv").isHidden(), 4000));
   await t2.ctx.close();
   let t3 = await tipPage({ ua: IPHONE, standalone: true });
   check("once it is installed and opened from the home screen, the hint never shows", await t3.pg.locator("#installTip").isHidden());
@@ -843,7 +859,7 @@ try {
   let t4 = await tipPage({});
   check("on a laptop browser the hint stays hidden (nothing to explain)", await t4.pg.locator("#installTip").isHidden());
   await t4.pg.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = () => {}; e.userChoice = Promise.resolve({}); window.dispatchEvent(e); });
-  check("...unless the browser itself offers to install it, then an Install button shows", await t4.pg.locator("#installTip").isVisible() && await t4.pg.locator("#installBtn").isVisible());
+  check("...unless the browser itself offers to install it, then an Add button shows", await t4.pg.locator("#installTip").isVisible() && await t4.pg.locator("#installBtn").isVisible());
   await t4.ctx.close();
   let t5 = await tipPage({ ua: IPHONE, signedIn: false });
   check("it does not show on the sign-in screen, only after signing in", await t5.pg.locator("#gate").isVisible() && await t5.pg.locator("#installTip").isHidden());

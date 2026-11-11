@@ -1,382 +1,398 @@
-Test results 2026-11-11T08:06:20.661Z
-
 
 == Import script and export endpoint (round trip)
-PASS  import with a wrong key is refused
-PASS  import script succeeds and its own count check passes
-PASS  running the import twice is safe (same counts)
-PASS  --replace without --yes refuses to erase anything
-PASS  Editor can download the export (one JSON file, attachment)
-PASS  daters: 230 records come back identical (ids and every field)
-PASS  questions: 500 records come back identical (ids and every field)
-PASS  matches: 4 records come back identical (ids and every field)
-PASS  streams: 6 records come back identical (ids and every field)
-PASS  game question and history come back identical
-PASS  Contributor cannot download the export (403)
-PASS  Viewer cannot download the export (403)
-PASS  export with no login is refused (401)
-PASS  export with a forged token is refused (401)
+  using your real data folder
+  PASS import with a wrong key is refused
+    Reading speed-dating-backup-2026-11-10.json
+    
+    Ready to import 741 records: daters 230, questions 500, matches 4, seats 6, game 1
+    Imported 100 / 741Imported 200 / 741Imported 300 / 741Imported 400 / 741Imported 500 / 741Imported 600 / 741Imported 700 / 741Imported 741 / 741
+    
+    The database now holds: daters 230, game 1, matches 4, questions 500, seats 6
+    Check passed: every collection has at least as many records as the files.
+    
+  PASS import script succeeds and its own count check passes
+  PASS running the import twice is safe (same counts)
+  PASS --replace without --yes refuses to erase anything
+  PASS Editor can download the export (one JSON file, attachment)
+  PASS daters: 230 records come back identical (ids and every field)
+  PASS questions: 500 records come back identical (ids and every field)
+  PASS matches: 4 records come back identical (ids and every field)
+  PASS streams: 6 records come back identical (ids and every field)
+  PASS game question and history come back identical
+  PASS Contributor cannot download the export (403)
+  PASS Viewer cannot download the export (403)
+  PASS export with no login is refused (401)
+  PASS export with a forged token is refused (401)
 
 == Google sign-in verification (forged and wrong tokens)
-PASS  genuine Editor token logs in with role editor
-PASS  genuine Contributor token gets role contributor
-PASS  genuine Viewer token gets role viewer
-PASS  email not on the list gets no access (403, default role none)
-PASS  token signed with the wrong private key is rejected
-PASS  token for a different Google client ID is rejected
-PASS  expired token is rejected
-PASS  unverified email is rejected
-PASS  wrong issuer is rejected
-PASS  unknown signing key id is rejected
-PASS  algorithm 'none' is rejected
-PASS  HS256 key-confusion attempt is rejected
-PASS  genuine signature with the email swapped to an Editor is rejected
-PASS  garbage credential is rejected
-PASS  missing credential is rejected
+  PASS genuine Editor token logs in with role editor
+  PASS genuine Contributor token gets role contributor
+  PASS genuine Viewer token gets role viewer
+  PASS email not on the list gets no access (403, default role none)
+  PASS token signed with the wrong private key is rejected
+  PASS token for a different Google client ID is rejected
+  PASS expired token is rejected
+  PASS unverified email is rejected
+  PASS wrong issuer is rejected
+  PASS unknown signing key id is rejected
+  PASS algorithm 'none' is rejected
+  PASS HS256 key-confusion attempt is rejected
+  PASS genuine signature with the email swapped to an Editor is rejected
+  PASS garbage credential is rejected
+  PASS missing credential is rejected
 
 == WebSocket door: origin and session checks
-PASS  no token: refused
-PASS  random token: refused (401)
-PASS  session signed with a different secret: refused (401)
-PASS  genuine signature but expired session: refused (401)
-PASS  valid session for an email not on the list: refused (403)
-PASS  wrong Origin: refused (403)
-PASS  missing Origin: refused (403)
-PASS  viewer session with the payload edited to an Editor email: refused (401)
-PASS  genuine Editor session from the right Origin connects
-PASS  server tells the page its role (editor)
+  PASS no token: refused
+  PASS random token: refused (401)
+  PASS session signed with a different secret: refused (401)
+  PASS genuine signature but expired session: refused (401)
+  PASS valid session for an email not on the list: refused (403)
+  PASS wrong Origin: refused (403)
+  PASS missing Origin: refused (403)
+  PASS viewer session with the payload edited to an Editor email: refused (401)
+  PASS genuine Editor session from the right Origin connects
+  PASS server tells the page its role (editor)
 
 == Server-side rules by role (read and write)
-PASS  Editor can read daters
-PASS  Editor can read matches
-PASS  Editor can read seats
-PASS  Editor can read game
-PASS  Editor can read questions
-PASS  contributor can NOT read daters
-PASS  contributor can NOT read matches
-PASS  contributor can read seats
-PASS  contributor can read game
-PASS  contributor can read questions
-PASS  viewer can NOT read daters
-PASS  viewer can NOT read matches
-PASS  viewer can read seats
-PASS  viewer can read game
-PASS  viewer can read questions
-PASS  Editor can add a dater
-PASS  Editor can add a match
-PASS  Editor can set seat 'hot'
-PASS  Editor can set game/question
-PASS  Editor can add a question
-PASS  Contributor can add a question
-PASS  Contributor can mark a question asked (askCount + lastAsked)
-PASS  Contributor can change the current question (game/question)
-PASS  Contributor can NOT seat daters (seats)
-PASS  Contributor can NOT add a dater
-PASS  Contributor can NOT edit or delete a dater
-PASS  Contributor can NOT touch matches
-PASS  Viewer can NOT write daters (set)
-PASS  Viewer can NOT write matches (set)
-PASS  Viewer can NOT write seats (set)
-PASS  Viewer can NOT write game (set)
-PASS  Viewer can NOT write questions (set)
-PASS  Viewer can NOT add or delete
-PASS  the viewer's and contributor's rejected writes changed nothing
+  PASS Editor can read daters
+  PASS Editor can read matches
+  PASS Editor can read seats
+  PASS Editor can read game
+  PASS Editor can read questions
+  PASS contributor can NOT read daters
+  PASS contributor can NOT read matches
+  PASS contributor can read seats
+  PASS contributor can read game
+  PASS contributor can read questions
+  PASS viewer can NOT read daters
+  PASS viewer can NOT read matches
+  PASS viewer can read seats
+  PASS viewer can read game
+  PASS viewer can read questions
+  PASS Editor can add a dater
+  PASS Editor can add a match
+  PASS Editor can set seat 'hot'
+  PASS Editor can set game/question
+  PASS Editor can add a question
+  PASS Contributor can add a question
+  PASS Contributor can mark a question asked (askCount + lastAsked)
+  PASS Contributor can change the current question (game/question)
+  PASS Contributor can NOT seat daters (seats)
+  PASS Contributor can NOT add a dater
+  PASS Contributor can NOT edit or delete a dater
+  PASS Contributor can NOT touch matches
+  PASS Viewer can NOT write daters (set)
+  PASS Viewer can NOT write matches (set)
+  PASS Viewer can NOT write seats (set)
+  PASS Viewer can NOT write game (set)
+  PASS Viewer can NOT write questions (set)
+  PASS Viewer can NOT add or delete
+  PASS the viewer's and contributor's rejected writes changed nothing
 
 == Server-side input checks
-PASS  unknown collection (write) is rejected
-PASS  unknown collection (read) is rejected
-PASS  seat id that is not a real seat is rejected
-PASS  game doc other than 'question' is rejected
-PASS  add() on seats is rejected
-PASS  path tricks in a document id are rejected
-PASS  very long document id is rejected
-PASS  oversized document (40 KB) is rejected
-PASS  bad field names are rejected
-PASS  __proto__ field is rejected
-PASS  a document that is not an object is rejected
-PASS  update of a missing document fails (not-found)
-PASS  unknown operation is rejected
-PASS  update can delete a field (db.deleteField)
-PASS  malformed JSON gets an error, connection survives
+  PASS unknown collection (write) is rejected
+  PASS unknown collection (read) is rejected
+  PASS seat id that is not a real seat is rejected
+  PASS game doc other than 'question' is rejected
+  PASS add() on seats is rejected
+  PASS path tricks in a document id are rejected
+  PASS very long document id is rejected
+  PASS oversized document (40 KB) is rejected
+  PASS bad field names are rejected
+  PASS __proto__ field is rejected
+  PASS a document that is not an object is rejected
+  PASS update of a missing document fails (not-found)
+  PASS unknown operation is rejected
+  PASS update can delete a field (db.deleteField)
+  PASS malformed JSON gets an error, connection survives
 
 == Limited users never receive dater data
-PASS  subscribing to daters is denied for a Contributor
-PASS  no dater or match changes are pushed to a Contributor
-PASS  subscribing to daters is denied for a Viewer
+  PASS subscribing to daters is denied for a Contributor
+  PASS no dater or match changes are pushed to a Contributor
+  PASS subscribing to daters is denied for a Viewer
 
 == Rate limit, message size, idle wake-up
-PASS  a flood of 600 messages is answered 'slow down' (rate limit)
-PASS  ...and a connection that keeps flooding is closed (4429)
-PASS  a smaller burst of 260 is partly slowed down but not disconnected
-PASS  after calming down the same connection works again
-PASS  a message over 64 KB closes the connection (1009)
-PASS  a binary message closes the connection (1003)
-PASS  after 13 s idle (object hibernated) the connection still works
-PASS  ...and other users still get the change after the wake-up
-PASS  session refresh returns a new token
-PASS  an open connection accepts the refreshed session
+  PASS a flood of 600 messages is answered 'slow down' (rate limit)
+  PASS ...and a connection that keeps flooding is closed (4429)
+  PASS a smaller burst of 260 is partly slowed down but not disconnected
+  PASS after calming down the same connection works again
+  PASS a message over 64 KB closes the connection (1009)
+  PASS a binary message closes the connection (1003)
+  PASS after 13 s idle (object hibernated) the connection still works
+  PASS ...and other users still get the change after the wake-up
+  PASS session refresh returns a new token
+  PASS an open connection accepts the refreshed session
 
 == Capacity: viewers are capped, hosts and mods keep reserved room
-PASS  6 viewers can connect (the limit used in this test)
-PASS  the 7th viewer is told the room is full (503)
-PASS  a refused viewer can ask 'is it full?' and the answer is yes
-PASS  a host and a mod still get in while viewers are full
-PASS  ...and the room is not 'full' for them yet
-PASS  people already connected keep getting live updates while the room is full
-PASS  when a viewer leaves, the next viewer gets in
-PASS  hosts and mods can use the 15 reserved places on top of the viewers
-PASS  beyond the reserve even a host is refused (hard ceiling = viewers + 15)
-PASS  viewers stay refused while hosts and mods fill the room
-PASS  after everyone leaves, connecting works again
+  PASS 6 viewers can connect (the limit used in this test)
+  PASS the 7th viewer is told the room is full (503)
+  PASS a refused viewer can ask 'is it full?' and the answer is yes
+  PASS a host and a mod still get in while viewers are full
+  PASS ...and the room is not 'full' for them yet
+  PASS people already connected keep getting live updates while the room is full
+  PASS when a viewer leaves, the next viewer gets in
+  PASS hosts and mods can use the 15 reserved places on top of the viewers
+  PASS beyond the reserve even a host is refused (hard ceiling = viewers + 15)
+  PASS viewers stay refused while hosts and mods fill the room
+  PASS after everyone leaves, connecting works again
 
 == Snapshot cache never serves stale data
-PASS  a new subscriber sees a question added after the list was cached
-PASS  ...and an edit
-PASS  ...and a deletion
-PASS  seats (whole collection) also reflect a change for the next subscriber
-PASS  ...and its removal
+  PASS a new subscriber sees a question added after the list was cached
+  PASS ...and an edit
+  PASS ...and a deletion
+  PASS seats (whole collection) also reflect a change for the next subscriber
+  PASS ...and its removal
 
 == Role assignment: owners, editors, the admin page API
-PASS  the access API also says what unlisted people get (the default role)
-PASS  a person listed as owner logs in as editor-level with owner true
-PASS  owner can list people (secret entries are included and marked)
-PASS  a normal Editor cannot use the admin API at all (403)
-PASS  Contributor cannot use the admin API (403)
-PASS  Viewer cannot use the admin API (403)
-PASS  no login: admin API refused (401)
-PASS  forged session: admin API refused (401)
-PASS  admin POST from a wrong Origin is refused (403)
-PASS  before being added, an unlisted account gets no access (403)
-PASS  a person who signed in but is on no list shows up under 'signed in recently'
-PASS  people who are on a list do not appear there
-PASS  a normal Editor cannot forget or add anyone from that list (403)
-PASS  owner can forget an entry
-PASS  owner adds the stranger as Viewer (email is lower-cased)
-PASS  adding someone to the list takes them off the 'signed in recently' list
-PASS  the new Viewer can now sign in and gets role viewer
-PASS  their WebSocket opens with role viewer
-PASS  the new Viewer can read questions but cannot write
-PASS  the new Viewer cannot read daters
-PASS  owner promotes a Viewer to Contributor
-PASS  their open page is told right away that its access changed
-PASS  ...and the new access applies to the open connection at once (can add questions now)
-PASS  a normal Editor cannot make anyone an Editor (403)
-PASS  ...nor a brand new Editor either (403)
-PASS  owner makes the helper an Editor (200)
-PASS  the helper signs in as an editor but not an owner
-PASS  the helper reads daters like any Editor
-PASS  an Editor made on the page is still not an owner: the admin API refuses them (403)
-PASS  a normal Editor cannot demote or remove another Editor (403)
-PASS  people set in the ROLES secret are locked, even for owners (409)
-PASS  ...so nobody can remove an owner from the page (409)
-PASS  a bad email is rejected (400)
-PASS  an unknown role is rejected (400)
-PASS  an email with list separators is rejected (400)
-PASS  320 sign-ins later the recent list is capped, newest first, oldest dropped
-PASS  the list records who added whom
-PASS  an Editor assigned on the page can download the export
-PASS  owner removes the stranger
-PASS  their open connection is closed at once (4403)
-PASS  they can no longer sign in (403)
-PASS  their old, still valid session token is refused at the door (403)
-PASS  removing the helper closes their connection too
+  PASS the access API also says what unlisted people get (the default role)
+  PASS a person listed as owner logs in as editor-level with owner true
+  PASS owner can list people (secret entries are included and marked)
+  PASS a normal Editor cannot use the admin API at all (403)
+  PASS Contributor cannot use the admin API (403)
+  PASS Viewer cannot use the admin API (403)
+  PASS no login: admin API refused (401)
+  PASS forged session: admin API refused (401)
+  PASS admin POST from a wrong Origin is refused (403)
+  PASS before being added, an unlisted account gets no access (403)
+  PASS a person who signed in but is on no list shows up under 'signed in recently'
+  PASS people who are on a list do not appear there
+  PASS a normal Editor cannot forget or add anyone from that list (403)
+  PASS owner can forget an entry
+  PASS owner adds the stranger as Viewer (email is lower-cased)
+  PASS adding someone to the list takes them off the 'signed in recently' list
+  PASS the new Viewer can now sign in and gets role viewer
+  PASS their WebSocket opens with role viewer
+  PASS the new Viewer can read questions but cannot write
+  PASS the new Viewer cannot read daters
+  PASS owner promotes a Viewer to Contributor
+  PASS their open page is told right away that its access changed
+  PASS ...and the new access applies to the open connection at once (can add questions now)
+  PASS a normal Editor cannot make anyone an Editor (403)
+  PASS ...nor a brand new Editor either (403)
+  PASS owner makes the helper an Editor (200)
+  PASS the helper signs in as an editor but not an owner
+  PASS the helper reads daters like any Editor
+  PASS an Editor made on the page is still not an owner: the admin API refuses them (403)
+  PASS a normal Editor cannot demote or remove another Editor (403)
+  PASS people set in the ROLES secret are locked, even for owners (409)
+  PASS ...so nobody can remove an owner from the page (409)
+  PASS a bad email is rejected (400)
+  PASS an unknown role is rejected (400)
+  PASS an email with list separators is rejected (400)
+  PASS 320 sign-ins later the recent list is capped, newest first, oldest dropped
+  PASS the list records who added whom
+  PASS an Editor assigned on the page can download the export
+  PASS owner removes the stranger
+  PASS their open connection is closed at once (4403)
+  PASS they can no longer sign in (403)
+  PASS their old, still valid session token is refused at the door (403)
+  PASS removing the helper closes their connection too
 
 == Role rules in code (default role, owner, precedence)
-PASS  DEFAULT_ROLE can be none, viewer or contributor
-PASS  DEFAULT_ROLE can never make strangers editors or owners
-PASS  ROLES accepts commas, semicolons, new lines and any letter case
-PASS  ROLES also accepts a JSON object
-PASS  owner resolves to editor level with owner true
-PASS  the secret beats a role assigned on the page
-PASS  an assigned role beats the default
-PASS  unlisted and unassigned falls back to DEFAULT_ROLE
-PASS  email checks reject junk
+  PASS DEFAULT_ROLE can be none, viewer or contributor
+  PASS DEFAULT_ROLE can never make strangers editors or owners
+  PASS ROLES accepts commas, semicolons, new lines and any letter case
+  PASS ROLES also accepts a JSON object
+  PASS owner resolves to editor level with owner true
+  PASS the secret beats a role assigned on the page
+  PASS an assigned role beats the default
+  PASS unlisted and unassigned falls back to DEFAULT_ROLE
+  PASS email checks reject junk
 
 == Browser: three roles, live sync, reconnect
-PASS  Editor page opens in Host view
-PASS  second Editor page opens in Host view
-PASS  Contributor page opens in Limited view
-PASS  Viewer page opens in View only
-PASS  Editor sees the imported daters
-PASS  both Editors see the same dater count
-PASS  Contributor sees no Daters, Match log or Past streams panels and no tabs
-PASS  the Admin button shows for the owner only (not a normal Editor, Contributor or Viewer)
-PASS  the Admin button opens the access page in a new tab and keeps the console open
-PASS  Contributor has Random question; Viewer does not
-PASS  Viewer sees no Questions panel
-PASS  Contributor page subscribes to 3 feeds only (no daters, no matches)
-PASS  Viewer page subscribes to 3 feeds (seats, game, questions for the picker), never daters
-PASS  viewers send heartbeats every 45 s, hosts and mods every 15 s
-PASS  Editor page subscribes to 5 feeds
-PASS  the add-dater form starts collapsed behind an Add dater button
-PASS  tapping Add dater opens the form and the button becomes Close
-PASS  after saving, the form closes again
-PASS  Editor A adds a dater: Editor B sees it live
-PASS  ...and B's dater count went up by one
-PASS  a dater row shows Panel, Hot seat and More, with Edit and Remove tucked away
-PASS  More reveals Edit and Remove
-PASS  Remove still asks 'Confirm remove / Keep' first
-PASS  Keep leaves the dater in place
-PASS  More, Remove, Confirm really deletes the dater (here and on the server)
-PASS  Editor B seats that dater: Editor A sees them on the board live
-PASS  ...and the Contributor sees the seated dater on the board (display snapshot)
-PASS  ...and the Viewer sees it too
-PASS  Editor B moves them to the hot seat: Editor A sees it
-PASS  Editor A clears all seats: Editor B's board empties
-PASS  ...and so does the Viewer's
-PASS  tapping an empty seat opens the picker, titled with that seat
-PASS  with no hot seat the newest dater (whoever joined last) is on top
-PASS  typing in the search box narrows the list
-PASS  picking someone closes the picker and puts them in the seat that was tapped
-PASS  ...and the other Editor sees them there live
-PASS  tapping the empty hot seat opens the picker for the hot seat
-PASS  the hot seat list is newest first (no fit ordering)
-PASS  picking someone for the hot seat seats them there
-PASS  for a panel seat the list puts the best fits first (green, then yellow, then red)
-PASS  each row shows its fit (label) so you can tell at a glance
-PASS  picker rows are tall enough for their text and never overlap the next row
-PASS  a panel pick lands in the seat that was tapped (Seat 4), not the first empty one
-PASS  Add new dater from the picker closes it and opens the form
-PASS  a dater added from the picker goes straight into that seat (Seat 2)
-PASS  ...and is saved on the server and visible to the other Editor
-PASS  tapping a seat that already has someone does not open the picker (select, swap and Remove still work)
-PASS  Escape closes the picker without choosing anyone
-PASS  Contributors and Viewers cannot open the picker (hearts are read only for them)
-PASS  seats cleaned up by removing each dater from their seat
-PASS  Contributor presses Random question and gets a question
-PASS  Editor A sees the same question live
-PASS  Viewer sees the same question live
-PASS  the question's askCount and lastAsked were saved on the server
-PASS  Contributor 'Back' restores the question that was cleared, for everyone
-PASS  Contributor has the Questions panel
-PASS  Contributor adds a question: the Editor's question total goes up by one, live
-PASS  ...and the new question exists on the server
-PASS  every role sees the connection pill saying Live
-PASS  on a phone all four tabs fit on one row
-PASS  on a phone the page does not scroll sideways
-PASS  hosts get a bottom bar with Remove hot seat and Match
-PASS  the bottom bar has no Random question button
-PASS  Remove hot seat is greyed out while the hot seat is empty
-PASS  Viewers and Contributors never get the bottom bar
-PASS  with someone in the hot seat, Remove hot seat switches on
-PASS  Remove hot seat empties the hot seat in one tap
-PASS  ...and the other Editor sees the hot seat empty too
-PASS  ...and offers Undo
-PASS  Undo puts them back in the hot seat
-PASS  a panel dater is seated in Seat 1
-PASS  Match in the bar arms the pick: it turns green and says Pick?
-PASS  tapping the heart logs the match on the server
-PASS  ...and the bar goes back to Match
-PASS  the logged match names the hot seat dater and the pick
-PASS  seats cleaned up
-PASS  on a phone the picker fits the screen and does not scroll sideways
-PASS  when the room is full a viewer's page says so instead of looping
-PASS  ...the tag reads Full and a plain message explains it
-PASS  ...and it stops hammering the server (no retries for minutes)
-PASS  hosts are not affected by a full viewer room
-PASS  tapping the Full tag after a place frees up connects the viewer
-PASS  ...and the 'busy' message goes away
-PASS  a viewer's tab that stays hidden lets go of its connection
-PASS  ...and reconnects with fresh data as soon as the tab is seen again
-PASS  hosts and mods never let go of their connection that way
-PASS  the headline is the banner-style lettering and still reads 'Kim's Speed Dating' to screen readers
-PASS  the headline font file is served by the site itself
-PASS  the font's license text is included
-PASS  the font really loaded in the browser (not a fallback)
-PASS  the headline is sized sensibly on laptop and phone and fits the screen
-PASS  the headline fits inside its box (nothing clipped or spilling)
-PASS  page background is the banner's red-black
-PASS  there is a subtle sparkle field behind everything
-PASS  a mismatch heart is dark with a bright red edge
-PASS  fit hearts stay easy to tell apart: mismatch, hot seat, both fit, off by 1 to 2, empty
-PASS  mismatch heart is clearly darker than the hot seat and empty seats
-PASS  body text is easy to read on the page background
-PASS  secondary text is readable on cards and rows (at least 4.5 to 1)
-PASS  button text is readable on the glossy red buttons, even at the middle of the gradient
-PASS  no old plum colours are left on any page
-PASS  an install manifest is served with the name, start page and banner colours
-PASS  ...and every icon it lists exists and is a real PNG of the declared size (192, 512 and a maskable 512)
-PASS  the iPhone home screen icon is 180 by 180 and the tab icon is 32 by 32
-PASS  /favicon.ico exists (browsers ask for it by name)
-PASS  the link-preview card is a 1200 by 630 JPEG under 300 KB (Discord and others show it)
-PASS  the site is set up to open as a full screen home screen app (manifest display and iPhone tags)
-PASS  admin, backup and privacy pages have a 'Back to the board' link (a home screen app has no Back button)
-PASS  every page links the icons, the manifest and the banner colour
-PASS  the main page has link-preview tags with a full https address for the card
-PASS  home screen icons are fully opaque (no see-through corners, which phones paint black)
-PASS  the maskable icon keeps its art in the middle and a dark red border, so round masks never cut the lettering
-PASS  on a short page (the sign-in screen) the glow fills the screen and does not restart halfway down
-PASS  the sign-in screen offers Google sign-in and says what viewers get
-PASS  admin.html also fills the screen without a repeat seam
-PASS  backup.html also fills the screen without a repeat seam
-PASS  privacy.html also fills the screen without a repeat seam
-PASS  the admin, backup and privacy pages use the same red-black palette and sparkle
-PASS  as a home screen app the Admin link opens in the same window (no new tab to get lost in)
-PASS  ...while in a normal browser tab it still opens in a new tab so the console stays open
-PASS  on an iPhone browser a card tells people to Share, then Add to Home Screen
-PASS  'Not now' hides it...
-PASS  ...and it stays hidden after a reload (remembered for 30 days)
-PASS  on an Android browser it says to use the menu, then Add to Home screen or Install app
-PASS  when the browser offers a real install prompt, an Install button appears
-PASS  ...tapping it opens the browser's install prompt and then hides the card
-PASS  once it is installed and opened from the home screen, the hint never shows
-PASS  on a laptop browser the hint stays hidden (nothing to explain)
-PASS  ...unless the browser itself offers to install it, then an Install button shows
-PASS  it does not show on the sign-in screen, only after signing in
-PASS  every signed-in role sees a Sign out button
-PASS  cancelling the 'Sign out?' question keeps you signed in
-PASS  signing out returns to the sign-in screen and clears the saved login
-PASS  ...the sign-in screen no longer shows the Sign out button
-PASS  ...it stays signed out after another reload
-PASS  signing out on one device does not sign the same person out on another
-PASS  the signed-out page opened no connection of its own
-PASS  Viewer sees the private question picker; Editor, Contributor do not
-PASS  the picker shows real questions from the list
-PASS  ...never the same question twice in a row, and no repeats until every question was shown
-PASS  the picker writes nothing: ask counts unchanged on the server
-PASS  ...and the stream's current question is unchanged
-PASS  ...and the Editor's page still shows the stream's question, not the viewer's pick
-PASS  the admin page explains what each role can do and what an unlisted person gets
-PASS  the role help is not shown to people who cannot manage access
-PASS  admin page (owner) lists people, marks secret ones locked
-PASS  owner adds a viewer on the page and they appear in the Viewers section
-PASS  ...and the person can sign in as Viewer
-PASS  a normal Editor on the admin page is told they are not an owner and sees no controls
-PASS  a Contributor on the admin page is told the same
-PASS  the page lists people who signed in recently
-PASS  clicking Add moves them into the Viewers section
-PASS  owner removes them on the page and they disappear
-PASS  ...and they can no longer sign in
-PASS  people with more than watch-only access are in their own section at the top (owners, editors, contributors)
-PASS  ...with a count that matches
-PASS  viewers are in a section of their own, below that, and never mixed into the staff list
-PASS  ...and the Viewers section sits below the staff section
-PASS  changing a viewer to Contributor moves them up into the staff section
-PASS  ...and the change shows up under Recent changes with an Undo
-PASS  ...and an Undo button appears right at the top of the page
-PASS  one tap on that Undo puts them back in the Viewers section
-PASS  ...and on the server they are a Viewer again
-PASS  older entries for the same person no longer offer Undo (it says they changed again)
-PASS  an accidental Remove disappears from the list...
-PASS  ...but Recent changes says who was removed and what they were
-PASS  ...and they cannot sign in while removed
-PASS  Undo brings them straight back as a Contributor in the staff section
-PASS  the history records who did what (server side)
-PASS  only owners can read that history (403 for an Editor and a Contributor)
-PASS  Editor page through the test proxy is live
-PASS  connection loss is noticed and the page says so
-PASS  a write while offline fails fast with the page's normal 'Could not save' message
-PASS  ...and the page's question snaps back to the last known server state (no half-applied change)
-PASS  stale screen: still showing the old question while offline
-PASS  while reconnecting the pill says Reconnecting (amber)
-PASS  after 10 seconds without a connection the pill turns red and says Offline
-PASS  while still down the red Offline pill stays red (it does not flicker back to Reconnecting)
-PASS  the pill goes back to Live after reconnecting
-PASS  page reconnects by itself and re-syncs the question
-PASS  ...and re-syncs the question list (includes the one added during the outage)
-PASS  the page announced 'online' after resync
-PASS  writes work again after the reconnect
-PASS  5 abrupt drops in a row: the page reconnected every time
-PASS  no JavaScript errors on any page during the whole run
+  PASS Editor page opens in Host view
+  PASS second Editor page opens in Host view
+  PASS Contributor page opens in Limited view
+  PASS Viewer page opens in View only
+  PASS Editor sees the imported daters
+  PASS both Editors see the same dater count
+  PASS Contributor sees no Daters, Match log or Past streams panels and no tabs
+  PASS the Admin button shows for the owner only (not a normal Editor, Contributor or Viewer)
+  PASS the Admin button opens the access page in a new tab and keeps the console open
+  PASS Contributor has Random question; Viewer does not
+  PASS Viewer sees no Questions panel
+  PASS Contributor page subscribes to 3 feeds only (no daters, no matches)
+  PASS Viewer page subscribes to 3 feeds (seats, game, questions for the picker), never daters
+  PASS viewers send heartbeats every 45 s, hosts and mods every 15 s
+  PASS Editor page subscribes to 5 feeds
+  PASS the add-dater form starts collapsed behind an Add dater button
+  PASS tapping Add dater opens the form and the button becomes Close
+  PASS after saving, the form closes again
+  PASS Editor A adds a dater: Editor B sees it live
+  PASS ...and B's dater count went up by one
+  PASS a dater row shows Panel, Hot seat and More, with Edit and Remove tucked away
+  PASS More reveals Edit and Remove
+  PASS Remove still asks 'Confirm remove / Keep' first
+  PASS Keep leaves the dater in place
+  PASS More, Remove, Confirm really deletes the dater (here and on the server)
+  PASS Editor B seats that dater: Editor A sees them on the board live
+  PASS ...and the Contributor sees the seated dater on the board (display snapshot)
+  PASS ...and the Viewer sees it too
+  PASS Editor B moves them to the hot seat: Editor A sees it
+  PASS Editor A clears all seats: Editor B's board empties
+  PASS ...and so does the Viewer's
+  PASS tapping an empty seat opens the picker, titled with that seat
+  PASS with no hot seat the newest dater (whoever joined last) is on top
+  PASS typing in the search box narrows the list
+  PASS picking someone closes the picker and puts them in the seat that was tapped
+  PASS ...and the other Editor sees them there live
+  PASS tapping the empty hot seat opens the picker for the hot seat
+  PASS the hot seat list is newest first (no fit ordering)
+  PASS picking someone for the hot seat seats them there
+  PASS for a panel seat the list puts the best fits first (green, then yellow, then red)
+  PASS each row shows its fit (label) so you can tell at a glance
+  PASS picker rows are tall enough for their text and never overlap the next row
+  PASS a panel pick lands in the seat that was tapped (Seat 4), not the first empty one
+  PASS Add new dater from the picker closes it and opens the form
+  PASS a dater added from the picker goes straight into that seat (Seat 2)
+  PASS ...and is saved on the server and visible to the other Editor
+  PASS tapping a seat that already has someone does not open the picker (select, swap and Remove still work)
+  PASS Escape closes the picker without choosing anyone
+  PASS Contributors and Viewers cannot open the picker (hearts are read only for them)
+  PASS seats cleaned up by removing each dater from their seat
+  PASS Contributor presses Random question and gets a question
+  PASS Editor A sees the same question live
+  PASS Viewer sees the same question live
+  PASS the question's askCount and lastAsked were saved on the server
+  PASS Contributor 'Back' restores the question that was cleared, for everyone
+  PASS Contributor has the Questions panel
+  PASS Contributor adds a question: the Editor's question total goes up by one, live
+  PASS ...and the new question exists on the server
+  PASS every role sees the connection pill saying Live
+  PASS on a phone all four tabs fit on one row
+  PASS on a phone the page does not scroll sideways
+  PASS hosts get a bottom bar with Remove hot seat and Match
+  PASS the bottom bar has no Random question button
+  PASS Remove hot seat is greyed out while the hot seat is empty
+  PASS Viewers and Contributors never get the bottom bar
+  PASS with someone in the hot seat, Remove hot seat switches on
+  PASS Remove hot seat empties the hot seat in one tap
+  PASS ...and the other Editor sees the hot seat empty too
+  PASS ...and offers Undo
+  PASS Undo puts them back in the hot seat
+  PASS a panel dater is seated in Seat 1
+  PASS Match in the bar arms the pick: it turns green and says Pick?
+  PASS tapping the heart logs the match on the server
+  PASS ...and the bar goes back to Match
+  PASS the logged match names the hot seat dater and the pick
+  PASS seats cleaned up
+  PASS on a phone the picker fits the screen and does not scroll sideways
+  PASS when the room is full a viewer's page says so instead of looping
+  PASS ...the tag reads Full and a plain message explains it
+  PASS ...and it stops hammering the server (no retries for minutes)
+  PASS hosts are not affected by a full viewer room
+  PASS tapping the Full tag after a place frees up connects the viewer
+  PASS ...and the 'busy' message goes away
+  PASS a viewer's tab that stays hidden lets go of its connection
+  PASS ...and reconnects with fresh data as soon as the tab is seen again
+  PASS hosts and mods never let go of their connection that way
+  PASS the headline is the banner-style lettering and still reads 'Kim's Speed Dating' to screen readers
+  PASS the headline font file is served by the site itself
+  PASS the font's license text is included
+  PASS the font really loaded in the browser (not a fallback)
+  PASS the headline is sized sensibly on laptop and phone and fits the screen
+  PASS the headline fits inside its box (nothing clipped or spilling)
+  PASS page background is the banner's red-black
+  PASS there is a subtle sparkle field behind everything
+  PASS a mismatch heart is dark with a bright red edge
+  PASS fit hearts stay easy to tell apart: mismatch, hot seat, both fit, off by 1 to 2, empty
+  PASS mismatch heart is clearly darker than the hot seat and empty seats
+  PASS body text is easy to read on the page background
+  PASS secondary text is readable on cards and rows (at least 4.5 to 1)
+  PASS button text is readable on the glossy red buttons, even at the middle of the gradient
+  PASS no old plum colours are left on any page
+  PASS an install manifest is served with the name, start page and banner colours
+  PASS ...and every icon it lists exists and is a real PNG of the declared size (192, 512 and a maskable 512)
+  PASS the iPhone home screen icon is 180 by 180 and the tab icon is 32 by 32
+  PASS /favicon.ico exists (browsers ask for it by name)
+  PASS the link-preview card is a 1200 by 630 JPEG under 300 KB (Discord and others show it)
+  PASS the site is set up to open as a full screen home screen app (manifest display and iPhone tags)
+  PASS admin, backup and privacy pages have a 'Back to the board' link (a home screen app has no Back button)
+  PASS terms and security pages are served and match the privacy page look
+  PASS the three policy pages link to each other
+  PASS the sign-in screen asks for 18+ and links Terms and Privacy; every screen has a footer with all three
+  PASS policies contain no em dashes and say 18 or older
+  PASS policy numbers match the code (300 sign-ins, 100 changes, 12 hours, 7 days)
+  PASS every page links the icons, the manifest and the banner colour
+  PASS the main page has link-preview tags with a full https address for the card
+  PASS home screen icons are fully opaque (no see-through corners, which phones paint black)
+  PASS the maskable icon keeps its art in the middle and a dark red border, so round masks never cut the lettering
+  PASS on a short page (the sign-in screen) the glow fills the screen and does not restart halfway down
+  PASS the sign-in screen offers Google sign-in and says what viewers get
+  PASS admin.html also fills the screen without a repeat seam
+  PASS backup.html also fills the screen without a repeat seam
+  PASS privacy.html also fills the screen without a repeat seam
+  PASS the admin, backup and privacy pages use the same red-black palette and sparkle
+  PASS as a home screen app the Admin link opens in the same window (no new tab to get lost in)
+  PASS ...while in a normal browser tab it still opens in a new tab so the console stays open
+  PASS on an iPhone browser a card offers an Add button
+  PASS tapping Add opens a step by step guide for iPhone (Safari, Share, Add to Home Screen, Add)
+  PASS the guide has an Android tab with its own steps
+  PASS the guide fits a phone screen without sideways scroll
+  PASS Got it closes the guide
+  PASS 'Not now' hides it...
+  PASS ...and it stays hidden after a reload (remembered for 30 days)
+  PASS on Android the guide opens on the Android steps
+  PASS when the browser offers a real install prompt, an Install now button appears in the guide
+  PASS ...tapping it opens the browser's install prompt, closes the guide and hides the card
+  PASS once it is installed and opened from the home screen, the hint never shows
+  PASS on a laptop browser the hint stays hidden (nothing to explain)
+  PASS ...unless the browser itself offers to install it, then an Add button shows
+  PASS it does not show on the sign-in screen, only after signing in
+  PASS every signed-in role sees a Sign out button
+  PASS cancelling the 'Sign out?' question keeps you signed in
+  PASS signing out returns to the sign-in screen and clears the saved login
+  PASS ...the sign-in screen no longer shows the Sign out button
+  PASS ...it stays signed out after another reload
+  PASS signing out on one device does not sign the same person out on another
+  PASS the signed-out page opened no connection of its own
+  PASS Viewer sees the private question picker; Editor, Contributor do not
+  PASS the picker shows real questions from the list
+  PASS ...never the same question twice in a row, and no repeats until every question was shown
+  PASS the picker writes nothing: ask counts unchanged on the server
+  PASS ...and the stream's current question is unchanged
+  PASS ...and the Editor's page still shows the stream's question, not the viewer's pick
+  PASS the admin page explains what each role can do and what an unlisted person gets
+  PASS the role help is not shown to people who cannot manage access
+  PASS admin page (owner) lists people, marks secret ones locked
+  PASS owner adds a viewer on the page and they appear in the Viewers section
+  PASS ...and the person can sign in as Viewer
+  PASS a normal Editor on the admin page is told they are not an owner and sees no controls
+  PASS a Contributor on the admin page is told the same
+  PASS the page lists people who signed in recently
+  PASS clicking Add moves them into the Viewers section
+  PASS owner removes them on the page and they disappear
+  PASS ...and they can no longer sign in
+  PASS people with more than watch-only access are in their own section at the top (owners, editors, contributors)
+  PASS ...with a count that matches
+  PASS viewers are in a section of their own, below that, and never mixed into the staff list
+  PASS ...and the Viewers section sits below the staff section
+  PASS changing a viewer to Contributor moves them up into the staff section
+  PASS ...and the change shows up under Recent changes with an Undo
+  PASS ...and an Undo button appears right at the top of the page
+  PASS one tap on that Undo puts them back in the Viewers section
+  PASS ...and on the server they are a Viewer again
+  PASS older entries for the same person no longer offer Undo (it says they changed again)
+  PASS an accidental Remove disappears from the list...
+  PASS ...but Recent changes says who was removed and what they were
+  PASS ...and they cannot sign in while removed
+  PASS Undo brings them straight back as a Contributor in the staff section
+  PASS the history records who did what (server side)
+  PASS only owners can read that history (403 for an Editor and a Contributor)
+  PASS Editor page through the test proxy is live
+  PASS connection loss is noticed and the page says so
+  PASS a write while offline fails fast with the page's normal 'Could not save' message
+  PASS ...and the page's question snaps back to the last known server state (no half-applied change)
+  PASS stale screen: still showing the old question while offline
+  PASS while reconnecting the pill says Reconnecting (amber)
+  PASS after 10 seconds without a connection the pill turns red and says Offline
+  PASS while still down the red Offline pill stays red (it does not flicker back to Reconnecting)
+  PASS the pill goes back to Live after reconnecting
+  PASS page reconnects by itself and re-syncs the question
+  PASS ...and re-syncs the question list (includes the one added during the outage)
+  PASS the page announced 'online' after resync
+  PASS writes work again after the reconnect
+  PASS 5 abrupt drops in a row: the page reconnected every time
+  PASS no JavaScript errors on any page during the whole run
 
-354 passed, 0 failed, 354 total
+363 passed, 0 failed, 363 total

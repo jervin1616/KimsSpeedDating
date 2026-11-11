@@ -441,3 +441,15 @@ The one thing it cannot test is the real Google button, because that needs your 
 | Everything loads but nothing saves | Check `SESSION_SECRET` was set (step 7a), then `npx wrangler deploy` |
 | `npx wrangler secret put` says no Worker exists | Do step 4 first |
 | Want to see errors live | `npx wrangler tail` while you reproduce the problem |
+
+## Privacy policy, terms and security page
+
+The site serves three plain pages: `/privacy.html`, `/terms.html` and `/security.html`. They are linked from the sign-in screen and from a footer on the main page. They were written to match what the app really does (what is stored, the 300 sign-in and 100 change limits, 12 hour sessions, 18 and over). A test checks those numbers, so if you change them in the code, update the pages too.
+
+These are good-faith plain language pages, not legal advice. Before a big launch, have a lawyer or a nonprofit legal clinic read them, especially the parts about gender and sexuality details, the age rule, and your state or country's privacy law.
+
+Facts only you can add: if you want a named operator or a contact address on these pages, edit the Contact section of each page. Do not put a personal email in a public file unless you want it public. The Google consent screen already points at `/privacy.html`, which has not moved.
+
+## Add to home screen guide
+
+The "Install the app" card has an Add button. It opens a step by step guide with an iPhone tab and an Android tab. On Android, if the browser offers a real install prompt, an "Install now" button also shows.
