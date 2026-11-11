@@ -12,6 +12,7 @@ const BUCKET_SIZE = 200; // write/read messages allowed in a burst
 const BUCKET_REFILL_PER_SEC = 50;
 const MAX_VIOLATIONS = 200; // then the connection is closed
 const MAX_ASSIGNED_ROLES = 300;
+const MAX_SEEN = 300; // recent sign-ins kept; the oldest are dropped first
 
 export class Database extends DurableObject {
   constructor(ctx, env) {
@@ -21,6 +22,7 @@ export class Database extends DurableObject {
       "CREATE TABLE IF NOT EXISTS docs (coll TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (coll, id)) WITHOUT ROWID"
     );
     this.sql.exec("CREATE TABLE IF NOT EXISTS roles (email TEXT PRIMARY KEY, role TEXT NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL) WITHOUT ROWID");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS seen (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL) WITHOUT ROWID");
     this.dbRoles = null; // loaded on first use after each wake-up (a handful of rows)
     // Heartbeats are answered without waking the object, so they cost nothing.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -58,25 +60,48 @@ export class Database extends DurableObject {
     return this.resolve(email);
   }
 
+  // Used at sign-in only. People who are on no list (they get the default role, or nothing)
+  // are remembered so an owner can see them on the access page and give them more access.
+  loginInfo(email) {
+    const me = this.resolve(email);
+    if (me.source === "default") {
+      const e = String(email).toLowerCase(), now = Date.now();
+      const exists = this.sql.exec("SELECT 1 AS x FROM seen WHERE email = ?", e).toArray().length > 0;
+      if (!exists) {
+        const n = this.sql.exec("SELECT COUNT(*) AS n FROM seen").one().n;
+        if (n >= MAX_SEEN) this.sql.exec("DELETE FROM seen WHERE email IN (SELECT email FROM seen ORDER BY last ASC LIMIT ?)", n - MAX_SEEN + 1);
+      }
+      this.sql.exec("INSERT INTO seen (email, first, last, n) VALUES (?, ?, ?, 1) ON CONFLICT (email) DO UPDATE SET last = excluded.last, n = n + 1", e, now, now);
+    }
+    return me;
+  }
+
   // Only owners may use the access page. Returns { ok, ... } or { ok:false, code, message }.
   listRoles(actorEmail) {
     const actor = this.resolve(actorEmail);
     if (!actor.owner) return { ok: false, code: "forbidden", message: "Only owners can manage access." };
     const assigned = this.sql.exec("SELECT email, role, by, ts FROM roles ORDER BY email").toArray().map((r) => ({ ...r, source: "admin" }));
-    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned] };
+    const seen = this.sql.exec("SELECT email, first, last, n FROM seen ORDER BY last DESC LIMIT 100").toArray()
+      .filter((r) => this.resolve(r.email).source === "default");
+    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen };
   }
 
-  // role: "viewer" | "contributor" | "editor" | "none" (remove).
+  // role: "viewer" | "contributor" | "editor" | "none" (remove) | "forget" (delete from the recent sign-ins).
   // Only owners may do this, and they cannot change people listed in the ROLES secret.
   changeRole(actorEmail, targetEmail, role) {
     const actor = this.resolve(actorEmail);
     if (!actor.owner) return { ok: false, code: "forbidden", message: "Only owners can manage access." };
     const target = String(targetEmail || "").trim().toLowerCase();
     if (!validEmail(target)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
-    if (!["viewer", "contributor", "editor", "none"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
+    if (!["viewer", "contributor", "editor", "none", "forget"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
+    if (role === "forget") {
+      this.sql.exec("DELETE FROM seen WHERE email = ?", target);
+      return { ok: true, email: target, role };
+    }
     const current = this.resolve(target);
     if (current.source === "secret") return { ok: false, code: "locked", message: "That person is set in the ROLES secret and can only be changed there." };
     const roles = this.loadRoles();
+    this.sql.exec("DELETE FROM seen WHERE email = ?", target); // they are on a list now (or were just removed)
     if (role === "none") {
       this.sql.exec("DELETE FROM roles WHERE email = ?", target);
       roles.delete(target);

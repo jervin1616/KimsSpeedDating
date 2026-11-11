@@ -59,7 +59,7 @@ export default {
         } catch (e) {
           return json({ error: "invalid_token", message: e.message }, 401);
         }
-        const me = await database(env).whoami(who.email);
+        const me = await database(env).loginInfo(who.email);
         if (me.role === "none") return json({ error: "no_access", email: who.email }, 403);
         const s = await mintSession(env, who.email);
         return json({ token: s.token, exp: s.exp, email: who.email, role: me.role, owner: me.owner });

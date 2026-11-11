@@ -395,8 +395,16 @@ try {
   check("admin POST from a wrong Origin is refused (403)", (await rolesApi(sessions.editorA, "POST", { email: EMAILS.newbie || "n@example.com", role: "viewer" }, { Origin: "https://evil.example.com" })).status === 403);
 
   check("before being added, an unlisted account gets no access (403)", (await login(EMAILS.stranger)).status === 403);
+  const seen0 = await rolesApi(sessions.editorA);
+  check("a person who signed in but is on no list shows up under 'signed in recently'", seen0.body.seen.some((p) => p.email === EMAILS.stranger && p.n >= 1), seen0.body.seen);
+  check("people who are on a list do not appear there", !seen0.body.seen.some((p) => [EMAILS.editorA, EMAILS.editorB, EMAILS.contributor, EMAILS.viewer].includes(p.email)));
+  await login("ghost@example.com");
+  check("a normal Editor cannot forget or add anyone from that list (403)", (await rolesApi(sessions.editorB, "POST", { email: "ghost@example.com", role: "forget" })).status === 403);
+  const forgot = await rolesApi(sessions.editorA, "POST", { email: "ghost@example.com", role: "forget" });
+  check("owner can forget an entry", forgot.status === 200 && !(await rolesApi(sessions.editorA)).body.seen.some((p) => p.email === "ghost@example.com"), forgot);
   const addV = await rolesApi(sessions.editorA, "POST", { email: EMAILS.stranger.toUpperCase(), role: "viewer" });
   check("owner adds the stranger as Viewer (email is lower-cased)", addV.status === 200 && addV.body.email === EMAILS.stranger, addV);
+  check("adding someone to the list takes them off the 'signed in recently' list", !(await rolesApi(sessions.editorA)).body.seen.some((p) => p.email === EMAILS.stranger));
   const sl = await login(EMAILS.stranger);
   check("the new Viewer can now sign in and gets role viewer", sl.status === 200 && sl.body.role === "viewer" && sl.body.owner === false, sl.body);
   const sw = await connect(sl.session);
@@ -428,6 +436,9 @@ try {
   check("an email with list separators is rejected (400)", (await rolesApi(sessions.editorA, "POST", { email: "a@example.com,b@example.com", role: "viewer" })).status === 400);
   const listAfter = await rolesApi(sessions.editorA);
   const helperRow = listAfter.body.people.find((p) => p.email === EMAILS.helper);
+  for (let i = 0; i < 320; i++) await login(`cap${i}@example.com`);
+  const capList = await rolesApi(sessions.editorA);
+  check("320 sign-ins later the recent list is capped, newest first, oldest dropped", capList.body.seen.length <= 100 && capList.body.seen[0].email === "cap319@example.com" && !capList.body.seen.some((p) => p.email === "cap0@example.com"), { n: capList.body.seen.length, first: capList.body.seen[0] && capList.body.seen[0].email });
   check("the list records who added whom", helperRow && helperRow.by === EMAILS.editorA && helperRow.role === "editor" && helperRow.source === "admin", helperRow);
   const exH = await fetch(BASE + "/api/export", { headers: { Authorization: "Bearer " + hl.session.token } });
   check("an Editor assigned on the page can download the export", exH.status === 200, exH.status);
@@ -564,6 +575,14 @@ try {
   check("...and the person can sign in as Viewer", (await login(EMAILS.uipick)).body && (await login(EMAILS.uipick)).body.role === "viewer");
   check("a normal Editor on the admin page is told they are not an owner and sees no controls", await until(async () => /not an owner/.test(await text(ADE, "#msg")), 6000) && await ADE.locator("#listCard").isHidden() && await ADE.locator("#addCard").isHidden());
   check("a Contributor on the admin page is told the same", await until(async () => /not an owner/.test(await text(ADK, "#msg")), 6000) && await ADK.locator("#listCard").isHidden());
+  await login("pending@example.com");
+  await AD.reload();
+  check("the page lists people who signed in recently", await until(async () => (await text(AD, "#seenList")).includes("pending@example.com"), 6000));
+  await AD.locator("#seenList .row", { hasText: "pending@example.com" }).getByRole("button", { name: "Add" }).click();
+  check("clicking Add moves them into People with the chosen role", await until(async () => (await text(AD, "#list")).includes("pending@example.com") && !(await text(AD, "#seenList")).includes("pending@example.com"), 6000));
+  AD.once("dialog", (d) => d.accept());
+  await AD.locator("#list .row", { hasText: "pending@example.com" }).getByRole("button", { name: "Remove" }).click();
+  await until(async () => !(await text(AD, "#list")).includes("pending@example.com"), 6000);
   AD.once("dialog", (d) => d.accept());
   await AD.locator("#list .row", { hasText: EMAILS.uipick }).getByRole("button", { name: "Remove" }).click();
   check("owner removes them on the page and they disappear", await until(async () => !(await text(AD, "#list")).includes(EMAILS.uipick), 6000));

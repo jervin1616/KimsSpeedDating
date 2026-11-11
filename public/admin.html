@@ -39,6 +39,11 @@
     </form>
     <p id="rules"></p>
   </section>
+  <section class="card" id="seenCard" hidden>
+    <h2>Signed in recently, not on any list</h2>
+    <p id="seenNote"></p>
+    <div id="seenList"></div>
+  </section>
   <section class="card" id="listCard" hidden>
     <h2>People</h2>
     <div id="list"></div>
@@ -61,6 +66,7 @@
     me = data.you;
     $("addCard").hidden = false; $("listCard").hidden = false;
     $("rules").textContent = "You are an owner. People set in the ROLES secret (the owners) are locked here; change them with npx wrangler secret put ROLES.";
+    renderSeen(data.seen || []);
     var list = $("list"); list.textContent = "";
     data.people.forEach(function (p) {
       var row = document.createElement("div"); row.className = "row";
@@ -84,10 +90,32 @@
       row.appendChild(right); list.appendChild(row);
     });
   }
+  function renderSeen(seen) {
+    $("seenCard").hidden = !seen.length;
+    $("seenNote").textContent = "These people signed in with Google but are not on the list, so they only get the default access. Add them to give more, or forget them to clear the entry.";
+    var box = $("seenList"); box.textContent = "";
+    seen.forEach(function (p) {
+      var row = document.createElement("div"); row.className = "row";
+      var who = document.createElement("div"); who.className = "who";
+      who.appendChild(document.createTextNode(p.email));
+      var meta = document.createElement("div"); meta.className = "meta";
+      meta.textContent = "Signed in " + p.n + (p.n === 1 ? " time" : " times") + ", last " + ago(p.last);
+      who.appendChild(meta); row.appendChild(who);
+      var right = document.createElement("div"); right.className = "form";
+      var sel = document.createElement("select"); sel.setAttribute("aria-label", "Role for " + p.email);
+      ["viewer", "contributor", "editor"].forEach(function (r) { var o = document.createElement("option"); o.value = r; o.textContent = LABEL[r]; sel.appendChild(o); });
+      var add = document.createElement("button"); add.type = "button"; add.className = "primary"; add.textContent = "Add";
+      add.onclick = function () { change(p.email, sel.value); };
+      var forget = document.createElement("button"); forget.type = "button"; forget.textContent = "Forget";
+      forget.onclick = function () { change(p.email, "forget"); };
+      right.appendChild(sel); right.appendChild(add); right.appendChild(forget);
+      row.appendChild(right); box.appendChild(row);
+    });
+  }
   function load() { return api("GET").then(render).catch(function (e) { say(e.message, true); }); }
   function change(email, role) {
     say("Saving...");
-    return api("POST", { email: email, role: role }).then(function () { say(role === "none" ? "Removed " + email + "." : "Saved " + email + " as " + LABEL[role] + "."); return load(); })
+    return api("POST", { email: email, role: role }).then(function () { say(role === "forget" ? "Forgot " + email + "." : role === "none" ? "Removed " + email + "." : "Saved " + email + " as " + LABEL[role] + "."); return load(); })
       .catch(function (e) { say(e.message, true); return load(); });
   }
   $("addForm").onsubmit = function (ev) {

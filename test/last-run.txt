@@ -1,4 +1,4 @@
-Test results 2026-11-11T00:46:54.397Z
+Test results 2026-11-11T00:48:33.055Z
 
 
 == Import script and export endpoint (round trip)
@@ -126,7 +126,12 @@ PASS  no login: admin API refused (401)
 PASS  forged session: admin API refused (401)
 PASS  admin POST from a wrong Origin is refused (403)
 PASS  before being added, an unlisted account gets no access (403)
+PASS  a person who signed in but is on no list shows up under 'signed in recently'
+PASS  people who are on a list do not appear there
+PASS  a normal Editor cannot forget or add anyone from that list (403)
+PASS  owner can forget an entry
 PASS  owner adds the stranger as Viewer (email is lower-cased)
+PASS  adding someone to the list takes them off the 'signed in recently' list
 PASS  the new Viewer can now sign in and gets role viewer
 PASS  their WebSocket opens with role viewer
 PASS  the new Viewer can read questions but cannot write
@@ -146,6 +151,7 @@ PASS  ...so nobody can remove an owner from the page (409)
 PASS  a bad email is rejected (400)
 PASS  an unknown role is rejected (400)
 PASS  an email with list separators is rejected (400)
+PASS  320 sign-ins later the recent list is capped, newest first, oldest dropped
 PASS  the list records who added whom
 PASS  an Editor assigned on the page can download the export
 PASS  owner removes the stranger
@@ -214,6 +220,8 @@ PASS  owner adds a person on the page and they appear in the list
 PASS  ...and the person can sign in as Viewer
 PASS  a normal Editor on the admin page is told they are not an owner and sees no controls
 PASS  a Contributor on the admin page is told the same
+PASS  the page lists people who signed in recently
+PASS  clicking Add moves them into People with the chosen role
 PASS  owner removes them on the page and they disappear
 PASS  ...and they can no longer sign in
 PASS  Editor page through the test proxy is live
@@ -228,4 +236,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-207 passed, 0 failed, 207 total
+215 passed, 0 failed, 215 total

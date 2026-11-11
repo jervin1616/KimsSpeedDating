@@ -292,6 +292,10 @@ Three places decide someone's role, strongest first:
 2. **The access page, `YOUR ADDRESS/admin.html`.** Owners only (the server enforces it, not just the button). An owner types an email, picks a role, and clicks Save. It takes effect immediately, even for people who are already on the app: their page tells them to reload, and anyone you remove is disconnected at once.
 3. **`DEFAULT_ROLE`** in `wrangler.jsonc`, for any other Google account. It is `viewer` here, so anyone who signs in can watch and use the private question picker. It can only be `none`, `viewer` or `contributor`, never `editor`.
 
+The access page also shows **"Signed in recently, not on any list"**: everyone who signed in with Google but is not on the secret or the page's list (up to the latest 300), with how many times and when.
+Pick a role and click **Add** to move them onto the list, or **Forget** to clear the entry. Those emails are only kept for this purpose, and the privacy page says so.
+Anyone already on a list does not appear there. If you set `DEFAULT_ROLE` to `none`, this list is where people waiting for approval show up.
+
 Only owners can use the access page. Editors, Contributors and Viewers cannot, even if they type the address. Nobody can change people listed in the secret from the page (edit the secret for that).
 
 To change the owners or fix a locked person, run this and type the whole new list (it replaces the old one). Do it before a stream, not during one:
