@@ -67,6 +67,11 @@
     <p id="lockState"></p>
     <div><button id="lockBtn" type="button" class="primary"></button></div>
   </section>
+  <section class="card" id="catCard" hidden>
+    <h2>Question categories</h2>
+    <p id="catNote"></p>
+    <div><button id="catBtn" type="button" class="primary">Sort the questions into categories</button></div>
+  </section>
   <section class="card" id="listCard" hidden>
     <h2>Owners, editors and contributors <span class="count" id="staffCount">0</span></h2>
     <p>People with more than watch-only access.</p>
@@ -204,6 +209,7 @@
     $("blockedCard").hidden = !blocked.length; $("blockedCount").textContent = blocked.length;
     var bl = $("blockedList"); bl.textContent = ""; blocked.forEach(function (p) { bl.appendChild(personRow(p)); });
     renderLock(data);
+    loadCats();
     $("eraseCard").hidden = false;
     if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
   }
@@ -219,6 +225,24 @@
       if (!lk && !window.confirm("Lock the door? New sign-ins from people not on your list will be turned away until you open it again. People already watching are not affected.")) return;
       say("Saving..."); post("/api/lock", { locked: !lk }).then(function (r) { say(r.locked ? "The door is locked." : "The door is open."); return load(); }).catch(function (e) { say(e.message, true); });
     };
+  }
+  function loadCats() {
+    $("catCard").hidden = false;
+    window.claude.authFetch("/api/categorize").then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) return;
+      var left = j.total - j.categorized;
+      $("catNote").textContent = left > 0
+        ? left + " of " + j.total + " questions have no category yet. Sorting adds a category to each one (it never changes the question, who asked it, or how often it was asked). Viewers and hosts can then filter by category."
+        : "All " + j.total + " questions have a category. Anyone can filter by category on the board, in the Questions tab and in the Random question buttons.";
+      $("catBtn").disabled = left <= 0; $("catBtn").textContent = left > 0 ? "Sort " + left + " questions into categories" : "Everything is sorted";
+      $("catBtn").onclick = function () {
+        say("Sorting..."); $("catBtn").disabled = true;
+        post("/api/categorize", {}).then(function (r) {
+          say("Sorted " + r.applied + " questions." + (r.unknown ? " " + r.unknown + " could not be matched (they stay uncategorized)." : ""));
+          loadCats();
+        }).catch(function (e) { say(e.message, true); loadCats(); });
+      };
+    }).catch(function () { /* leave the card as is */ });
   }
   function labelOf(r) { return LABEL[r] || r; }
   function renderLog(log) {

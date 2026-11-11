@@ -252,6 +252,8 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 .row.nodot { grid-template-columns: minmax(0, 1fr) auto; }
 .empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
 .note { color: var(--muted); font-size: 13px; margin: 0; }
+.catsel { width: auto; max-width: 100%; }
+.catpick { width: auto; font-size: 12px; padding: 4px 6px; }
 .note a, .legal a { color: #ff8fa8; }
 .legal { text-align: center; font-size: 12px; color: var(--muted); padding: 18px 12px 28px; }
 .toast .undo { margin-left: 6px; border: 0; background: rgba(26,5,16,.12); color: #1a0510; font-weight: 800; padding: 2px 10px; border-radius: 999px; min-height: 0; }
@@ -366,9 +368,10 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <div class="lbl">Your own question</div>
         <div class="qt" id="myQText">Tap the button for a random question.</div>
         <div class="by">Only you see this. It does not change the question on the stream.</div>
-        <div class="toolbar"><button class="primary" id="myQBtn" type="button">Random question for me</button></div>
+        <div class="toolbar"><select id="myCat" class="catsel" aria-label="Question category" hidden></select><button class="primary" id="myQBtn" type="button">Random question for me</button></div>
       </div>
       <div class="toolbar">
+        <select id="randomCat" class="catsel" aria-label="Random question category" hidden></select>
         <button class="primary contrib-only" id="randomQ">Random question</button>
         <button class="ghost contrib-only" id="backQ" hidden>Back</button>
         <button class="ghost" id="clearQ" hidden>Clear question</button>
@@ -448,6 +451,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <div class="toolbar" style="justify-content:space-between;margin-bottom:8px">
           <h2>Questions <span class="pill" id="readyCount">0</span> <span class="pill" id="totalCount">0 total</span></h2>
           <button class="small ghost" id="resetUsed" hidden>Move all back to ready</button>
+          <select id="qCat" class="catsel" aria-label="Filter by category" hidden></select>
           <select id="qSort" aria-label="Sort or filter questions" style="width:auto">
             <option value="least">Least asked first</option>
             <option value="most">Most asked first</option>
@@ -457,6 +461,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
           </select>
         </div>
         <div class="list scroll" id="readyList"></div>
+        <div class="toolbar" style="margin-top:8px"><button class="ghost small" id="qMore" type="button" hidden></button></div>
       </div>
     </section>
 
@@ -740,8 +745,32 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
 
   /* ---------- questions ---------- */
+  var CATS = [["first", "First dates"], ["date", "About your date"], ["flirty", "Flirty"], ["love", "Love & relationships"], ["wyr", "Would you rather"], ["tot", "This or that"], ["funny", "Funny & hypothetical"], ["food", "Food & drink"], ["media", "Music, movies & games"], ["travel", "Travel & adventure"], ["memories", "Childhood & memories"], ["deep", "Deep & personal"], ["life", "Everyday life"], ["hot", "Hot takes & debates"], ["chat", "From chat"], ["other", "Other"]];
+  var CAT_LABEL = {}; CATS.forEach(function (c) { CAT_LABEL[c[0]] = c[1]; });
+  function catOf(q) { return q && CAT_LABEL[q.cat] ? q.cat : "other"; }
+  // Category filters only appear once some questions have been sorted into categories (see the admin page).
+  function haveCats() { return state.questions.some(function (q) { return CAT_LABEL[q.cat] && q.cat !== "chat"; }); }
+  function fillCatSelect(sel, show) {
+    var keep = sel.value, counts = {};
+    state.questions.forEach(function (q) { if (q.text) counts[catOf(q)] = (counts[catOf(q)] || 0) + 1; });
+    sel.hidden = !show; if (!show) { sel.value = ""; return; }
+    var total = Object.keys(counts).reduce(function (n, k) { return n + counts[k]; }, 0);
+    sel.textContent = "";
+    var o0 = document.createElement("option"); o0.value = ""; o0.textContent = "All categories (" + total + ")"; sel.appendChild(o0);
+    CATS.forEach(function (c) { if (!counts[c[0]]) return; var o = document.createElement("option"); o.value = c[0]; o.textContent = c[1] + " (" + counts[c[0]] + ")"; sel.appendChild(o); });
+    sel.value = counts[keep] ? keep : "";
+  }
+  function syncCatSelects() {
+    var on = haveCats(), m = state.mode;
+    fillCatSelect($("myCat"), on && m === "viewer");
+    fillCatSelect($("randomCat"), on && m !== "viewer" && !!m);
+    fillCatSelect($("qCat"), on && m !== "viewer" && !!m);
+  }
+  var Q_PAGE = 150; state.qLimit = Q_PAGE;
   function renderQuestions() {
+    syncCatSelects();
     var mode = $("qSort").value, all = state.questions.slice();
+    if ($("qCat").value) all = all.filter(function (q) { return catOf(q) === $("qCat").value; });
     if (mode === "never") all = all.filter(function (q) { return qCount(q) === 0; });
     if (mode === "asked") all = all.filter(function (q) { return qCount(q) > 0; });
     all.sort(function (a, b) {
@@ -750,17 +779,28 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     });
     var fresh = all.filter(function (q) { return qCount(q) === 0; }).length;
     $("readyCount").textContent = fresh + " never asked"; $("totalCount").textContent = state.questions.length + " total"; $("resetUsed").hidden = true;
-    fillQ($("readyList"), all, state.questions.length ? "No questions match this view." : "No questions yet. Add one from the chat above.", false);
+    var shown = all.slice(0, state.qLimit);
+    fillQ($("readyList"), shown, state.questions.length ? "No questions match this view." : "No questions yet. Add one from the chat above.", false);
+    var more = all.length - shown.length;
+    $("qMore").hidden = more <= 0; if (more > 0) $("qMore").textContent = "Show " + Math.min(Q_PAGE, more) + " more (" + more + " not shown)";
   }
+  $("qMore").onclick = function () { state.qLimit += Q_PAGE; renderQuestions(); };
   function qCount(q) { return Math.max(q.askCount || 0, q.status === "used" ? 1 : 0); }
   function fillQ(box, items, emptyMsg, isUsed) {
     box.textContent = "";
     if (!items.length) { box.appendChild(el("div", "empty", emptyMsg)); return; }
     items.forEach(function (q) {
       var row = el("div", "row nodot"); var main = el("div", "main");
-      main.appendChild(el("div", "t", q.text)); main.appendChild(el("div", "m", (q.handle ? "From " + q.handle : "From chat") + (qCount(q) ? " \u00b7 Asked " + qCount(q) + (qCount(q) === 1 ? " time" : " times") : " \u00b7 Never asked")));
+      main.appendChild(el("div", "t", q.text)); main.appendChild(el("div", "m", (q.handle ? "From " + q.handle : "From chat") + (haveCats() ? " \u00b7 " + CAT_LABEL[catOf(q)] : "") + (qCount(q) ? " \u00b7 Asked " + qCount(q) + (qCount(q) === 1 ? " time" : " times") : " \u00b7 Never asked")));
       var acts = el("div", "racts");
       var ask = el("button", "small", qCount(q) ? "Ask again" : "Ask this"); ask.onclick = function () { askQuestion(q); }; acts.appendChild(ask);
+      if (state.mode === "host" && haveCats()) {
+        var cs = el("select", "catpick"); cs.setAttribute("aria-label", "Category for this question");
+        CATS.forEach(function (c) { var o = document.createElement("option"); o.value = c[0]; o.textContent = c[1]; cs.appendChild(o); });
+        cs.value = catOf(q);
+        cs.onchange = function () { var v = cs.value; q.cat = v; queue(function () { return state.db.collection("questions").doc(q.id).update({ cat: v }); }); };
+        acts.appendChild(cs);
+      }
       if (state.mode === "host") { var no = el("button", "small danger ghost", "Remove"); no.onclick = function () { delQ(q); }; acts.appendChild(no); }
       row.appendChild(main); row.appendChild(acts); box.appendChild(row);
     });
@@ -966,9 +1006,10 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   };
   $("clearQ").onclick = function () { commitQuestion(null); };
   $("randomQ").onclick = function () {
-    var cur = state.question && state.question.text, pool = state.questions.filter(function (q) { return q.text !== cur; });
-    if (!pool.length) pool = state.questions.slice();
-    if (!pool.length) { toast("Add a question first."); return; }
+    var cat = $("randomCat").value, inCat = function (q) { return !cat || catOf(q) === cat; };
+    var cur = state.question && state.question.text, pool = state.questions.filter(function (q) { return q.text !== cur && inCat(q); });
+    if (!pool.length) pool = state.questions.filter(inCat);
+    if (!pool.length) { toast(cat ? "No questions in that category." : "Add a question first."); return; }
     var w = pool.map(function (q) { return 1 / Math.pow(1 + qCount(q), 2); }), tot = w.reduce(function (a, b) { return a + b; }, 0), x = Math.random() * tot, i = 0;
     while (i < pool.length - 1 && x >= w[i]) { x -= w[i]; i++; }
     askQuestion(pool[i]);
@@ -1040,7 +1081,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   $("qForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
     var text = $("qIn").value.trim(); if (!text) return;
-    var body = { text: text, handle: $("qHandle").value.trim(), status: "ready", ts: Date.now() };
+    var body = { text: text, handle: $("qHandle").value.trim(), status: "ready", cat: "chat", ts: Date.now() };
     queue(function () { return state.db.collection("questions").add(body); }).then(function () { toast("Question added."); });
     $("qIn").value = ""; $("qHandle").value = ""; $("qIn").focus();
   });
@@ -1057,7 +1098,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     state.matches.forEach(function (m) { queue(function () { return state.db.collection("matches").doc(m.id).delete(); }); });
   };
 
-  $("qSort").onchange = renderQuestions; $("search").oninput = renderDaters; $("sort").onchange = renderDaters;
+  $("qSort").onchange = function () { state.qLimit = Q_PAGE; renderQuestions(); }; $("qCat").onchange = function () { state.qLimit = Q_PAGE; renderQuestions(); }; $("search").oninput = renderDaters; $("sort").onchange = renderDaters;
 
   /* ---------- stream ---------- */
   function sumCells(x) {
@@ -1126,7 +1167,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     var m = state.mode;
     document.querySelectorAll(".host-only").forEach(function (e) { e.hidden = m !== "host"; });
     document.querySelectorAll(".contrib-only").forEach(function (e) { e.hidden = m === "viewer"; });
-    $("myQBox").hidden = m !== "viewer";
+    $("myQBox").hidden = m !== "viewer"; syncCatSelects();
     $("adminLink").hidden = !window.claude.status().owner; // owners only
     $("signOut").hidden = false;
     $("connPill").hidden = false; showConn(window.claude.connection ? window.claude.connection() : "connecting"); syncBar(); syncInstallTip();
@@ -1144,11 +1185,13 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   function renderAll() { renderStage(); renderDaters(); renderQuestions(); renderMatches(); renderStream(); renderStreams(); if (!$("pickModal").hidden) renderPicker(); }
 
   /* ---------- private question picker (viewers only, writes nothing) ---------- */
-  var myBag = [], myLast = null;
+  var myBag = [], myLast = null, myBagCat = "";
   function pickMine() {
-    var byId = {}; state.questions.forEach(function (q) { if (q.text) byId[q.id] = q; });
+    var cat = $("myCat").value, byId = {};
+    state.questions.forEach(function (q) { if (q.text && (!cat || catOf(q) === cat)) byId[q.id] = q; });
     var ids = Object.keys(byId);
-    if (!ids.length) { $("myQText").textContent = "No questions yet."; return; }
+    if (!ids.length) { $("myQText").textContent = cat ? "No questions in that category." : "No questions yet."; return; }
+    if (myBagCat !== cat) { myBag = []; myBagCat = cat; }
     myBag = myBag.filter(function (id) { return byId[id]; });
     if (!myBag.length) {
       myBag = ids;
@@ -1158,7 +1201,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     myLast = myBag.pop();
     $("myQText").textContent = byId[myLast].text;
   }
-  $("myQBtn").onclick = pickMine;
+  $("myQBtn").onclick = pickMine; $("myCat").onchange = function () { pickMine(); };
 
   // As a home screen app there is no browser Back button, so the Admin link opens in this same window
   // (the admin page has a Back to the board link).

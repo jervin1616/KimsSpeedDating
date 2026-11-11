@@ -590,6 +590,52 @@ export class Database extends DurableObject {
     }
   }
 
+  /* ---------- question categories ---------- */
+
+  categoryStatus() {
+    let total = 0, done = 0;
+    for (const r of this.sql.exec("SELECT data FROM docs WHERE coll = 'questions'").toArray()) {
+      total++;
+      try { if (typeof JSON.parse(r.data).cat === "string") done++; } catch (e) { /* skip */ }
+    }
+    return { total, categorized: done };
+  }
+
+  // Gives every question that has no category the one listed in `map` (id -> key). Existing categories, ask counts and
+  // every other field are left alone. Viewers get one small patch message instead of one message per question.
+  applyCategories(actorEmail, map, allowed) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const okKey = new Set(allowed);
+    const patch = [];
+    let total = 0, already = 0, unknown = 0;
+    this.ctx.storage.transactionSync(() => {
+      for (const r of this.sql.exec("SELECT id, data FROM docs WHERE coll = 'questions'").toArray()) {
+        total++;
+        let d; try { d = JSON.parse(r.data); } catch (e) { continue; }
+        if (typeof d.cat === "string") { already++; continue; }
+        const c = Object.prototype.hasOwnProperty.call(map, r.id) ? map[r.id] : undefined;
+        if (!okKey.has(c)) { unknown++; continue; }
+        d.cat = c;
+        this.upsert("questions", r.id, validateDoc(d));
+        patch.push([r.id, { cat: c }]);
+      }
+    });
+    if (patch.length) this.broadcastPatch("questions", patch);
+    return { ok: true, applied: patch.length, already, unknown, total };
+  }
+
+  broadcastPatch(coll, patch) {
+    this.snap.delete(coll);
+    const out = '{"t":"bulk","coll":' + JSON.stringify(coll) + ',"patch":' + JSON.stringify(patch) + "}";
+    const now = Math.floor(Date.now() / 1000);
+    for (const [ws, att] of this.loadMeta()) {
+      if (!att.colls.includes(coll) || att.exp <= now) continue;
+      const role = this.resolve(att.email, att.iat).role;
+      if (role === "none" || !canRead(role, coll)) continue;
+      this.send(ws, out);
+    }
+  }
+
   /* ---------- RPC used by the Worker (export / import) ---------- */
 
   exportAll() {

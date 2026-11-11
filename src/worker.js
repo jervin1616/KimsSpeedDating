@@ -1,6 +1,6 @@
 // Worker: serves the API. Static files (the page) are served by Cloudflare assets and are free.
 import { verifyGoogleToken, mintSession, verifySession, canRefresh, safeEqual } from "./auth.js";
-import { LEVEL } from "./rules.js";
+import { LEVEL, CATEGORY_KEYS } from "./rules.js";
 
 export { Database } from "./database.js";
 
@@ -137,6 +137,24 @@ export default {
         if (path === "/api/lock") r = await database(env).setLock(s.email, !!body.locked);
         else if (path === "/api/revoke") r = await database(env).signOutEmail(s.email, body.email);
         else r = body.action === "erase" ? await database(env).erasePerson(s.email, body.query, body.select) : await database(env).findPerson(s.email, body.query);
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
+      }
+
+      if (path === "/api/categorize" && (request.method === "GET" || request.method === "POST")) {
+        // Owners only. Sorts questions that have no category using the list shipped with the site (/categories.json).
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (!s.owner) return json({ error: "forbidden", message: "Only owners can do that." }, 403);
+        if (request.method === "GET") return json({ ok: true, ...(await database(env).categoryStatus()) });
+        let file;
+        try {
+          const res = await env.ASSETS.fetch(new Request(url.origin + "/categories.json"));
+          file = await res.json();
+        } catch (e) { return json({ error: "no_file", message: "The category list was not found on the site." }, 500); }
+        if (!file || typeof file.map !== "object" || file.map === null) return json({ error: "no_file", message: "The category list is not valid." }, 500);
+        const r = await database(env).applyCategories(s.email, file.map, CATEGORY_KEYS);
         if (r.ok) return json(r);
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }

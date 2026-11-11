@@ -257,6 +257,30 @@
   PASS their email is gone from the change history too (blanked, entry kept), and the history notes an erase
   PASS a second erase for the other Zelda works
   PASS 'delete the whole question' removes the question itself
+  PASS before any question is sorted, no category filters show anywhere (viewer picker, host list, host random)
+  PASS only owners can see or run the category sorter (403 for an Editor, 401 with no login, 403 from a wrong origin)
+  PASS sorting the questions applies a category to all that have none (preset category and unknown ids are left alone)
+  PASS running it again changes nothing
+  PASS the status call reports how many are sorted
+  PASS each question got exactly the category from the list
+  PASS ask counts, handles and the question text are untouched, and a category set by hand is not overwritten
+  PASS the question nobody listed stays uncategorized
+  PASS every category in the list is one the server allows
+  PASS the open viewer page shows its category picker at once
+  PASS the open host page shows its two category filters at once
+  PASS the picker lists 'All categories', each category that has questions with its count, and Other for any not yet sorted
+  PASS a viewer who picks Would you rather only gets those questions, every time
+  PASS back on All categories they get questions from everywhere again
+  PASS the host Questions list shows a category on each row
+  PASS the list shows 150 at a time, with a button for the rest
+  PASS 'Show more' adds the next 150
+  PASS filtering the host list to Food & drink shows only those (and resets to the first page)
+  PASS a host can change one question's category from its row, and it is saved for everyone
+  PASS the host's Random question can be limited to one category too
+  PASS a question typed in by hand is filed under 'From chat'
+  PASS on a phone screen the category pickers fit without sideways scrolling
+  screenshots: /tmp/cat-shots/viewer.png /tmp/cat-shots/host.png
+  PASS the category pages show no JavaScript errors
 
 == Browser: three roles, live sync, reconnect
   PASS Editor page opens in Host view
@@ -469,4 +493,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-435 passed, 0 failed, 435 total
+458 passed, 0 failed, 458 total

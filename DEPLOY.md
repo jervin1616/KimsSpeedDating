@@ -476,3 +476,15 @@ The file `content/questions.json` holds 1,000 new questions, checked against you
 5. Download a backup from the Backup page.
 
 The bank then holds 1,500 of the 5,000 allowed. Every question is a "ready" question. In the app, "Clear question" and "ask" counts work as before.
+
+## Question categories
+
+Every question can have a category. Viewers get a category picker above **Random question for me**. Hosts and mods get a category filter above the Questions list and next to **Random question**. Nothing shows until questions are sorted, so deploying is safe.
+
+The categories are: First dates, About your date, Flirty, Love & relationships, Would you rather, This or that, Funny & hypothetical, Food & drink, Music, movies & games, Travel & adventure, Childhood & memories, Deep & personal, Everyday life, Hot takes & debates, From chat (questions typed in by hand), and Other (not sorted yet).
+
+**To sort the existing questions (once):** deploy, sign in as an owner, open the admin page, find **Question categories**, press **Sort N questions into categories**. It reads `public/categories.json` (the category for each of the 1,500 questions), fills in only the questions that have no category, and never changes the text, who asked, or ask counts. Pressing it twice is harmless. Viewers get one small update message, not one per question, so it is safe while people are watching, but I would still do it before a stream.
+
+The sorting was done by rules, not by a person, so a few will be in the wrong place. Hosts can fix one in the Questions tab: each row has a category dropdown.
+
+**For a future question pack:** put `"cat": "food"` (or another key from the list) on each question in the pack file. Or add `"id": "category"` pairs to `public/categories.json`, deploy, and press the admin button again.

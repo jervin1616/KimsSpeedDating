@@ -658,6 +658,88 @@ try {
     await api("/api/person", O, { action: "erase", query: "someoneelse", select: { questions: [q3], deleteQuestions: true } });
     check("'delete the whole question' removes the question itself", er3.body.questions.length === 1 && !(await (await connect(O)).sub("questions")).docs.some((d) => d.id === q3));
     for (const c of [oc, vw, ec]) c.close();
+
+    // ---- question categories
+    const content = JSON.parse(readFileSync(join(ROOT, "content", "questions.json"), "utf8"));
+    const catMap = JSON.parse(readFileSync(join(ROOT, "public", "categories.json"), "utf8")).map;
+    const getCat = (session) => fetch(API_BASE + "/api/categorize", { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+    const base0 = (await getCat(O)).body.total; // questions left over from the erase tests above
+    const cz = await connect(O); await cz.wait((m) => m.t === "hello");
+    for (let i = 0; i < content.length; i++) {
+      const { id, ...d } = content[i];
+      await cz.w("set", "questions", id, i === 0 ? { ...d, askCount: 7, handle: "@keepme" } : i === 1 ? { ...d, askCount: 4, handle: "@keepme2" } : d);
+    }
+    await cz.w("set", "questions", "zz_unknown1", { text: "A question the list does not know?", handle: "", status: "ready", ts: 1 });
+    const catPages = await chromium.launch();
+    const pageFor = async (session, path = "/") => {
+      const ctx = await catPages.newContext({ viewport: { width: 1100, height: 1300 } });
+      await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
+      await ctx.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }, ["sd.session.v1", JSON.stringify(session)]);
+      const pg = await ctx.newPage(); pg.errors = []; pg.on("pageerror", (e) => pg.errors.push(e.message));
+      await pg.goto(API_BASE + path); return pg;
+    };
+    const catV = await pageFor((await login("catviewer@example.com")).session);
+    const catE = await pageFor(O);
+    await until(async () => (await catV.locator("#role").textContent()) === "View only" && /never asked/.test(await catE.locator("#readyCount").textContent()), 15000);
+    await catE.click("#tabQ");
+    check("before any question is sorted, no category filters show anywhere (viewer picker, host list, host random)", await catV.locator("#myCat").isHidden() && await catE.locator("#qCat").isHidden() && await catE.locator("#randomCat").isHidden());
+    await cz.w("update", "questions", content[0].id, { cat: "hot" }); // a category set by hand, before sorting
+    const st0 = await api("/api/categorize", O); // POST
+    await sleep(100);
+    check("only owners can see or run the category sorter (403 for an Editor, 401 with no login, 403 from a wrong origin)", (await getCat(ED)).status === 403 && (await getCat(null)).status === 401 && (await api("/api/categorize", ED)).status === 403 && (await api("/api/categorize", O, {}, { Origin: "https://evil.example.com" })).status === 403);
+    check("sorting the questions applies a category to all that have none (preset category and unknown ids are left alone)", st0.status === 200 && st0.body.applied === content.length - 1 && st0.body.already === 1 && st0.body.unknown === base0 + 1 && st0.body.total === base0 + content.length + 1, st0.body);
+    const st1 = await api("/api/categorize", O);
+    check("running it again changes nothing", st1.body.applied === 0 && st1.body.already === content.length && st1.body.unknown === base0 + 1, st1.body);
+    const status = await getCat(O);
+    check("the status call reports how many are sorted", status.body.total === base0 + content.length + 1 && status.body.categorized === content.length, status.body);
+    const snapQ = (await (await connect(O)).sub("questions")).docs;
+    const byIdQ = new Map(snapQ.map((d) => [d.id, d.data]));
+    const wrong = content.slice(2).filter((q) => byIdQ.get(q.id).cat !== catMap[q.id]);
+    check("each question got exactly the category from the list", wrong.length === 0, wrong.slice(0, 2));
+    check("ask counts, handles and the question text are untouched, and a category set by hand is not overwritten", byIdQ.get(content[0].id).cat === "hot" && byIdQ.get(content[0].id).askCount === 7 && byIdQ.get(content[0].id).handle === "@keepme" && byIdQ.get(content[1].id).askCount === 4 && byIdQ.get(content[1].id).handle === "@keepme2" && byIdQ.get(content[1].id).text === content[1].text && byIdQ.get(content[1].id).cat === catMap[content[1].id]);
+    check("the question nobody listed stays uncategorized", byIdQ.get("zz_unknown1").cat === undefined);
+    check("every category in the list is one the server allows", Object.values(catMap).every((k) => ["first", "date", "flirty", "love", "wyr", "tot", "funny", "food", "media", "travel", "memories", "deep", "life", "hot", "chat", "other"].includes(k)));
+
+    // pages that were already open update live, without a reload
+    check("the open viewer page shows its category picker at once", await until(async () => await catV.locator("#myCat").isVisible(), 6000));
+    check("the open host page shows its two category filters at once", await until(async () => await catE.locator("#qCat").isVisible() && await catE.locator("#randomCat").isVisible(), 6000));
+    const optsV = await catV.locator("#myCat option").allTextContents();
+    check("the picker lists 'All categories', each category that has questions with its count, and Other for any not yet sorted", /All categories \(\d+\)/.test(optsV[0]) && optsV.some((o) => /^Would you rather \(\d+\)/.test(o)) && optsV.some((o) => /^Other \(\d+\)/.test(o)), optsV);
+    const wyrTexts = new Set(content.filter((q) => catMap[q.id] === "wyr").map((q) => q.text));
+    await catV.selectOption("#myCat", "wyr");
+    const seenTexts = [];
+    for (let i = 0; i < 12; i++) { await catV.click("#myQBtn"); seenTexts.push(await catV.locator("#myQText").innerText()); }
+    check("a viewer who picks Would you rather only gets those questions, every time", seenTexts.every((t) => wyrTexts.has(t)) && new Set(seenTexts).size > 6, seenTexts);
+    await catV.selectOption("#myCat", "");
+    const anyTexts = new Set(); for (let i = 0; i < 40; i++) { await catV.click("#myQBtn"); anyTexts.add(await catV.locator("#myQText").innerText()); }
+    check("back on All categories they get questions from everywhere again", [...anyTexts].some((t) => !wyrTexts.has(t)));
+
+    check("the host Questions list shows a category on each row", /Would you rather|First dates|Flirty|Food & drink|Deep & personal|Everyday life|Funny/.test(await catE.locator("#readyList .row .m").nth(6).innerText()));
+    check("the list shows 150 at a time, with a button for the rest", (await catE.locator("#readyList .row").count()) === 150 && /Show 150 more/.test(await catE.locator("#qMore").innerText()));
+    await catE.click("#qMore");
+    check("'Show more' adds the next 150", (await catE.locator("#readyList .row").count()) === 300);
+    const nFood = content.filter((q) => catMap[q.id] === "food").length;
+    await catE.selectOption("#qCat", "food");
+    const foodRows = await catE.locator("#readyList .row .m").allInnerTexts();
+    check("filtering the host list to Food & drink shows only those (and resets to the first page)", foodRows.length === Math.min(150, nFood) && foodRows.every((t) => /Food & drink/.test(t)), { n: foodRows.length, nFood });
+    const firstFoodText = await catE.locator("#readyList .row .t").first().innerText();
+    const firstFoodId = content.find((q) => q.text === firstFoodText).id;
+    await catE.locator("#readyList .row").first().locator("select.catpick").selectOption("life");
+    check("a host can change one question's category from its row, and it is saved for everyone", await until(async () => { const d = (await (await connect(O)).sub("questions/" + firstFoodId)).docs[0]; return d && d.data.cat === "life"; }, 6000));
+    await catE.selectOption("#qCat", "");
+    await catE.selectOption("#randomCat", "date");
+    const dateTexts = new Set(content.filter((q) => catMap[q.id] === "date").map((q) => q.text));
+    const picks = [];
+    for (let i = 0; i < 6; i++) { await catE.click("#randomQ"); await sleep(250); picks.push(await catE.locator("#qtext").innerText()); }
+    check("the host's Random question can be limited to one category too", picks.every((t) => dateTexts.has(t)) && new Set(picks).size > 1, picks);
+    const addC = await (async () => { await catE.fill("#qIn", "A question typed in from chat?"); await catE.click("#qSend"); return until(async () => (await (await connect(O)).sub("questions")).docs.find((d) => d.data.text === "A question typed in from chat?"), 6000); })();
+    check("a question typed in by hand is filed under 'From chat'", addC && addC.data.cat === "chat", addC && addC.data);
+    await catV.setViewportSize({ width: 390, height: 844 }); await catE.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+    check("on a phone screen the category pickers fit without sideways scrolling", await catV.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth) && await catE.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    await catV.locator("#myQBox").screenshot({ path: "/tmp/cat-shots/viewer.png" }); await catE.screenshot({ path: "/tmp/cat-shots/host.png", fullPage: false });
+    console.log("  screenshots: " + "/tmp/cat-shots/viewer.png" + " " + "/tmp/cat-shots/host.png");
+    check("the category pages show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0, [...catV.errors, ...catE.errors]);
+    await catPages.close(); cz.close();
   }
   API_BASE = BASE;
   try { process.kill(-wrangler2.pid, "SIGKILL"); } catch (e) { /* gone */ }

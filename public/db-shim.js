@@ -375,6 +375,14 @@
         else sub.mirror.set(m.id, m.data);
         if (sub.ready) dispatch(sub);
       });
+    } else if (m.t === "bulk") {
+      // many small field changes in one message (for example question categories): merge them, tell listeners once
+      Object.keys(subs).forEach(function (k) {
+        var sub = subs[k];
+        if (sub.coll !== m.coll || sub.docId || !sub.mirror || !Array.isArray(m.patch)) return;
+        m.patch.forEach(function (p) { var cur = sub.mirror.get(p[0]); if (cur) sub.mirror.set(p[0], Object.assign({}, cur, p[1])); });
+        if (sub.ready) dispatch(sub);
+      });
     } else if (m.t === "ack") {
       var p = pending[m.rid];
       if (p) { clearTimeout(p.t); delete pending[m.rid]; p.res({ id: m.id }); }
