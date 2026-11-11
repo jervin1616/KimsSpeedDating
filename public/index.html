@@ -196,6 +196,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
       <h1>Kim's Speed Dating</h1>
     </div>
     <span class="pill" id="role">Loading</span>
+    <a class="pill" id="signOut" href="#" role="button" style="text-decoration:none" hidden>Sign out</a>
     <a class="pill" id="adminLink" href="/admin.html" target="_blank" rel="noopener" style="text-decoration:none" hidden>Admin</a>
   </header>
   <div class="streambar host-only" id="streamBar" hidden>
@@ -969,6 +970,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     document.querySelectorAll(".contrib-only").forEach(function (e) { e.hidden = m === "viewer"; });
     $("myQBox").hidden = m !== "viewer";
     $("adminLink").hidden = !window.claude.status().owner; // owners only
+    $("signOut").hidden = false;
     $("tabs").hidden = m !== "host";
     if (m === "host") { var t0 = "d"; try { t0 = sessionStorage.getItem("sd-tab") || "d"; } catch (e) {} showTab(TABS[t0] ? t0 : "d"); }
     else { $("panelD").hidden = true; $("panelM").hidden = true; $("panelP").hidden = true; $("panelQ").hidden = m === "viewer"; }
@@ -998,6 +1000,13 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
     $("myQText").textContent = byId[myLast].text;
   }
   $("myQBtn").onclick = pickMine;
+
+  $("signOut").onclick = function (ev) {
+    ev.preventDefault();
+    if (!window.confirm("Sign out of Kim's Speed Dating on this device?")) return;
+    window.claude.signOut();
+    location.reload();
+  };
 
   /* ---------- boot ---------- */
   function snapDocs(snap) { return snap.docs.map(function (d) { var o = Object.assign({}, d.data() || {}); o.id = d.id; return o; }); }

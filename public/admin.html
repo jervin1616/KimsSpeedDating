@@ -29,6 +29,7 @@
   <p>Owners and editors only. People you add can sign in with the Google account for that email.</p>
   <div id="gsi"></div>
   <p id="msg" role="status"></p>
+  <div><button id="signOut" type="button" hidden>Sign out</button></div>
   <section class="card" id="addCard" hidden>
     <h2>Add or change someone</h2>
     <form class="form" id="addForm">
@@ -102,7 +103,7 @@
       if (!u) return needSignIn();
       return u.canEdit().then(function (ok) {
         if (!ok) { say("This account is not an owner or editor, so it cannot manage access.", true); return; }
-        $("gsi").textContent = ""; say("Signed in as " + window.claude.status().email + "."); return load();
+        $("gsi").textContent = ""; $("signOut").hidden = false; say("Signed in as " + window.claude.status().email + "."); return load();
       });
     });
   }
@@ -111,6 +112,7 @@
     say(st.noAccess ? "This Google account (" + st.email + ") is not on the list." : "Sign in with Google to continue.");
     window.claude.signIn($("gsi"), function (r) { if (r.error) say(r.error, true); else ready(); });
   }
+  $("signOut").onclick = function () { if (window.confirm("Sign out on this device?")) { window.claude.signOut(); location.reload(); } };
   window.addEventListener("claude-conn", function (e) { if (e.detail && e.detail.state === "role") ready(); });
   ready();
 })();

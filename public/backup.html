@@ -16,6 +16,7 @@
   <p>Editors only. This saves every dater, question, match, seat and past stream as one JSON file.</p>
   <div id="gsi"></div>
   <button id="dl" hidden>Download backup</button>
+  <button id="signOut" type="button" hidden style="background:#33101f;color:#fff1f4;border:1px solid #4a1429">Sign out</button>
   <p id="msg" role="status"></p>
 </main>
 <script src="/db-shim.js"></script>
@@ -27,7 +28,7 @@
       if (!u) return needSignIn();
       return u.canEdit().then(function (ok) {
         if (!ok) { $("msg").textContent = "This account is not an Editor, so it cannot download backups."; return; }
-        $("gsi").textContent = ""; $("dl").hidden = false; $("msg").textContent = "Signed in as " + window.claude.status().email + ".";
+        $("gsi").textContent = ""; $("dl").hidden = false; $("signOut").hidden = false; $("msg").textContent = "Signed in as " + window.claude.status().email + ".";
       });
     });
   }
@@ -48,6 +49,7 @@
       $("msg").textContent = "Done. Keep the file somewhere private: it contains your daters' names.";
     }).catch(function (e) { $("msg").textContent = "Download failed: " + e.message; }).then(function () { $("dl").disabled = false; });
   };
+  $("signOut").onclick = function () { if (window.confirm("Sign out on this device?")) { window.claude.signOut(); location.reload(); } };
   ready();
 })();
 </script></body></html>

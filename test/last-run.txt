@@ -1,4 +1,4 @@
-Test results 2026-11-11T00:28:57.190Z
+Test results 2026-11-11T00:38:10.138Z
 
 
 == Import script and export endpoint (round trip)
@@ -197,6 +197,13 @@ PASS  Contributor 'Back' restores the question that was cleared, for everyone
 PASS  Contributor has the Questions panel
 PASS  Contributor adds a question: the Editor's question total goes up by one, live
 PASS  ...and the new question exists on the server
+PASS  every signed-in role sees a Sign out button
+PASS  cancelling the 'Sign out?' question keeps you signed in
+PASS  signing out returns to the sign-in screen and clears the saved login
+PASS  ...the sign-in screen no longer shows the Sign out button
+PASS  ...it stays signed out after another reload
+PASS  signing out on one device does not sign the same person out on another
+PASS  the signed-out page opened no connection of its own
 PASS  Viewer sees the private question picker; Editor, Contributor do not
 PASS  the picker shows real questions from the list
 PASS  ...never the same question twice in a row, and no repeats until every question was shown
@@ -222,4 +229,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-201 passed, 0 failed, 201 total
+208 passed, 0 failed, 208 total

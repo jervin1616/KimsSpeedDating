@@ -464,7 +464,7 @@ try {
   const mkPage = async (session, base = BASE, path = "/") => {
     const ctx = await browser.newContext({ viewport: { width: 1100, height: 1300 } });
     await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
-    await ctx.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } window.__ev = []; window.addEventListener("claude-conn", (e) => window.__ev.push(e.detail.state)); }, ["sd.session.v1", JSON.stringify(session)]);
+    await ctx.addInitScript(([k, v]) => { try { if (!sessionStorage.getItem("__seeded")) { localStorage.setItem(k, v); sessionStorage.setItem("__seeded", "1"); } } catch (e) { /* ignore */ } window.__ev = []; window.addEventListener("claude-conn", (e) => window.__ev.push(e.detail.state)); }, ["sd.session.v1", JSON.stringify(session)]);
     const page = await ctx.newPage();
     page.errors = []; page.on("pageerror", (e) => page.errors.push(e.message));
     await page.goto(base + path);
@@ -526,6 +526,21 @@ try {
   await K.locator("#qIn").fill("Added by a mod live?"); await K.click("#qSend");
   check("Contributor adds a question: the Editor's question total goes up by one, live", await until(async () => Number(/(\d+) total/i.exec(await text(A, "#totalCount"))[1]) === totalA0 + 1, 5000), totalA0);
   check("...and the new question exists on the server", !!(await until(async () => (await viaWs.sub("questions")).docs.some((d) => d.data.text === "Added by a mod live?"), 4000)));
+
+  // sign out
+  check("every signed-in role sees a Sign out button", (await Promise.all([A, B, K, V].map((p) => p.locator("#signOut").isVisible()))).every(Boolean));
+  const V2 = await mkPage(sessions.viewer);
+  await until(async () => (await roleOf(V2)) === "View only");
+  V2.once("dialog", (d) => d.dismiss());
+  await V2.click("#signOut"); await sleep(400);
+  check("cancelling the 'Sign out?' question keeps you signed in", (await roleOf(V2)) === "View only" && await V2.locator("#gate").isHidden());
+  V2.once("dialog", (d) => d.accept());
+  await V2.click("#signOut");
+  check("signing out returns to the sign-in screen and clears the saved login", await until(async () => await V2.locator("#gate").isVisible() && (await V2.locator("#app").isHidden()), 6000) && (await V2.evaluate(() => localStorage.getItem("sd.session.v1"))) === null);
+  check("...the sign-in screen no longer shows the Sign out button", await V2.locator("#signOut").isHidden());
+  check("...it stays signed out after another reload", await (async () => { await V2.reload(); await sleep(600); return await V2.locator("#gate").isVisible() && (await V2.evaluate(() => localStorage.getItem("sd.session.v1"))) === null; })());
+  check("signing out on one device does not sign the same person out on another", (await roleOf(V)) === "View only" && (await V.evaluate(() => window.claude._test.state().state)) === "open");
+  check("the signed-out page opened no connection of its own", (await V2.evaluate(() => window.claude._test.state().everOpened)) === false);
 
   // viewer's private picker
   check("Viewer sees the private question picker; Editor, Contributor do not", await V.locator("#myQBox").isVisible() && await A.locator("#myQBox").isHidden() && await K.locator("#myQBox").isHidden());

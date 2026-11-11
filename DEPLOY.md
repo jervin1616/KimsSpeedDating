@@ -308,6 +308,12 @@ npx wrangler secret put ROLES
 
 ---
 
+## Signing out
+
+Everyone has a **Sign out** pill at the top of the console (and a button on the access and backup pages). It asks first, then signs that one browser out and clears its saved login.
+It does not sign the same person out on their other devices.
+Signing out only clears this device. To cut someone off everywhere right now, remove them on `/admin.html`: their open pages are disconnected at once.
+
 ## Staying on the free plan
 
 Checked against Cloudflare's own docs (Workers Free plan, Durable Objects with SQLite):

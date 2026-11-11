@@ -128,6 +128,7 @@
   }
 
   function signOut() {
+    clearTimeout(refreshTimer);
     session = null; saveSession(); bootPromise = Promise.resolve(false); authFailed = true;
     try { window.google.accounts.id.disableAutoSelect(); } catch (e) { /* not loaded */ }
     closeSocket();
