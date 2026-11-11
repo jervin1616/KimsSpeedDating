@@ -464,3 +464,15 @@ All four are on the admin page (owners only). Nothing to set up. The first reque
 - **Erase a person's records.** Type a name, handle or email, review everything that mentions them, untick anything that is not theirs, then erase. Daters, their match log entries, seats showing them, chat handles on questions (or the whole question), sign-in and access records. The change history keeps its entry but the email becomes "(erased)". Downloaded backups are not changed. People in the ROLES secret cannot be erased here.
 
 Note: a page that has stayed completely silent since it opened may not be closed until its next message. Nothing is sent to a blocked or signed-out person in the meantime, because every broadcast checks their role first.
+
+## Adding the 1,000 extra questions (and any future question packs)
+
+The file `content/questions.json` holds 1,000 new questions, checked against your 500 so none repeat. Packs are loaded with the same import tool as step 9. Use `--dir content` so it only reads that folder. **Do not import your `data/` backup again**: it would put the old ask counts back.
+
+1. Make a fresh key and save it, the same way as step 7c (new terminal window, from inside the `KimsSpeedDating` folder).
+2. Practice run, nothing is sent: `node scripts/import.mjs --dir content --dry-run` (expect `questions 1000`).
+3. Real import: `node scripts/import.mjs --dir content --url https://YOUR-ADDRESS.workers.dev`. It ends with a check line. Running it twice is safe, it updates by id.
+4. Switch the key off again: `npx wrangler secret delete ADMIN_KEY`.
+5. Download a backup from the Backup page.
+
+The bank then holds 1,500 of the 5,000 allowed. Every question is a "ready" question. In the app, "Clear question" and "ask" counts work as before.

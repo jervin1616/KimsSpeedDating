@@ -1,13 +1,13 @@
 Load test: 400 viewers + 15 hosts/mods, MAX_VIEWERS=400
-memory before: 223 MB (all workerd processes)
-connect 400 viewers: 1.9 s, refused: 0
+memory before: 227 MB (all workerd processes)
+connect 400 viewers: 2.5 s, refused: 0
   every viewer got its 3 snapshots: 400/400
-memory with 400 viewers: 544 MB
+memory with 400 viewers: 559 MB
 connect 15 hosts/mods on top of the full viewer room: 15 ok, refused: 0
 viewer number 401 is refused: yes (503)
-1 write -> reached 400/400 viewers; delay p50 36 ms, p95 56 ms, max 57 ms
-busy moment (9 writes back to back): host saw all acks in 331 ms; 400/400 viewers received all 9 updates; slowest viewer finished 330 ms after start
-heartbeat: 400/400 answered; slowest 49 ms
-memory after traffic: 564 MB
-reconnect storm (all 400 at once): 1.2 s, refused: 0, got snapshots: 400/400
-memory after storm: 659 MB
+1 write -> reached 400/400 viewers; delay p50 35 ms, p95 49 ms, max 50 ms
+busy moment (9 writes back to back): host saw all acks in 271 ms; 400/400 viewers received all 9 updates; slowest viewer finished 270 ms after start
+heartbeat: 400/400 answered; slowest 50 ms
+memory after traffic: 575 MB
+reconnect storm (all 400 at once): 1.9 s, refused: 0, got snapshots: 400/400
+memory after storm: 662 MB

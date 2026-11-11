@@ -35,6 +35,9 @@ for (let i = 0; i < 180; i++) { try { if ((await fetch(BASE + "/api/config")).ok
 // real data: the same 741 records
 const imp = spawnSync("node", ["scripts/import.mjs", "--url", BASE, "--dir", "data"], { cwd: ROOT, env: { ...process.env, ADMIN_KEY: ADMIN }, encoding: "utf8" });
 if (imp.status !== 0) { console.log("import failed (is the data folder present?):", imp.stderr); stop(); process.exit(1); }
+// the extra question bank too, so the test sees the full-size question list every viewer downloads
+const imp2 = spawnSync("node", ["scripts/import.mjs", "--url", BASE, "--dir", "content"], { cwd: ROOT, env: { ...process.env, ADMIN_KEY: ADMIN }, encoding: "utf8" });
+console.log(imp2.status === 0 ? "also imported the extra question bank (content folder)" : "extra question bank not imported: " + (imp2.stderr || "").slice(0, 200));
 
 const out = [];
 const log = (s) => { out.push(s); console.log(s); };
