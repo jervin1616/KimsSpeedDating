@@ -189,6 +189,9 @@
   PASS removing the helper closes their connection too
 
 == Role rules in code (default role, owner, precedence)
+  PASS a blocked person gets no access even though the default is Viewer
+  PASS a block can never apply to someone in the ROLES secret
+  PASS a locked door turns away new sign-ins from unlisted people but not older sessions, added people or owners
   PASS DEFAULT_ROLE can be none, viewer or contributor
   PASS DEFAULT_ROLE can never make strangers editors or owners
   PASS ROLES accepts commas, semicolons, new lines and any letter case
@@ -198,6 +201,62 @@
   PASS an assigned role beats the default
   PASS unlisted and unassigned falls back to DEFAULT_ROLE
   PASS email checks reject junk
+
+== Block, lock the door, sign out, erase a person (second server, default role Viewer)
+  PASS with the default role Viewer, any Google account can sign in (this is why Remove was not a block)
+  PASS a non-owner cannot block anyone (403)
+  PASS owners cannot be blocked from the page (409, set in the ROLES secret)
+  PASS an owner blocks the account
+  PASS their open page is closed at once (4403)
+  PASS they cannot sign in again, even though the default role is Viewer (403)
+  PASS their old session is refused everywhere: session check, refresh, WebSocket
+  PASS blocked people are listed as blocked, and not under recent sign-ins
+  PASS the block is in Recent changes (so Undo works)
+  PASS unblocking (Remove from the block list) lets them sign in again as a Viewer
+  PASS blocking a Contributor remembers what they were, so Undo puts them back
+  PASS ...and they are a Contributor again
+  PASS a non-owner cannot lock the door (403)
+  PASS an owner locks the door
+  PASS the access page API reports the door is locked
+  PASS new people who are on no list are turned away with a plain 'paused' answer (403 locked)
+  PASS ...and they are not added to the recent sign-ins list (a flood cannot push real entries out)
+  PASS someone who was already signed in keeps watching: their session refreshes and a new connection opens
+  PASS ...and the page they already had open stays connected
+  PASS people the owner added can still sign in while it is locked
+  PASS people in the ROLES secret can still sign in while it is locked
+  PASS opening the door again works
+  PASS new people can sign in again after the door is opened
+  PASS signing out needs a real session (401) and the right origin (403)
+  PASS signing out works (200)
+  PASS that device's open page is closed at once
+  PASS the copied token no longer works: session check, refresh and WebSocket all refuse it (401)
+  PASS signing out on one device does not sign the person out on their other device
+  PASS ...and the other device keeps refreshing (its session id carries over)
+  PASS a fresh sign-in after signing out works
+  PASS a non-owner cannot sign someone out everywhere (403), and a bad email is refused (400)
+  PASS an owner signs a person out on every device (200)
+  PASS ...both of their sessions stop working and the open page closes
+  PASS ...nobody else is affected
+  PASS ...and they can sign in again afterwards (it ends sessions, not the account)
+  PASS only owners can search for a person (403 for an Editor, 401 with no login)
+  PASS a search needs at least 2 characters (400)
+  PASS finding 'zelda' shows both daters with that name, their match log entry, both handles' questions, the seat, and the matching accounts
+  PASS ...and it does not list people who do not match (Bob, the unrelated question)
+  PASS searching changes nothing
+  PASS people set in the ROLES secret are never offered for erasing (they live in the secret, not the database)
+  PASS erasing items that do not match the search is ignored (Bob, an unrelated question, owners)
+  PASS an Editor cannot erase (403)
+  PASS the owner erases what they ticked
+  PASS the ticked dater is gone; the unticked 'Zelda Quillen' and Bob are still there
+  PASS the match log entry is gone; Bob's own entry stays
+  PASS questions keep their text but lose the chat handle (the unrelated one is untouched)
+  PASS the seat that showed them is emptied; the other seat is untouched
+  PASS the question on screen and its history lose their handle (other handles stay)
+  PASS people watching see the emptied seat change live
+  PASS the erased account is gone from the list, and an unticked matching account stays
+  PASS their email is gone from the change history too (blanked, entry kept), and the history notes an erase
+  PASS a second erase for the other Zelda works
+  PASS 'delete the whole question' removes the question itself
 
 == Browser: three roles, live sync, reconnect
   PASS Editor page opens in Host view
@@ -379,6 +438,21 @@
   PASS Undo brings them straight back as a Contributor in the staff section
   PASS the history records who did what (server side)
   PASS only owners can read that history (403 for an Editor and a Contributor)
+  PASS the admin page has Lock the door and Erase a person tools for owners only
+  PASS Block on a viewer row moves them into the Blocked section, out of Viewers
+  PASS ...and Recent changes says Blocked, with an Undo
+  PASS ...and they cannot sign in
+  PASS Undo on a block puts them straight back as a Viewer
+  PASS Unblock takes them off the Blocked section
+  PASS Sign out everywhere on a row ends that person's sessions
+  PASS the Lock the door card says the door is open, with a button
+  PASS locking shows LOCKED and the button becomes Open the door
+  PASS opening the door again shows it is open
+  PASS searching for a person lists their dater record, match entry and question, all ticked
+  PASS erasing removes only what was ticked and reports it
+  PASS ...the dater is gone, the unticked match entry stays, the question lost its handle but kept its text
+  PASS ...and the history shows 'Records erased on request' with no Undo
+  PASS the admin page shows no JavaScript errors
   PASS Editor page through the test proxy is live
   PASS connection loss is noticed and the page says so
   PASS a write while offline fails fast with the page's normal 'Could not save' message
@@ -395,4 +469,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-363 passed, 0 failed, 363 total
+435 passed, 0 failed, 435 total

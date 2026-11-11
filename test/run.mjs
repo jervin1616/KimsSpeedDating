@@ -19,6 +19,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const PORT = 8799, PROXY_PORT = 8798;
 const BASE = `http://127.0.0.1:${PORT}`;
+const PORT2 = 8797, BASE2 = `http://127.0.0.1:${PORT2}`;
+let API_BASE = BASE; // the tests below talk to this server (a second one is started for the default-role-viewer tests)
 const PROXY_BASE = `http://127.0.0.1:${PROXY_PORT}`;
 const CLIENT_ID = "test-client-id.apps.googleusercontent.com";
 const SESSION_SECRET = crypto.randomBytes(32).toString("hex");
@@ -73,7 +75,7 @@ function ourSession(email, { exp = nowS() + 3600, secret = SESSION_SECRET } = {}
 }
 
 async function post(path, body, headers = {}) {
-  const r = await fetch(BASE + path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
+  const r = await fetch(API_BASE + path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
   return { status: r.status, body: await r.json().catch(() => null) };
 }
 async function login(email) {
@@ -86,8 +88,8 @@ class Client {
   constructor(token, { origin = BASE, protocols } = {}) { this.token = token; this.origin = origin; this.protocols = protocols; this.msgs = []; this.n = 1; }
   open() {
     return new Promise((resolve) => {
-      const headers = this.origin ? { Origin: this.origin } : {};
-      this.ws = new WebSocket(BASE.replace("http", "ws") + "/api/ws", this.protocols || ["kim-v1", this.token], { headers });
+      const headers = this.origin ? { Origin: this.origin === BASE ? API_BASE : this.origin } : {};
+      this.ws = new WebSocket(API_BASE.replace("http", "ws") + "/api/ws", this.protocols || ["kim-v1", this.token], { headers });
       this.ws.on("open", () => resolve({ ok: true }));
       this.ws.on("unexpected-response", (req, res) => resolve({ ok: false, status: res.statusCode }));
       this.ws.on("error", () => {});
@@ -111,7 +113,7 @@ class Client {
 async function connect(session, opts) { const c = new Client(session.token, opts); const r = await c.open(); c.status = r; return c; }
 
 /* ---------- processes ---------- */
-let wrangler, jwksServer, proxy;
+let wrangler, wrangler2, jwksServer, proxy;
 const logDir = mkdtempSync(join(tmpdir(), "kim-test-"));
 
 function startJwks() {
@@ -123,21 +125,23 @@ function startJwks() {
   });
 }
 
-async function startWrangler(jwksPort) {
+async function startWrangler(jwksPort, o = {}) {
+  const port = o.port || PORT, base = `http://127.0.0.1:${port}`;
   const vars = {
     GOOGLE_CLIENT_ID: CLIENT_ID, GOOGLE_JWKS_URL: `http://127.0.0.1:${jwksPort}/jwks`, SESSION_SECRET, ADMIN_KEY, ROLES,
-    DEFAULT_ROLE: "none", MAX_VIEWERS: "6", ALLOWED_ORIGINS: `${PROXY_BASE},http://localhost:${PROXY_PORT}`,
+    DEFAULT_ROLE: o.defaultRole || "none", MAX_VIEWERS: o.maxViewers || "6", ALLOWED_ORIGINS: `${PROXY_BASE},http://localhost:${PROXY_PORT}`,
   };
-  const args = ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--inspector-port", "9239", "--persist-to", join(logDir, "state"), "--local"];
+  const args = ["wrangler", "dev", "--port", String(port), "--ip", "127.0.0.1", "--inspector-port", o.inspector || "9239", "--persist-to", join(logDir, o.state || "state"), "--local"];
   for (const [k, v] of Object.entries(vars)) args.push("--var", `${k}:${v}`);
-  wrangler = spawn("npx", args, { cwd: ROOT, env: { ...process.env, NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost", WRANGLER_SEND_METRICS: "false", CI: "1" }, detached: true });
+  const proc = spawn("npx", args, { cwd: ROOT, env: { ...process.env, NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost", WRANGLER_SEND_METRICS: "false", CI: "1" }, detached: true });
   const out = [];
-  wrangler.stdout.on("data", (d) => out.push(d.toString()));
-  wrangler.stderr.on("data", (d) => out.push(d.toString()));
-  const ok = await until(async () => (await fetch(BASE + "/api/config")).ok, 90000, 500);
-  writeFileSync(join(logDir, "wrangler.log"), out.join(""));
+  proc.stdout.on("data", (d) => out.push(d.toString()));
+  proc.stderr.on("data", (d) => out.push(d.toString()));
+  const ok = await until(async () => (await fetch(base + "/api/config")).ok, 90000, 500);
+  writeFileSync(join(logDir, o.log || "wrangler.log"), out.join(""));
   if (!ok) { console.error(out.join("").slice(-3000)); throw new Error("wrangler dev did not start"); }
-  wrangler.log = out;
+  proc.log = out;
+  return proc;
 }
 
 function makeProxy() {
@@ -155,6 +159,7 @@ function makeProxy() {
 
 function stop() {
   try { process.kill(-wrangler.pid, "SIGKILL"); } catch (e) { /* gone */ }
+  try { wrangler2 && process.kill(-wrangler2.pid, "SIGKILL"); } catch (e) { /* gone */ }
   try { jwksServer && jwksServer.close(); } catch (e) { /* ignore */ }
   try { proxy && proxy.close(); } catch (e) { /* ignore */ }
 }
@@ -178,7 +183,7 @@ function syntheticDir() {
 let browser;
 try {
   const jwksPort = await startJwks();
-  await startWrangler(jwksPort);
+  wrangler = await startWrangler(jwksPort);
   proxy = makeProxy();
 
   /* ===== import ===== */
@@ -426,7 +431,7 @@ try {
   /* ===== roles admin ===== */
   group("Role assignment: owners, editors, the admin page API");
   const rolesApi = async (session, method = "GET", body, extra = {}) => {
-    const r = await fetch(BASE + "/api/roles", { method, headers: { Authorization: "Bearer " + (session ? session.token : "none"), "content-type": "application/json", ...extra }, body: body ? JSON.stringify(body) : undefined });
+    const r = await fetch(API_BASE + "/api/roles", { method, headers: { Authorization: "Bearer " + (session ? session.token : "none"), "content-type": "application/json", ...extra }, body: body ? JSON.stringify(body) : undefined });
     return { status: r.status, body: await r.json().catch(() => null) };
   };
   const loginRes = await login(EMAILS.editorA);
@@ -503,6 +508,10 @@ try {
   sw.close(); hc.close();
 
   group("Role rules in code (default role, owner, precedence)");
+  const lockEnv = { ROLES: "boss@x.com=owner", DEFAULT_ROLE: "viewer" };
+  check("a blocked person gets no access even though the default is Viewer", resolveRole(lockEnv, "bad@x.com", "blocked").role === "none" && resolveRole(lockEnv, "bad@x.com", "blocked").blocked === true);
+  check("a block can never apply to someone in the ROLES secret", resolveRole(lockEnv, "boss@x.com", "blocked").role === "editor");
+  check("a locked door turns away new sign-ins from unlisted people but not older sessions, added people or owners", resolveRole(lockEnv, "n@x.com", undefined, { iat: 200, lockTs: 100 }).role === "none" && resolveRole(lockEnv, "n@x.com", undefined, { iat: 50, lockTs: 100 }).role === "viewer" && resolveRole(lockEnv, "n@x.com", "viewer", { iat: 200, lockTs: 100 }).role === "viewer" && resolveRole(lockEnv, "boss@x.com", undefined, { iat: 200, lockTs: 100 }).role === "editor" && resolveRole(lockEnv, "n@x.com", undefined, { iat: undefined, lockTs: 100 }).role === "viewer");
   check("DEFAULT_ROLE can be none, viewer or contributor", defaultRole({}) === "none" && defaultRole({ DEFAULT_ROLE: "viewer" }) === "viewer" && defaultRole({ DEFAULT_ROLE: "contributor" }) === "contributor");
   check("DEFAULT_ROLE can never make strangers editors or owners", defaultRole({ DEFAULT_ROLE: "editor" }) === "none" && defaultRole({ DEFAULT_ROLE: "owner" }) === "none" && defaultRole({ DEFAULT_ROLE: "EDITOR " }) === "none");
   const envR = { ROLES: "Boss@x.com=owner, ed@x.com=editor ; c@x.com=contributor\nv@x.com=viewer", DEFAULT_ROLE: "viewer" };
@@ -515,6 +524,144 @@ try {
   check("email checks reject junk", validEmail("a@b.co") && !validEmail("a@b") && !validEmail("a b@c.com") && !validEmail("a@b.com,c@d.com") && !validEmail("a=b@c.com") && !validEmail(5));
 
   /* ===== browser ===== */
+  group("Block, lock the door, sign out, erase a person (second server, default role Viewer)");
+  wrangler2 = await startWrangler(jwksPort, { port: PORT2, inspector: "9240", defaultRole: "viewer", maxViewers: "50", state: "state2", log: "wrangler2.log" });
+  API_BASE = BASE2;
+  {
+    const O = (await login(EMAILS.editorA)).session, ED = (await login(EMAILS.editorB)).session;
+    const api = (path, session, body, extra = {}) => post(path, body || {}, { Authorization: "Bearer " + (session ? session.token : "none"), ...extra });
+    const roles = (session, method, body) => rolesApi(session, method, body);
+    const sess = async (email, tok) => { const r = await login(email); return r.session; };
+    const ago1 = () => sleep(1150); // session ids are in whole seconds
+
+    // ---- block
+    const stranger = (await login("blockme@example.com"));
+    check("with the default role Viewer, any Google account can sign in (this is why Remove was not a block)", stranger.status === 200 && stranger.body.role === "viewer");
+    const bws = await connect(stranger.session); await bws.wait((m) => m.t === "hello"); await bws.sub("questions"); // (a socket that has said nothing yet is closed on its next message)
+    check("a non-owner cannot block anyone (403)", (await roles(ED, "POST", { email: "blockme@example.com", role: "blocked" })).status === 403);
+    check("owners cannot be blocked from the page (409, set in the ROLES secret)", (await roles(O, "POST", { email: EMAILS.editorB, role: "blocked" })).status === 409 && (await roles(O, "POST", { email: EMAILS.editorA, role: "blocked" })).status === 409);
+    const blk = await roles(O, "POST", { email: "BlockMe@example.com", role: "blocked" });
+    check("an owner blocks the account", blk.status === 200 && blk.body.role === "blocked", blk);
+    await sleep(500);
+    check("their open page is closed at once (4403)", bws.closed === 4403, { closed: bws.closed ?? "never", opened: bws.status });
+    const relog = await login("blockme@example.com");
+    check("they cannot sign in again, even though the default role is Viewer (403)", relog.status === 403 && relog.body.error === "no_access", relog);
+    check("their old session is refused everywhere: session check, refresh, WebSocket", (await fetch(API_BASE + "/api/session", { headers: { Authorization: "Bearer " + stranger.session.token } })).status === 403 && (await api("/api/refresh", stranger.session)).status === 401 && (await connect(stranger.session)).status.status === 403);
+    const bl = await roles(O, "GET");
+    check("blocked people are listed as blocked, and not under recent sign-ins", bl.body.people.some((p) => p.email === "blockme@example.com" && p.role === "blocked") && !bl.body.seen.some((p) => p.email === "blockme@example.com"));
+    check("the block is in Recent changes (so Undo works)", bl.body.log[0].email === "blockme@example.com" && bl.body.log[0].to_role === "blocked" && bl.body.log[0].from_role === "none", bl.body.log[0]);
+    check("unblocking (Remove from the block list) lets them sign in again as a Viewer", (await roles(O, "POST", { email: "blockme@example.com", role: "none" })).status === 200 && (await login("blockme@example.com")).body.role === "viewer");
+    await roles(O, "POST", { email: "modblock@example.com", role: "contributor" });
+    await roles(O, "POST", { email: "modblock@example.com", role: "blocked" });
+    const logB = (await roles(O, "GET")).body.log[0];
+    check("blocking a Contributor remembers what they were, so Undo puts them back", logB.from_role === "contributor" && logB.to_role === "blocked", logB);
+    await roles(O, "POST", { email: "modblock@example.com", role: "contributor" });
+    check("...and they are a Contributor again", (await login("modblock@example.com")).body.role === "contributor");
+    await roles(O, "POST", { email: "modblock@example.com", role: "none" });
+
+    // ---- lock the door
+    const early = await login("early@example.com");
+    const earlyWs = await connect(early.session); await earlyWs.wait((m) => m.t === "hello");
+    await ago1();
+    check("a non-owner cannot lock the door (403)", (await api("/api/lock", ED, { locked: true })).status === 403 && (await api("/api/lock", null, { locked: true })).status === 401);
+    const lock = await api("/api/lock", O, { locked: true });
+    check("an owner locks the door", lock.status === 200 && lock.body.locked && lock.body.locked.by === EMAILS.editorA, lock);
+    check("the access page API reports the door is locked", (await roles(O, "GET")).body.locked && true);
+    const late = await login("late@example.com");
+    check("new people who are on no list are turned away with a plain 'paused' answer (403 locked)", late.status === 403 && late.body.error === "locked", late);
+    check("...and they are not added to the recent sign-ins list (a flood cannot push real entries out)", !(await roles(O, "GET")).body.seen.some((p) => p.email === "late@example.com"));
+    check("someone who was already signed in keeps watching: their session refreshes and a new connection opens", (await api("/api/refresh", early.session)).status === 200 && (await connect(early.session)).status.ok);
+    check("...and the page they already had open stays connected", earlyWs.closed === undefined);
+    await roles(O, "POST", { email: "invited@example.com", role: "viewer" });
+    check("people the owner added can still sign in while it is locked", (await login("invited@example.com")).body.role === "viewer");
+    check("people in the ROLES secret can still sign in while it is locked", (await login(EMAILS.viewer)).body.role === "viewer" && (await login(EMAILS.editorB)).body.role === "editor");
+    const unlock = await api("/api/lock", O, { locked: false });
+    check("opening the door again works", unlock.status === 200 && unlock.body.locked === null && (await roles(O, "GET")).body.locked === null);
+    check("new people can sign in again after the door is opened", (await login("late@example.com")).body.role === "viewer");
+    earlyWs.close();
+
+    // ---- sign out on the server
+    const s1 = await login("leaving@example.com"), s2 = await login("leaving@example.com");
+    const w1 = await connect(s1.session); await w1.wait((m) => m.t === "hello"); await w1.sub("questions");
+    const w2 = await connect(s2.session); await w2.wait((m) => m.t === "hello");
+    check("signing out needs a real session (401) and the right origin (403)", (await api("/api/signout", null)).status === 401 && (await api("/api/signout", s1.session, {}, { Origin: "https://evil.example.com" })).status === 403);
+    check("signing out works (200)", (await api("/api/signout", s1.session)).status === 200);
+    await sleep(500);
+    check("that device's open page is closed at once", w1.closed === 4403, { closed: w1.closed ?? "never", opened: w1.status });
+    check("the copied token no longer works: session check, refresh and WebSocket all refuse it (401)", (await fetch(API_BASE + "/api/session", { headers: { Authorization: "Bearer " + s1.session.token } })).status === 401 && (await api("/api/refresh", s1.session)).status === 401 && (await connect(s1.session)).status.status === 401);
+    check("signing out on one device does not sign the person out on their other device", w2.closed === undefined && (await fetch(API_BASE + "/api/session", { headers: { Authorization: "Bearer " + s2.session.token } })).status === 200);
+    const refreshed = await api("/api/refresh", s2.session);
+    check("...and the other device keeps refreshing (its session id carries over)", refreshed.status === 200 && (await api("/api/signout", { token: refreshed.body.token })).status === 200 && (await api("/api/refresh", { token: refreshed.body.token })).status === 401);
+    check("a fresh sign-in after signing out works", (await login("leaving@example.com")).status === 200);
+    // owner: sign out everywhere
+    const e1 = await login("everywhere@example.com"), e2 = await login("everywhere@example.com"), other = await login("untouched@example.com");
+    const ew = await connect(e1.session); await ew.wait((m) => m.t === "hello"); await ew.sub("questions");
+    await ago1();
+    check("a non-owner cannot sign someone out everywhere (403), and a bad email is refused (400)", (await api("/api/revoke", ED, { email: "everywhere@example.com" })).status === 403 && (await api("/api/revoke", O, { email: "nope" })).status === 400);
+    check("an owner signs a person out on every device (200)", (await api("/api/revoke", O, { email: "everywhere@example.com" })).status === 200);
+    await sleep(500);
+    check("...both of their sessions stop working and the open page closes", ew.closed === 4403 && (await fetch(API_BASE + "/api/session", { headers: { Authorization: "Bearer " + e1.session.token } })).status === 401 && (await fetch(API_BASE + "/api/session", { headers: { Authorization: "Bearer " + e2.session.token } })).status === 401);
+    check("...nobody else is affected", (await fetch(API_BASE + "/api/session", { headers: { Authorization: "Bearer " + other.session.token } })).status === 200);
+    check("...and they can sign in again afterwards (it ends sessions, not the account)", (await login("everywhere@example.com")).status === 200);
+    for (const c of [w2, ew]) c.close();
+
+    // ---- erase a person
+    const oc = await connect(O); await oc.wait((m) => m.t === "hello");
+    const add = async (coll, data) => (await oc.w("add", coll, null, data)).id;
+    const zq = await add("daters", { name: "Zelda Quill", age: 27, location: "NC", gender: "woman", sexuality: "straight", min: 20, max: 40, ts: 1 });
+    const zl = await add("daters", { name: "Zelda Quillen", age: 31, location: "VA", gender: "woman", sexuality: "straight", min: 20, max: 40, ts: 2 });
+    const bob = await add("daters", { name: "Bob Other", age: 29, location: "SC", gender: "man", sexuality: "straight", min: 20, max: 40, ts: 3 });
+    const m1 = await add("matches", { hotId: zq, hotName: "Zelda Quill", pickId: bob, pickName: "Bob Other", fit: "Fits both", ts: 4 });
+    const m2 = await add("matches", { hotId: bob, hotName: "Bob Other", pickId: bob, pickName: "Bob Other", fit: "x", ts: 5 });
+    const q1 = await add("questions", { text: "What is your favorite food?", handle: "@zeldaq", status: "ready", ts: 6 });
+    const q2 = await add("questions", { text: "Second one?", handle: "@zeldaq", status: "ready", ts: 7 });
+    const q3 = await add("questions", { text: "Unrelated?", handle: "@someoneelse", status: "ready", ts: 8 });
+    await oc.w("set", "seats", "s1", { dater: { id: zq, name: "Zelda Quill", age: 27 }, view: { name: "Zelda Quill" }, since: 5 });
+    await oc.w("set", "seats", "s2", { dater: { id: bob, name: "Bob Other", age: 29 }, view: null, since: 5 });
+    await oc.w("set", "game", "question", { text: "What is your favorite food?", handle: "@zeldaq", qid: q1, hist: [{ text: "Old?", handle: "@zeldaq", qid: "" }, { text: "Other?", handle: "@someoneelse", qid: "" }] });
+    await roles(O, "POST", { email: "zelda.fan@example.com", role: "contributor" });
+    await login("zelda.other@example.com");
+    const vw = await connect((await login("watcher@example.com")).session); await vw.sub("seats");
+
+    const find = (session, query) => api("/api/person", session, { action: "find", query });
+    check("only owners can search for a person (403 for an Editor, 401 with no login)", (await find(ED, "zelda")).status === 403 && (await find(null, "zelda")).status === 401);
+    check("a search needs at least 2 characters (400)", (await find(O, "z")).status === 400);
+    const f = await find(O, "zelda");
+    check("finding 'zelda' shows both daters with that name, their match log entry, both handles' questions, the seat, and the matching accounts", f.status === 200 && f.body.daters.length === 2 && f.body.matches.some((m) => m.id === m1) && f.body.questions.length === 2 && f.body.seats.length === 1 && f.body.accounts.some((a) => a.email === "zelda.fan@example.com") && f.body.accounts.some((a) => a.email === "zelda.other@example.com"), f.body);
+    check("...and it does not list people who do not match (Bob, the unrelated question)", !JSON.stringify(f.body).includes("Bob Other") || f.body.matches.length >= 1 && !f.body.daters.some((d) => d.id === bob) && !f.body.questions.some((q) => q.id === q3));
+    check("searching changes nothing", (await (await connect(O)).sub("daters")).docs.length >= 3);
+
+    const secretHit = await find(O, "viewer@example");
+    check("people set in the ROLES secret are never offered for erasing (they live in the secret, not the database)", secretHit.status === 200 && !secretHit.body.accounts.some((a) => a.email === EMAILS.viewer && !a.locked), secretHit.body.accounts);
+    const sneaky = await api("/api/person", O, { action: "erase", query: "zelda", select: { daters: [bob], matches: [m2], questions: [q3], accounts: [EMAILS.viewer, EMAILS.editorB] } });
+    check("erasing items that do not match the search is ignored (Bob, an unrelated question, owners)", sneaky.status === 200 && sneaky.body.removed.daters === 0 && sneaky.body.removed.matches === 0 && sneaky.body.removed.questions === 0 && sneaky.body.removed.accounts === 0, sneaky.body);
+    const er = await api("/api/person", O, { action: "erase", query: "zelda", select: { daters: [zq], matches: [m1], questions: [q1, q2], seats: ["s1"], accounts: ["zelda.fan@example.com"], deleteQuestions: false } });
+    check("an Editor cannot erase (403)", (await api("/api/person", ED, { action: "erase", query: "zelda", select: { daters: [zl] } })).status === 403);
+    check("the owner erases what they ticked", er.status === 200 && er.body.removed.daters === 1 && er.body.removed.matches === 1 && er.body.removed.questions === 2 && er.body.removed.seats === 1 && er.body.removed.accounts === 1, er.body);
+    const ec = await connect(O);
+    const daters2 = (await ec.sub("daters")).docs, matches2 = (await ec.sub("matches")).docs, qs2 = (await ec.sub("questions")).docs, seats2 = (await ec.sub("seats")).docs;
+    check("the ticked dater is gone; the unticked 'Zelda Quillen' and Bob are still there", !daters2.some((d) => d.id === zq) && daters2.some((d) => d.id === zl) && daters2.some((d) => d.id === bob));
+    check("the match log entry is gone; Bob's own entry stays", !matches2.some((d) => d.id === m1) && matches2.some((d) => d.id === m2));
+    check("questions keep their text but lose the chat handle (the unrelated one is untouched)", qs2.find((d) => d.id === q1).data.handle === "" && qs2.find((d) => d.id === q1).data.text === "What is your favorite food?" && qs2.find((d) => d.id === q2).data.handle === "" && qs2.find((d) => d.id === q3).data.handle === "@someoneelse");
+    const s1doc = seats2.find((d) => d.id === "s1").data, s2doc = seats2.find((d) => d.id === "s2").data;
+    check("the seat that showed them is emptied; the other seat is untouched", s1doc.dater === null && s1doc.view === null && s2doc.dater && s2doc.dater.name === "Bob Other", { s1doc, s2doc });
+    const gdoc = (await ec.sub("game/question")).docs[0].data;
+    check("the question on screen and its history lose their handle (other handles stay)", gdoc.handle === "" && gdoc.hist[0].handle === "" && gdoc.hist[1].handle === "@someoneelse", gdoc);
+    check("people watching see the emptied seat change live", !!(await vw.wait((m) => m.t === "chg" && m.coll === "seats" && m.id === "s1" && m.data && m.data.dater === null, 3000)));
+    const after = await roles(O, "GET");
+    check("the erased account is gone from the list, and an unticked matching account stays", !after.body.people.some((p) => p.email === "zelda.fan@example.com") && after.body.seen.some((p) => p.email === "zelda.other@example.com"));
+    const blob = JSON.stringify(after.body);
+    check("their email is gone from the change history too (blanked, entry kept), and the history notes an erase", !blob.includes("zelda.fan") && after.body.log.some((l) => l.email === "(erased)" && l.to_role === "erased"), after.body.log.slice(0, 3));
+    const er2 = await api("/api/person", O, { action: "erase", query: "zelda", select: { daters: [zl], questions: [], accounts: [] } });
+    check("a second erase for the other Zelda works", er2.status === 200 && er2.body.removed.daters === 1 && !(await (await connect(O)).sub("daters")).docs.some((d) => d.id === zl));
+    const er3 = await api("/api/person", O, { action: "find", query: "someoneelse" });
+    await api("/api/person", O, { action: "erase", query: "someoneelse", select: { questions: [q3], deleteQuestions: true } });
+    check("'delete the whole question' removes the question itself", er3.body.questions.length === 1 && !(await (await connect(O)).sub("questions")).docs.some((d) => d.id === q3));
+    for (const c of [oc, vw, ec]) c.close();
+  }
+  API_BASE = BASE;
+  try { process.kill(-wrangler2.pid, "SIGKILL"); } catch (e) { /* gone */ }
+
   group("Browser: three roles, live sync, reconnect");
   browser = await chromium.launch();
   const mkPage = async (session, base = BASE, path = "/", viewport = { width: 1100, height: 1300 }) => {
@@ -867,7 +1014,7 @@ try {
 
   // sign out
   check("every signed-in role sees a Sign out button", (await Promise.all([A, B, K, V].map((p) => p.locator("#signOut").isVisible()))).every(Boolean));
-  const V2 = await mkPage(sessions.viewer);
+  const V2 = await mkPage((await login(EMAILS.viewer)).session); // its own sign-in, like a second device
   await until(async () => (await roleOf(V2)) === "View only");
   V2.once("dialog", (d) => d.dismiss());
   await V2.click("#signOut"); await sleep(400);
@@ -952,6 +1099,49 @@ try {
   check("the history records who did what (server side)", apiLog.length >= 4 && apiLog[0].actor === EMAILS.editorA && apiLog[0].email === mk.mod && apiLog[0].from_role === "none" && apiLog[0].to_role === "contributor", apiLog.slice(0, 2));
   check("only owners can read that history (403 for an Editor and a Contributor)", (await rolesApi(sessions.editorB)).status === 403 && (await rolesApi(sessions.contributor)).status === 403);
   for (const e of Object.values(mk)) await adminApi(e, "none");
+
+  // block, lock the door, sign out everywhere and erase, on the admin page itself
+  check("the admin page has Lock the door and Erase a person tools for owners only", await until(async () => await AD.locator("#lockCard").isVisible() && await AD.locator("#eraseCard").isVisible(), 6000) && await ADE.locator("#lockCard").isHidden() && await ADE.locator("#eraseCard").isHidden() && await ADK.locator("#eraseCard").isHidden());
+  const bk = "blockui@example.com";
+  await adminApi(bk, "viewer"); await AD.reload();
+  await until(async () => (await text(AD, "#viewerList")).includes(bk), 6000);
+  AD.once("dialog", (d) => d.accept());
+  await AD.locator("#viewerList .row", { hasText: bk }).getByRole("button", { name: "Block", exact: true }).click();
+  check("Block on a viewer row moves them into the Blocked section, out of Viewers", await until(async () => (await text(AD, "#blockedList")).includes(bk) && !(await text(AD, "#viewerList")).includes(bk) && Number(await text(AD, "#blockedCount")) >= 1, 6000), await text(AD, "#blockedList"));
+  check("...and Recent changes says Blocked, with an Undo", await until(async () => { const r = AD.locator("#logList .row", { hasText: bk }).first(); return (await r.count()) && /Blocked \(was Viewer\)/.test(await r.innerText()) && await r.getByRole("button", { name: /Undo/ }).isVisible(); }, 6000));
+  check("...and they cannot sign in", (await login(bk)).status === 403);
+  await AD.locator("#logList .row", { hasText: bk }).first().getByRole("button", { name: /Undo/ }).click();
+  check("Undo on a block puts them straight back as a Viewer", await until(async () => (await text(AD, "#viewerList")).includes(bk) && !(await text(AD, "#blockedList")).includes(bk), 6000));
+  AD.once("dialog", (d) => d.accept());
+  await AD.locator("#viewerList .row", { hasText: bk }).getByRole("button", { name: "Block", exact: true }).click();
+  await until(async () => (await text(AD, "#blockedList")).includes(bk), 6000);
+  await AD.locator("#blockedList .row", { hasText: bk }).getByRole("button", { name: "Unblock" }).click();
+  check("Unblock takes them off the Blocked section", await until(async () => !(await text(AD, "#blockedList")).includes(bk) && await AD.locator("#blockedCard").isHidden(), 6000));
+  await adminApi(bk, "none");
+  const so = "signoutui@example.com"; await adminApi(so, "viewer"); const soSess = (await login(so)).session; await AD.reload();
+  await until(async () => (await text(AD, "#viewerList")).includes(so), 6000); await sleep(1100);
+  AD.once("dialog", (d) => d.accept());
+  await AD.locator("#viewerList .row", { hasText: so }).getByRole("button", { name: "Sign out everywhere" }).click();
+  check("Sign out everywhere on a row ends that person's sessions", await until(async () => /signed out everywhere/.test(await text(AD, "#msg")), 6000) && (await fetch(BASE + "/api/session", { headers: { Authorization: "Bearer " + soSess.token } })).status === 401);
+  await adminApi(so, "none");
+  check("the Lock the door card says the door is open, with a button", /open/.test(await text(AD, "#lockState")) && /Lock the door/.test(await text(AD, "#lockBtn")));
+  AD.once("dialog", (d) => d.accept()); await AD.click("#lockBtn");
+  check("locking shows LOCKED and the button becomes Open the door", await until(async () => /LOCKED/.test(await text(AD, "#lockState")) && /Open the door/.test(await text(AD, "#lockBtn")), 6000));
+  await AD.click("#lockBtn");
+  check("opening the door again shows it is open", await until(async () => /open/.test(await text(AD, "#lockState")) && /Lock the door/.test(await text(AD, "#lockBtn")), 6000));
+  const qd = (await viaWs.w("add", "daters", null, { name: "Quincy Testperson", age: 30, location: "NC", gender: "man", sexuality: "straight", min: 20, max: 40, ts: 9 })).id;
+  await viaWs.w("add", "matches", null, { hotId: qd, hotName: "Quincy Testperson", pickId: "x", pickName: "Someone", fit: "x", ts: 10 });
+  await viaWs.w("add", "questions", null, { text: "Quincy asked this?", handle: "@quincyfan", status: "ready", ts: 11 });
+  await AD.fill("#findQ", "quincy"); await AD.click("#findForm button[type=submit]");
+  check("searching for a person lists their dater record, match entry and question, all ticked", await until(async () => { const t = await text(AD, "#findOut"); return /Quincy Testperson/.test(t) && /Quincy Testperson and Someone/.test(t) && /@quincyfan/.test(t); }, 6000) && (await AD.locator("#findOut input[type=checkbox][data-key]:checked").count()) >= 3);
+  await AD.locator("#findOut label", { hasText: "Quincy Testperson and Someone" }).locator("input").uncheck();
+  AD.once("dialog", (d) => d.accept());
+  await AD.getByRole("button", { name: "Erase the ticked items" }).click();
+  check("erasing removes only what was ticked and reports it", await until(async () => /Erased: 0 account\(s\), 1 dater\(s\), 0 match log entr/.test(await text(AD, "#msg")), 6000), await text(AD, "#msg"));
+  const afterQ = await (await fetch(BASE + "/api/export", { headers: { Authorization: "Bearer " + sessions.editorA.token } })).json();
+  check("...the dater is gone, the unticked match entry stays, the question lost its handle but kept its text", !afterQ.daters.some((d) => d.name === "Quincy Testperson") && afterQ.matches.some((m) => m.hotName === "Quincy Testperson") && afterQ.questions.some((q) => q.text === "Quincy asked this?" && q.handle === ""));
+  check("...and the history shows 'Records erased on request' with no Undo", await until(async () => /Records erased on request/.test(await text(AD, "#logList")), 6000));
+  check("the admin page shows no JavaScript errors", AD.errors.length === 0, AD.errors);
 
   // reconnect
   const P = await mkPage(sessions.editorA, PROXY_BASE);

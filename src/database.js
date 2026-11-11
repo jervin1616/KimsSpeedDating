@@ -5,7 +5,9 @@ import {
   RULES, MAX_MESSAGE_BYTES, RuleError, isKnownCollection, validDocId, canRead, canWrite,
   parsePath, validateDoc, newId,
 } from "./rules.js";
-import { resolveRole, secretEntries, validEmail, verifySession, defaultRole } from "./auth.js";
+import { resolveRole, secretEntries, validEmail, verifySession, defaultRole, parseRoles } from "./auth.js";
+
+function parseRolesFor(env, email) { return parseRoles(env.ROLES).get(String(email).toLowerCase()); }
 
 // Capacity: viewers (read-only watchers) are capped; hosts and mods keep STAFF_RESERVE extra places
 // so a crowd of viewers can never lock them out. MAX_VIEWERS can be changed in wrangler.jsonc.
@@ -31,6 +33,12 @@ export class Database extends DurableObject {
     this.sql.exec("CREATE TABLE IF NOT EXISTS roles (email TEXT PRIMARY KEY, role TEXT NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS seen (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS role_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, actor TEXT NOT NULL, email TEXT NOT NULL, from_role TEXT NOT NULL, to_role TEXT NOT NULL)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS revoked (email TEXT PRIMARY KEY, after INTEGER NOT NULL) WITHOUT ROWID");
+    this.lock = undefined; // { ts, by } while the door is locked, else null (loaded on first use)
+    this.sql.exec("CREATE TABLE IF NOT EXISTS revoked_jti (jti TEXT PRIMARY KEY, until INTEGER NOT NULL) WITHOUT ROWID");
+    this.revokedJti = null; // Set of signed-out session ids
+    this.revokedMap = null; // email -> seconds: sessions that began at or before this moment are no longer valid
     this.dbRoles = null; // loaded on first use after each wake-up (a handful of rows)
     // Heartbeats are answered without waking the object, so they cost nothing.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
@@ -95,17 +103,51 @@ export class Database extends DurableObject {
     return this.dbRoles;
   }
 
-  // { role, owner, source } for any email.
-  resolve(email) {
+  loadLock() {
+    if (this.lock === undefined) {
+      const r = this.sql.exec("SELECT value FROM settings WHERE key = 'lock'").toArray();
+      this.lock = null;
+      if (r.length) { try { this.lock = JSON.parse(r[0].value); } catch (e) { this.lock = null; } }
+    }
+    return this.lock;
+  }
+
+  loadRevoked() {
+    if (!this.revokedMap) {
+      this.revokedMap = new Map();
+      for (const r of this.sql.exec("SELECT email, after FROM revoked").toArray()) this.revokedMap.set(r.email, r.after);
+    }
+    return this.revokedMap;
+  }
+
+  loadRevokedJti() {
+    if (!this.revokedJti) {
+      this.revokedJti = new Set();
+      for (const r of this.sql.exec("SELECT jti FROM revoked_jti").toArray()) this.revokedJti.add(r.jti);
+    }
+    return this.revokedJti;
+  }
+
+  // True when this session was signed out on its own, or the owner signed the person out everywhere after it began.
+  isRevoked(email, iat, jti) {
+    if (typeof jti === "string" && this.loadRevokedJti().has(jti)) return true;
+    if (typeof iat !== "number") return false;
+    const a = this.loadRevoked().get(String(email || "").toLowerCase());
+    return a !== undefined && iat <= a;
+  }
+
+  // { role, owner, source } for any email. iat = when that person's session began (seconds), if known.
+  resolve(email, iat) {
     const e = String(email || "").toLowerCase();
-    return resolveRole(this.env, e, this.loadRoles().get(e));
+    const lock = this.loadLock();
+    return resolveRole(this.env, e, this.loadRoles().get(e), { iat, lockTs: lock ? lock.ts : 0 });
   }
 
   // Called after an owner or editor changes someone's role: tell or disconnect their open pages.
   onRolesChanged(email) {
-    const r = this.resolve(email);
     for (const [ws, att] of this.loadMeta()) {
       if (att.email !== email) continue;
+      const r = this.resolve(email, att.iat);
       if (r.role === "none") { try { ws.close(4403, "No access."); } catch (e) { /* gone */ } continue; }
       const v = r.role === "viewer";
       if (!!att.v !== v) { if (att.v) this.nv--; else this.ns--; att.v = v; if (v) this.nv++; else this.ns++; try { ws.serializeAttachment(att); } catch (e) { /* gone */ } }
@@ -113,15 +155,15 @@ export class Database extends DurableObject {
     }
   }
 
-  whoami(email) {
-    return this.resolve(email);
+  whoami(email, iat, jti) {
+    return { ...this.resolve(email, iat), revoked: this.isRevoked(email, iat, jti) };
   }
 
   // Used at sign-in only. People who are on no list (they get the default role, or nothing)
   // are remembered so an owner can see them on the access page and give them more access.
   loginInfo(email) {
-    const me = this.resolve(email);
-    if (me.source === "default") {
+    const me = this.resolve(email, Math.floor(Date.now() / 1000));
+    if (me.source === "default" && !me.locked) {
       const e = String(email).toLowerCase(), now = Date.now();
       const exists = this.sql.exec("SELECT 1 AS x FROM seen WHERE email = ?", e).toArray().length > 0;
       if (!exists) {
@@ -146,17 +188,17 @@ export class Database extends DurableObject {
     const seen = this.sql.exec("SELECT email, first, last, n FROM seen ORDER BY last DESC LIMIT 100").toArray()
       .filter((r) => this.resolve(r.email).source === "default");
     const log = this.sql.exec("SELECT id, ts, actor, email, from_role, to_role FROM role_log ORDER BY id DESC LIMIT 25").toArray();
-    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, log, defaultRole: defaultRole(this.env) };
+    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, log, defaultRole: defaultRole(this.env), locked: this.loadLock() };
   }
 
-  // role: "viewer" | "contributor" | "editor" | "none" (remove) | "forget" (delete from the recent sign-ins).
+  // role: "viewer" | "contributor" | "editor" | "blocked" | "none" (remove) | "forget" (delete from the recent sign-ins).
   // Only owners may do this, and they cannot change people listed in the ROLES secret.
   changeRole(actorEmail, targetEmail, role) {
     const actor = this.resolve(actorEmail);
     if (!actor.owner) return { ok: false, code: "forbidden", message: "Only owners can manage access." };
     const target = String(targetEmail || "").trim().toLowerCase();
     if (!validEmail(target)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
-    if (!["viewer", "contributor", "editor", "none", "forget"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
+    if (!["viewer", "contributor", "editor", "blocked", "none", "forget"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
     if (role === "forget") {
       this.sql.exec("DELETE FROM seen WHERE email = ?", target); this.seenCount = null;
       return { ok: true, email: target, role };
@@ -164,6 +206,7 @@ export class Database extends DurableObject {
     const current = this.resolve(target);
     if (current.source === "secret") return { ok: false, code: "locked", message: "That person is set in the ROLES secret and can only be changed there." };
     const roles = this.loadRoles();
+    const prev = roles.get(target);
     this.sql.exec("DELETE FROM seen WHERE email = ?", target); this.seenCount = null; // they are on a list now (or were just removed)
     if (role === "none") {
       this.sql.exec("DELETE FROM roles WHERE email = ?", target);
@@ -174,7 +217,7 @@ export class Database extends DurableObject {
         target, role, actorEmail, Date.now());
       roles.set(target, role);
     }
-    const before = current.source === "admin" ? current.role : "none";
+    const before = prev || "none";
     if (before !== role) { // remember it so the owner can undo a mistake with one tap
       this.sql.exec("INSERT INTO role_log (ts, actor, email, from_role, to_role) VALUES (?, ?, ?, ?, ?)", Date.now(), actorEmail, target, before, role);
       this.sql.exec("DELETE FROM role_log WHERE id <= (SELECT MAX(id) FROM role_log) - 100");
@@ -183,14 +226,171 @@ export class Database extends DurableObject {
     return { ok: true, email: target, role };
   }
 
+  /* ---------- signing out, locking the door, erasing a person (owners) ---------- */
+
+  // Ends every session of this person that began before now, and closes their open pages.
+  revokeSessions(email) {
+    const e = String(email || "").toLowerCase();
+    const now = Math.floor(Date.now() / 1000);
+    this.sql.exec("INSERT INTO revoked (email, after) VALUES (?, ?) ON CONFLICT (email) DO UPDATE SET after = excluded.after", e, now);
+    this.sql.exec("DELETE FROM revoked WHERE after < ?", now - 8 * 24 * 3600); // older than any session could live
+    this.loadRevoked().set(e, now);
+    for (const [ws, att] of this.loadMeta()) if (att.email === e) { try { ws.close(4403, "Signed out."); } catch (x) { /* gone */ } }
+  }
+
+  // Ends just this session (jti). Sessions made before session ids existed cannot be told apart, so those end everywhere.
+  signOutSelf(email, jti) {
+    const e = String(email || "").toLowerCase();
+    if (!validEmail(e)) return { ok: false, code: "invalid", message: "Bad email." };
+    if (typeof jti !== "string") { this.revokeSessions(e); return { ok: true }; }
+    const now = Math.floor(Date.now() / 1000);
+    this.sql.exec("INSERT INTO revoked_jti (jti, until) VALUES (?, ?) ON CONFLICT (jti) DO NOTHING", jti, now + 8 * 24 * 3600);
+    this.sql.exec("DELETE FROM revoked_jti WHERE until < ?", now);
+    this.loadRevokedJti().add(jti);
+    for (const [ws, att] of this.loadMeta()) if (att.email === e && att.jti === jti) { try { ws.close(4403, "Signed out."); } catch (x) { /* gone */ } }
+    return { ok: true };
+  }
+
+  signOutEmail(actorEmail, targetEmail) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const t = String(targetEmail || "").trim().toLowerCase();
+    if (!validEmail(t)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
+    this.revokeSessions(t);
+    return { ok: true, email: t };
+  }
+
+  setLock(actorEmail, locked) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    if (locked) {
+      const v = { ts: Math.floor(Date.now() / 1000), by: String(actorEmail).toLowerCase() };
+      this.sql.exec("INSERT INTO settings (key, value) VALUES ('lock', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", JSON.stringify(v));
+      this.lock = v;
+    } else {
+      this.sql.exec("DELETE FROM settings WHERE key = 'lock'");
+      this.lock = null;
+    }
+    return { ok: true, locked: this.lock };
+  }
+
+  // Finds everything that mentions a person, for the "erase a person" tool. Nothing is changed here.
+  personMatches(query) {
+    const q = String(query || "").trim().toLowerCase();
+    if (q.length < 2 || q.length > 80) return null;
+    const has = (v) => typeof v === "string" && v.toLowerCase().includes(q);
+    const out = { query: q, accounts: [], daters: [], matches: [], questions: [], seats: [] };
+
+    const emails = new Map();
+    for (const r of this.sql.exec("SELECT email, role FROM roles").toArray()) if (r.email.includes(q)) emails.set(r.email, { email: r.email, kind: r.role === "blocked" ? "blocked" : "on the list as " + r.role });
+    for (const r of this.sql.exec("SELECT email FROM seen").toArray()) if (r.email.includes(q) && !emails.has(r.email)) emails.set(r.email, { email: r.email, kind: "recent sign-in" });
+    for (const r of this.sql.exec("SELECT email FROM revoked").toArray()) if (r.email.includes(q) && !emails.has(r.email)) emails.set(r.email, { email: r.email, kind: "sign-out record" });
+    for (const a of emails.values()) {
+      a.locked = !!parseRolesFor(this.env, a.email);
+      a.logRows = this.sql.exec("SELECT COUNT(*) AS n FROM role_log WHERE email = ? OR actor = ?", a.email, a.email).one().n;
+      out.accounts.push(a);
+      if (out.accounts.length >= 25) break;
+    }
+
+    const ids = new Set();
+    for (const r of this.sql.exec("SELECT id, data FROM docs WHERE coll = 'daters'").toArray()) {
+      let d; try { d = JSON.parse(r.data); } catch (e) { continue; }
+      if (has(d.name)) { ids.add(r.id); if (out.daters.length < 50) out.daters.push({ id: r.id, label: [d.name, d.age, d.location].filter((x) => x !== undefined && x !== "").join(", ") }); }
+    }
+    for (const r of this.sql.exec("SELECT id, data FROM docs WHERE coll = 'matches'").toArray()) {
+      let d; try { d = JSON.parse(r.data); } catch (e) { continue; }
+      if (has(d.hotName) || has(d.pickName) || ids.has(d.hotId) || ids.has(d.pickId)) { if (out.matches.length < 50) out.matches.push({ id: r.id, label: (d.hotName || "?") + " and " + (d.pickName || "?") }); }
+    }
+    for (const r of this.sql.exec("SELECT id, data FROM docs WHERE coll = 'questions'").toArray()) {
+      let d; try { d = JSON.parse(r.data); } catch (e) { continue; }
+      if (has(d.handle)) { if (out.questions.length < 50) out.questions.push({ id: r.id, label: (d.handle || "") + ": " + String(d.text || "").slice(0, 60) }); }
+    }
+    for (const r of this.sql.exec("SELECT id, data FROM docs WHERE coll = 'seats'").toArray()) {
+      if (r.id.startsWith("stream_")) continue;
+      let d; try { d = JSON.parse(r.data); } catch (e) { continue; }
+      const dt = d && d.dater;
+      if (dt && (has(dt.name) || ids.has(dt.id))) out.seats.push({ id: r.id, label: "Seat " + r.id + ": " + (dt.name || "?") });
+    }
+    return out;
+  }
+
+  findPerson(actorEmail, query) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const m = this.personMatches(query);
+    if (!m) return { ok: false, code: "invalid", message: "Type at least 2 characters (a name, handle or email)." };
+    return { ok: true, ...m };
+  }
+
+  // sel: { accounts: [email], daters: [id], matches: [id], questions: [id], seats: [id], deleteQuestions: bool }
+  // Only items that still match the search are touched.
+  erasePerson(actorEmail, query, sel) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const m = this.personMatches(query);
+    if (!m) return { ok: false, code: "invalid", message: "Type at least 2 characters (a name, handle or email)." };
+    sel = sel && typeof sel === "object" ? sel : {};
+    const pick = (list, key) => { const want = new Set(Array.isArray(sel[key]) ? sel[key].map(String) : []); return list.filter((x) => want.has(x[key === "accounts" ? "email" : "id"])); };
+    const accounts = pick(m.accounts, "accounts").filter((a) => !a.locked);
+    const daters = pick(m.daters, "daters"), matches = pick(m.matches, "matches"), questions = pick(m.questions, "questions"), seats = pick(m.seats, "seats");
+    const q = m.query;
+    const changes = [];
+    const counts = { accounts: accounts.length, daters: daters.length, matches: matches.length, questions: questions.length, seats: seats.length };
+    this.ctx.storage.transactionSync(() => {
+      for (const a of accounts) {
+        this.sql.exec("DELETE FROM roles WHERE email = ?", a.email);
+        this.sql.exec("DELETE FROM seen WHERE email = ?", a.email);
+        this.sql.exec("DELETE FROM revoked WHERE email = ?", a.email);
+        this.sql.exec("UPDATE role_log SET email = '(erased)' WHERE email = ?", a.email);
+        this.sql.exec("UPDATE role_log SET actor = '(erased)' WHERE actor = ?", a.email);
+        this.sql.exec("UPDATE roles SET by = '(erased)' WHERE by = ?", a.email);
+      }
+      if (accounts.length) { this.dbRoles = null; this.revokedMap = null; this.seenCount = null; }
+      for (const d of daters) { this.sql.exec("DELETE FROM docs WHERE coll = 'daters' AND id = ?", d.id); changes.push({ coll: "daters", id: d.id, text: null }); }
+      for (const x of matches) { this.sql.exec("DELETE FROM docs WHERE coll = 'matches' AND id = ?", x.id); changes.push({ coll: "matches", id: x.id, text: null }); }
+      for (const x of questions) {
+        if (sel.deleteQuestions) { this.sql.exec("DELETE FROM docs WHERE coll = 'questions' AND id = ?", x.id); changes.push({ coll: "questions", id: x.id, text: null }); continue; }
+        const row = this.getRow("questions", x.id); if (row === null) continue;
+        const o = JSON.parse(row); o.handle = ""; const t = validateDoc(o); this.upsert("questions", x.id, t); changes.push({ coll: "questions", id: x.id, text: t });
+      }
+      const dids = new Set(daters.map((d) => d.id));
+      for (const sdoc of seats) {
+        const row = this.getRow("seats", sdoc.id); if (row === null) continue;
+        const o = JSON.parse(row); o.dater = null; o.view = null; if ("since" in o) o.since = null; if ("unlocked" in o) o.unlocked = false;
+        const t = validateDoc(o); this.upsert("seats", sdoc.id, t); changes.push({ coll: "seats", id: sdoc.id, text: t });
+      }
+      // the running stream remembers who was seated by id
+      const st = this.getRow("seats", "stream");
+      if (st !== null && dids.size) {
+        const o = JSON.parse(st);
+        if (Array.isArray(o.ids)) { o.ids = o.ids.filter((i) => !dids.has(i)); const t = validateDoc(o); this.upsert("seats", "stream", t); changes.push({ coll: "seats", id: "stream", text: t }); }
+      }
+      // the question on screen and its history can carry a chat handle
+      if (questions.length) {
+        const g = this.getRow("game", "question");
+        if (g !== null) {
+          const o = JSON.parse(g); let hit = false;
+          const mine = (h) => typeof h === "string" && h.toLowerCase().includes(q);
+          if (mine(o.handle)) { o.handle = ""; hit = true; }
+          if (Array.isArray(o.hist)) for (const h of o.hist) if (h && mine(h.handle)) { h.handle = ""; hit = true; }
+          if (hit) { const t = validateDoc(o); this.upsert("game", "question", t); changes.push({ coll: "game", id: "question", text: t }); }
+        }
+      }
+      this.sql.exec("INSERT INTO role_log (ts, actor, email, from_role, to_role) VALUES (?, ?, '(erased)', 'erased', 'erased')", Date.now(), String(actorEmail).toLowerCase());
+      this.sql.exec("DELETE FROM role_log WHERE id <= (SELECT MAX(id) FROM role_log) - 100");
+    });
+    for (const c of changes) this.broadcast(c.coll, c.id, c.text);
+    for (const a of accounts) this.onRolesChanged(a.email);
+    return { ok: true, removed: counts };
+  }
+
   /* ---------- WebSocket entry ---------- */
 
   async fetch(request) {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket.", { status: 426 });
     const email = request.headers.get("x-user-email");
     const exp = Number(request.headers.get("x-session-exp"));
-    if (!email || !exp) return new Response("Bad request.", { status: 400 });
-    const me = this.resolve(email);
+    const iat = Number(request.headers.get("x-session-iat"));
+    const jti = request.headers.get("x-session-jti") || undefined;
+    if (!email || !exp || !iat) return new Response("Bad request.", { status: 400 });
+    if (this.isRevoked(email, iat, jti)) return new Response("Not signed in.", { status: 401 });
+    const me = this.resolve(email, iat);
     const role = me.role;
     if (role === "none") return new Response("No access.", { status: 403 });
     if (this.isFull(role)) return new Response("The room is full right now.", { status: 503, headers: { "retry-after": "240" } });
@@ -198,7 +398,7 @@ export class Database extends DurableObject {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server);
-    const att = { email, exp, colls: [], v: role === "viewer" };
+    const att = { email, exp, iat, jti, colls: [], v: role === "viewer" };
     server.serializeAttachment(att);
     this.addMeta(server, att);
     server.send(JSON.stringify({ t: "hello", role, owner: me.owner, email }));
@@ -222,7 +422,8 @@ export class Database extends DurableObject {
     if (message.length > MAX_MESSAGE_BYTES) { ws.close(1009, "Message too big."); return; }
     const now = Math.floor(Date.now() / 1000);
     if (!att.exp || att.exp <= now) { ws.close(4401, "Session expired."); return; }
-    const role = this.resolve(att.email).role;
+    if (this.isRevoked(att.email, att.iat, att.jti)) { ws.close(4403, "Signed out."); return; }
+    const role = this.resolve(att.email, att.iat).role;
     if (role === "none") { ws.close(4403, "No access."); return; }
 
     const limited = this.take(ws);
@@ -292,7 +493,8 @@ export class Database extends DurableObject {
   async onAuth(ws, att, msg) {
     const s = await verifySession(this.env, msg.token);
     if (!s || s.email !== att.email) { ws.close(4401, "Bad session."); return; }
-    att.exp = s.exp;
+    if (this.isRevoked(s.email, s.iat, s.jti)) { ws.close(4403, "Signed out."); return; }
+    att.exp = s.exp; att.iat = s.iat; if (s.jti) att.jti = s.jti;
     ws.serializeAttachment(att);
     this.send(ws, { t: "auth-ok", exp: s.exp });
   }
@@ -381,7 +583,9 @@ export class Database extends DurableObject {
     const now = Math.floor(Date.now() / 1000);
     for (const [ws, att] of this.loadMeta()) {
       if (!att.colls.includes(coll) || att.exp <= now) continue;
-      if (!canRead(this.resolve(att.email).role, coll)) continue;
+      const role = this.resolve(att.email, att.iat).role;
+      if (role === "none" || this.isRevoked(att.email, att.iat, att.jti)) { try { ws.close(4403, "No access."); } catch (e) { /* gone */ } continue; } // blocked or signed out: send nothing, close
+      if (!canRead(role, coll)) continue;
       this.send(ws, out);
     }
   }

@@ -36,6 +36,8 @@
 <ul>
   <li><b>Your Google sign-in.</b> When you sign in with Google we receive your verified email address. We never see your Google password. We do not store your name or profile photo.</li>
   <li><b>A sign-in record.</b> For people who sign in but are not on the host's list we keep the email address, the first and last time you signed in, and how many times. We keep the latest 300 of these and drop the oldest.</li>
+  <li><b>A block list.</b> If the host blocks an account, we keep that email address, who blocked it and when, so the block keeps working.</li>
+  <li><b>Sign-out records.</b> When you sign out, the service remembers a random session code (not your email) for up to 8 days so a copied login cannot be reused. If an owner signs someone out on every device, we keep that email and the time for up to 8 days.</li>
   <li><b>The access list.</b> The email addresses of people the host has approved, the role each one has, and who added or changed them and when. We also keep a short history of the last 100 changes so a mistake can be undone.</li>
   <li><b>Information about people who take part in the show.</b> A name or handle, age, state, gender, sexuality, the age range they are looking for, a note that they confirmed they are 18 or older, how long they spent in each seat, and which seat they are in. We also keep the match log (who picked whom) and summaries of past streams (counts and times).</li>
   <li><b>Questions.</b> The text of questions sent in from chat, the chat handle of the person who sent it if the host entered one, and how many times it has been asked.</li>
@@ -71,13 +73,14 @@
 <h2>How long we keep it</h2>
 <ul>
   <li>Information about people who take part, questions, the match log and stream summaries stay until the host removes them.</li>
+  <li>A block stays on the block list until the host removes it.</li>
   <li>The sign-in record keeps the latest 300 entries. The access change history keeps the last 100 changes.</li>
   <li>Your browser session lasts up to 12 hours and renews quietly while the page is open, for up to 7 days. Signing out clears it from that device.</li>
   <li>Hosts can download backups of the data. Owners are asked to keep those private and to delete old ones.</li>
 </ul>
 
 <h2>Your choices</h2>
-<p>You can ask us to show you what we hold about you, correct it, or delete it. If you took part in the show, we will remove your record and any match log entries that mention you. If you signed in, we will remove you from the sign-in record and the access list. Contact the host through the live stream or the community Discord server. If you live somewhere with extra privacy rights (for example the UK, the EU, California, Canada or Australia) we will honor reasonable requests under those rights, and you may also complain to your local privacy authority. Copies already downloaded as backups may take a little longer to delete.</p>
+<p>You can ask us to show you what we hold about you, correct it, or delete it. If you took part in the show, we will remove your record, any match log entries that mention you, and your chat handle from questions. If you signed in, we will remove you from the sign-in record and the access list, and blank your email in the change history. If you are on the block list, we may keep that one entry when it is needed to keep the show safe; you can ask the host to review it. Contact the host through the live stream or the community Discord server. If you live somewhere with extra privacy rights (for example the UK, the EU, California, Canada or Australia) we will honor reasonable requests under those rights, and you may also complain to your local privacy authority. Copies already downloaded as backups may take a little longer to delete.</p>
 
 <h2>Children</h2>
 <p>This service is for people 18 and older. We do not knowingly collect information from anyone under 18, and if we learn we have, we will remove it.</p>

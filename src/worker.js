@@ -35,7 +35,8 @@ function database(env) {
 async function sessionFromRequest(env, request) {
   const s = await verifySession(env, bearer(request));
   if (!s) return null;
-  const who = await database(env).whoami(s.email);
+  const who = await database(env).whoami(s.email, s.iat, s.jti);
+  if (who.revoked) return null; // signed out (by them or an owner) since this session began
   return { ...s, role: who.role, owner: who.owner };
 }
 
@@ -60,6 +61,7 @@ export default {
           return json({ error: "invalid_token", message: e.message }, 401);
         }
         const me = await database(env).loginInfo(who.email);
+        if (me.locked) return json({ error: "locked" }, 403);
         if (me.role === "none") return json({ error: "no_access", email: who.email }, 403);
         const s = await mintSession(env, who.email);
         return json({ token: s.token, exp: s.exp, email: who.email, role: me.role, owner: me.owner });
@@ -78,7 +80,7 @@ export default {
         if (!originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
         const s = await sessionFromRequest(env, request);
         if (!s || s.role === "none" || !canRefresh(s)) return json({ error: "unauthorized" }, 401);
-        const n = await mintSession(env, s.email, s.iat);
+        const n = await mintSession(env, s.email, s.iat, s.jti);
         return json({ token: n.token, exp: n.exp, email: s.email, role: s.role, owner: s.owner });
       }
 
@@ -93,6 +95,8 @@ export default {
         const headers = new Headers(request.headers);
         headers.set("x-user-email", s.email);
         headers.set("x-session-exp", String(s.exp));
+        headers.set("x-session-iat", String(s.iat));
+        if (s.jti) headers.set("x-session-jti", s.jti);
         return database(env).fetch(new Request(request.url, { method: "GET", headers }));
       }
 
@@ -111,6 +115,30 @@ export default {
         }
         if (r.ok) return json(r);
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : r.code === "locked" ? 409 : 400);
+      }
+
+      if (path === "/api/signout" && request.method === "POST") {
+        // Ends this one session on the server (a copied token stops working), not only in the browser.
+        if (!originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const t = await verifySession(env, bearer(request));
+        if (!t) return json({ error: "unauthorized" }, 401);
+        return json(await database(env).signOutSelf(t.email, t.jti));
+      }
+
+      if ((path === "/api/lock" || path === "/api/revoke" || path === "/api/person") && request.method === "POST") {
+        // Owner tools: lock the door, sign someone out everywhere, find and erase a person's records.
+        if (!originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        let body;
+        try { body = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+        body = body && typeof body === "object" ? body : {};
+        let r;
+        if (path === "/api/lock") r = await database(env).setLock(s.email, !!body.locked);
+        else if (path === "/api/revoke") r = await database(env).signOutEmail(s.email, body.email);
+        else r = body.action === "erase" ? await database(env).erasePerson(s.email, body.query, body.select) : await database(env).findPerson(s.email, body.query);
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }
 
       if (path === "/api/export" && request.method === "GET") {

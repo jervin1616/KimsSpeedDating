@@ -38,6 +38,12 @@
   .lock{font-size:12px;color:#ffb347;border:1px solid #ffb347;border-radius:999px;padding:1px 8px;white-space:nowrap}
   #msg{min-height:1.4em;color:#f9e8e3}
   .err{color:#ff9aa6}
+  .tool{display:flex;flex-direction:column;gap:8px}
+  .tool label{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+  .tool input[type=checkbox]{margin-top:3px;flex:none}
+  #lockState{font-weight:600}
+  #lockState.on{color:#ffb347}
+  .blockedrow .meta{color:#ff9aa6}
 </style></head><body><main>
   <a class="back" href="/">&larr; Back to the board</a>
   <h1>Who can use Kim's Speed Dating</h1>
@@ -50,10 +56,16 @@
     <h2>Add or change someone</h2>
     <form class="form" id="addForm">
       <input id="email" type="email" required placeholder="their-google-email@gmail.com" autocomplete="off" aria-label="Email">
-      <select id="role" aria-label="Role"><option value="viewer">Viewer (watch only)</option><option value="contributor">Contributor (questions)</option><option value="editor" id="editorOpt">Editor (everything)</option></select>
+      <select id="role" aria-label="Role"><option value="viewer">Viewer (watch only)</option><option value="contributor">Contributor (questions)</option><option value="editor" id="editorOpt">Editor (everything)</option><option value="blocked">Blocked (no access)</option></select>
       <button class="primary" type="submit">Save</button>
     </form>
     <p id="rules"></p>
+  </section>
+  <section class="card" id="lockCard" hidden>
+    <h2>Lock the door</h2>
+    <p id="lockNote"></p>
+    <p id="lockState"></p>
+    <div><button id="lockBtn" type="button" class="primary"></button></div>
   </section>
   <section class="card" id="listCard" hidden>
     <h2>Owners, editors and contributors <span class="count" id="staffCount">0</span></h2>
@@ -70,10 +82,24 @@
     <p id="viewerNote">People you added as watch-only.</p>
     <div id="viewerList"></div>
   </section>
+  <section class="card" id="blockedCard" hidden>
+    <h2>Blocked <span class="count" id="blockedCount">0</span></h2>
+    <p>These accounts cannot use the app at all, even though other people can watch. A block applies to one Google account, so someone can make a new account. If that happens, use Lock the door.</p>
+    <div id="blockedList"></div>
+  </section>
   <section class="card" id="seenCard" hidden>
     <h2>Signed in, not on the list</h2>
     <p id="seenNote"></p>
     <div id="seenList"></div>
+  </section>
+  <section class="card tool" id="eraseCard" hidden>
+    <h2>Erase a person's records</h2>
+    <p>For when someone asks to be removed. Type a name, chat handle or email. You see everything that mentions them and choose what to erase. Backups you already downloaded are not changed.</p>
+    <form class="form" id="findForm">
+      <input id="findQ" type="text" required minlength="2" maxlength="80" placeholder="name, @handle or email" autocomplete="off" aria-label="Name, handle or email">
+      <button type="submit" class="primary">Find</button>
+    </form>
+    <div id="findOut"></div>
   </section>
   <section class="card" id="helpCard" hidden>
     <h2>What each role can do</h2>
@@ -81,6 +107,7 @@
       <div><dt>Owner</dt><dd>Everything an Editor can do, plus this page: deciding who gets in and what they can do. Owners are set by whoever manages the site, so they show as locked here.</dd></div>
       <div><dt>Editor</dt><dd>Runs the show. Seats daters, adds, edits and removes daters, uses the match log, starts and ends streams, manages all questions (add, ask, remove, clear) and downloads backups. Cannot change who has access.</dd></div>
       <div><dt>Contributor</dt><dd>Helps with questions. Sees the board and the current question, adds questions from chat, presses Random question and asks questions, and can go Back. Cannot see the daters list, the match log or past streams, change seats, remove questions or clear the question.</dd></div>
+      <div><dt>Blocked</dt><dd>No access at all. They see a plain "not on the list" message and any open page is closed right away. Owners cannot be blocked.</dd></div>
       <div><dt>Viewer</dt><dd>Watches. Sees the board and the current question, and has a private "Random question for me" button that does not change the stream. Cannot change anything.</dd></div>
     </dl>
     <p id="defaultNote"></p>
@@ -96,11 +123,15 @@
     return window.claude.authFetch("/api/roles", { method: method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.message || "Something went wrong (" + r.status + ")."); return j; }); });
   }
+  function post(path, body) {
+    return window.claude.authFetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.message || "Something went wrong (" + r.status + ")."); return j; }); });
+  }
   function ago(ts) { return ts ? new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; }
-  var LABEL = { owner: "Owner", editor: "Editor", contributor: "Contributor", viewer: "Viewer" };
+  var LABEL = { owner: "Owner", editor: "Editor", contributor: "Contributor", viewer: "Viewer", blocked: "Blocked" };
 
   var roleMap = new Map();
-  var RANK = { owner: 0, editor: 1, contributor: 2, viewer: 3 };
+  var RANK = { owner: 0, editor: 1, contributor: 2, viewer: 3, blocked: 4 };
   function personRow(p) {
     var row = document.createElement("div"); row.className = "row";
     var who = document.createElement("div"); who.className = "who";
@@ -109,18 +140,35 @@
     meta.textContent = p.source === "secret" ? "Set in the ROLES secret" : "Last changed by " + p.by + " " + ago(p.ts);
     who.appendChild(meta); row.appendChild(who);
     var right = document.createElement("div"); right.className = "form";
-    if (p.source === "secret") {
+    if (p.role === "blocked") {
+      row.className = "row blockedrow";
+      var ub = document.createElement("button"); ub.type = "button"; ub.className = "primary"; ub.textContent = "Unblock";
+      ub.onclick = function () { change(p.email, "none"); };
+      right.appendChild(ub);
+    } else if (p.source === "secret") {
       var l = document.createElement("span"); l.className = "lock"; l.textContent = LABEL[p.role] + " (locked)"; right.appendChild(l);
+      right.appendChild(signOutBtn(p.email));
     } else {
       var sel = document.createElement("select"); sel.setAttribute("aria-label", "Role for " + p.email);
       ["viewer", "contributor", "editor"].forEach(function (r) { var o = document.createElement("option"); o.value = r; o.textContent = LABEL[r]; if (r === p.role) o.selected = true; sel.appendChild(o); });
       sel.onchange = function () { change(p.email, sel.value); };
       var del = document.createElement("button"); del.type = "button"; del.className = "danger"; del.textContent = "Remove";
       del.onclick = function () { if (window.confirm("Remove " + p.email + "? They lose access right away. You can undo it from Recent changes.")) change(p.email, "none"); };
-      right.appendChild(sel); right.appendChild(del);
+      var blk = document.createElement("button"); blk.type = "button"; blk.className = "danger"; blk.textContent = "Block";
+      blk.onclick = function () { if (window.confirm("Block " + p.email + "? They lose access right away and cannot sign back in. You can undo it from Recent changes.")) change(p.email, "blocked"); };
+      right.appendChild(sel); right.appendChild(signOutBtn(p.email)); right.appendChild(del); right.appendChild(blk);
     }
     row.appendChild(right);
     return row;
+  }
+  function signOutBtn(email) {
+    var b = document.createElement("button"); b.type = "button"; b.textContent = "Sign out everywhere";
+    b.setAttribute("aria-label", "Sign out everywhere: " + email);
+    b.onclick = function () {
+      if (!window.confirm("Sign " + email + " out on every device? They can sign back in unless you also remove or block them.")) return;
+      say("Saving..."); post("/api/revoke", { email: email }).then(function () { say(email + " is signed out everywhere."); }).catch(function (e) { say(e.message, true); });
+    };
+    return b;
   }
   function byRoleThenEmail(a, b) { return (RANK[a.role] - RANK[b.role]) || (a.email < b.email ? -1 : 1); }
 
@@ -135,7 +183,7 @@
     renderLog(data.log || []);
 
     // above: everyone with more than watch-only access, grouped by role
-    var staff = data.people.filter(function (p) { return p.role !== "viewer"; }).sort(byRoleThenEmail);
+    var staff = data.people.filter(function (p) { return p.role !== "viewer" && p.role !== "blocked"; }).sort(byRoleThenEmail);
     $("staffCount").textContent = staff.length;
     var sl = $("staffList"); sl.textContent = "";
     [["owner", "Owners"], ["editor", "Editors"], ["contributor", "Contributors"]].forEach(function (g) {
@@ -152,9 +200,26 @@
     $("viewerNote").textContent = data.defaultRole === "viewer" ? "People you added as watch-only. Anyone else who signs in with Google can also watch, so they only appear here if you added them." : "People you added as watch-only.";
     var vl = $("viewerList"); vl.textContent = "";
     viewers.forEach(function (p) { vl.appendChild(personRow(p)); });
+    var blocked = data.people.filter(function (p) { return p.role === "blocked"; }).sort(byRoleThenEmail);
+    $("blockedCard").hidden = !blocked.length; $("blockedCount").textContent = blocked.length;
+    var bl = $("blockedList"); bl.textContent = ""; blocked.forEach(function (p) { bl.appendChild(personRow(p)); });
+    renderLock(data);
+    $("eraseCard").hidden = false;
     if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
   }
 
+  function renderLock(data) {
+    $("lockCard").hidden = false;
+    var lk = data.locked;
+    $("lockNote").textContent = "For a raid or a wave of fake accounts. While the door is locked, people who are not on your list cannot sign in. Everyone already signed in keeps watching, and anyone you added can still sign in.";
+    $("lockState").className = lk ? "on" : "";
+    $("lockState").textContent = lk ? "The door is LOCKED (since " + ago(lk.ts * 1000) + ", by " + lk.by + ")." + (data.defaultRole === "none" ? "" : "") : "The door is open." + (data.defaultRole === "none" ? " New people are already turned away because the default access is set to none." : "");
+    $("lockBtn").textContent = lk ? "Open the door" : "Lock the door";
+    $("lockBtn").onclick = function () {
+      if (!lk && !window.confirm("Lock the door? New sign-ins from people not on your list will be turned away until you open it again. People already watching are not affected.")) return;
+      say("Saving..."); post("/api/lock", { locked: !lk }).then(function (r) { say(r.locked ? "The door is locked." : "The door is open."); return load(); }).catch(function (e) { say(e.message, true); });
+    };
+  }
   function labelOf(r) { return LABEL[r] || r; }
   function renderLog(log) {
     $("logCard").hidden = !log.length;
@@ -163,15 +228,16 @@
     log.forEach(function (e) {
       var latest = !seenEmail[e.email]; seenEmail[e.email] = true;
       var cur = roleMap.get(e.email) || "none";
-      var canUndo = latest && cur === e.to_role;
+      var erased = e.to_role === "erased";
+      var canUndo = !erased && latest && cur === e.to_role;
       var row = document.createElement("div"); row.className = "row";
       var who = document.createElement("div"); who.className = "who";
-      who.appendChild(document.createTextNode(e.email));
-      var what = e.to_role === "none" ? "Removed (was " + labelOf(e.from_role) + ")" : e.from_role === "none" ? "Added as " + labelOf(e.to_role) : labelOf(e.from_role) + " to " + labelOf(e.to_role);
+      who.appendChild(document.createTextNode(erased ? "Records erased on request" : e.email));
+      var what = erased ? "Erased" : e.to_role === "blocked" ? "Blocked (was " + labelOf(e.from_role) + ")" : e.from_role === "blocked" ? (e.to_role === "none" ? "Unblocked" : "Unblocked, now " + labelOf(e.to_role)) : e.to_role === "none" ? "Removed (was " + labelOf(e.from_role) + ")" : e.from_role === "none" ? "Added as " + labelOf(e.to_role) : labelOf(e.from_role) + " to " + labelOf(e.to_role);
       var meta = document.createElement("div"); meta.className = "meta";
       meta.textContent = what + " by " + e.actor + ", " + ago(e.ts);
       who.appendChild(meta);
-      if (!canUndo) { var w = document.createElement("div"); w.className = "why"; w.textContent = "Changed again since, so no Undo here"; who.appendChild(w); }
+      if (!canUndo && !erased) { var w = document.createElement("div"); w.className = "why"; w.textContent = "Changed again since, so no Undo here"; who.appendChild(w); }
       row.appendChild(who);
       if (canUndo) {
         var b = document.createElement("button"); b.type = "button"; b.textContent = "Undo";
@@ -201,10 +267,64 @@
       add.onclick = function () { change(p.email, sel.value); };
       var forget = document.createElement("button"); forget.type = "button"; forget.textContent = "Forget";
       forget.onclick = function () { change(p.email, "forget"); };
-      right.appendChild(sel); right.appendChild(add); right.appendChild(forget);
+      var blk2 = document.createElement("button"); blk2.type = "button"; blk2.className = "danger"; blk2.textContent = "Block";
+      blk2.onclick = function () { if (window.confirm("Block " + p.email + "? They cannot sign in or watch. You can undo it from Recent changes.")) change(p.email, "blocked"); };
+      right.appendChild(sel); right.appendChild(add); right.appendChild(forget); right.appendChild(blk2);
       row.appendChild(right); box.appendChild(row);
     });
   }
+  /* ---------- erase a person ---------- */
+  var findState = null;
+  function group(title, items, key, labelOf2, preChecked) {
+    if (!items.length) return null;
+    var box = document.createElement("div");
+    var h = document.createElement("div"); h.className = "sub"; h.textContent = title + " (" + items.length + ")"; box.appendChild(h);
+    items.forEach(function (it) {
+      var lab = document.createElement("label");
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.dataset.key = key; cb.value = key === "accounts" ? it.email : it.id;
+      cb.checked = preChecked ? preChecked(it) : true; if (it.locked) { cb.checked = false; cb.disabled = true; }
+      var sp = document.createElement("span"); sp.textContent = labelOf2(it);
+      lab.appendChild(cb); lab.appendChild(sp); box.appendChild(lab);
+    });
+    return box;
+  }
+  function showFound(r) {
+    findState = r;
+    var out = $("findOut"); out.textContent = "";
+    var parts = [
+      group("Accounts", r.accounts, "accounts", function (a) { return a.email + " (" + a.kind + (a.locked ? ", set in the ROLES secret, cannot be erased here" : a.kind === "blocked" ? ", erasing this also removes the block" : "") + ")"; }, function (a) { return a.kind !== "blocked"; }),
+      group("Daters", r.daters, "daters", function (d) { return d.label; }),
+      group("Seats showing them", r.seats, "seats", function (d) { return d.label; }),
+      group("Match log entries", r.matches, "matches", function (d) { return d.label; }),
+      group("Questions with their handle", r.questions, "questions", function (d) { return d.label; })
+    ].filter(Boolean);
+    if (!parts.length) { var n = document.createElement("p"); n.textContent = "Nothing found for \"" + r.query + "\"."; out.appendChild(n); return; }
+    var warn = document.createElement("p"); warn.textContent = "Names can match more than one person. Untick anything that is not theirs."; out.appendChild(warn);
+    parts.forEach(function (x) { out.appendChild(x); });
+    if (r.questions.length) {
+      var dl = document.createElement("label"); var dc = document.createElement("input"); dc.type = "checkbox"; dc.id = "delQ";
+      var ds = document.createElement("span"); ds.textContent = "Delete those questions completely (otherwise only the handle is removed and the question stays)";
+      dl.appendChild(dc); dl.appendChild(ds); out.appendChild(dl);
+    }
+    var b = document.createElement("button"); b.type = "button"; b.className = "danger"; b.textContent = "Erase the ticked items";
+    b.onclick = function () {
+      var sel = { accounts: [], daters: [], matches: [], questions: [], seats: [], deleteQuestions: !!($("delQ") && $("delQ").checked) };
+      out.querySelectorAll("input[type=checkbox][data-key]").forEach(function (c) { if (c.checked) sel[c.dataset.key].push(c.value); });
+      var total = sel.accounts.length + sel.daters.length + sel.matches.length + sel.questions.length + sel.seats.length;
+      if (!total) { say("Nothing is ticked.", true); return; }
+      if (!window.confirm("Erase " + total + " item" + (total === 1 ? "" : "s") + "? This cannot be undone.")) return;
+      say("Erasing..."); post("/api/person", { action: "erase", query: r.query, select: sel }).then(function (x) {
+        var d = x.removed; say("Erased: " + d.accounts + " account(s), " + d.daters + " dater(s), " + d.matches + " match log entr" + (d.matches === 1 ? "y" : "ies") + ", " + d.questions + " question(s), " + d.seats + " seat(s).");
+        out.textContent = ""; findState = null; return load();
+      }).catch(function (e) { say(e.message, true); });
+    };
+    out.appendChild(b);
+  }
+  $("findForm").onsubmit = function (ev) {
+    ev.preventDefault(); say("Searching...");
+    post("/api/person", { action: "find", query: $("findQ").value.trim() }).then(function (r) { say(""); showFound(r); }).catch(function (e) { say(e.message, true); });
+  };
+
   function load() { return api("GET").then(render).catch(function (e) { say(e.message, true); }); }
   var undoTimer = null;
   function hideUndo() { clearTimeout(undoTimer); $("undoRow").hidden = true; }
@@ -218,7 +338,7 @@
     var prev = roleMap.get(email) || "none";
     hideUndo(); say("Saving...");
     return api("POST", { email: email, role: role }).then(function () {
-      say(isUndo ? "Undone: " + email + (role === "none" ? " is off the list." : " is back to " + labelOf(role) + ".") : role === "forget" ? "Forgot " + email + "." : role === "none" ? "Removed " + email + "." : "Saved " + email + " as " + LABEL[role] + ".");
+      say(isUndo ? "Undone: " + email + (role === "none" ? " is off the list." : " is back to " + labelOf(role) + ".") : role === "forget" ? "Forgot " + email + "." : role === "blocked" ? "Blocked " + email + "." : role === "none" ? "Removed " + email + "." : "Saved " + email + " as " + LABEL[role] + ".");
       if (!isUndo && role !== "forget" && prev !== role) showUndo(email, prev);
       return load();
     }).catch(function (e) { say(e.message, true); return load(); });

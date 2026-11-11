@@ -62,11 +62,16 @@ export function defaultRole(env) {
 //   2. roles an owner or editor assigned on the admin page (stored in the database)
 //   3. DEFAULT_ROLE for any other signed-in Google account
 // An owner has the "editor" level everywhere plus the right to manage roles.
-export function resolveRole(env, email, dbRole) {
+// Extra rules: a person an owner BLOCKED gets no access (it beats the default role, never the ROLES secret).
+// While the door is LOCKED (opts.lockTs, seconds), people on no list who sign in after the lock (opts.iat >= lockTs)
+// get no access; sessions that began before the lock, and anyone an owner added, are not affected.
+export function resolveRole(env, email, dbRole, opts) {
   const e = String(email || "").toLowerCase();
   const s = parseRoles(env.ROLES).get(e);
   if (s) return { role: s === "owner" ? "editor" : s, owner: s === "owner", source: "secret" };
+  if (dbRole === "blocked") return { role: "none", owner: false, source: "admin", blocked: true };
   if (dbRole === "editor" || dbRole === "contributor" || dbRole === "viewer") return { role: dbRole, owner: false, source: "admin" };
+  if (opts && opts.lockTs && typeof opts.iat === "number" && opts.iat >= opts.lockTs) return { role: "none", owner: false, source: "default", locked: true };
   return { role: defaultRole(env), owner: false, source: "default" };
 }
 
@@ -146,15 +151,17 @@ export function sessionHours(env) {
 }
 
 // iat = when the very first Google login happened (kept across refreshes).
-export async function mintSession(env, email, iat) {
+// jti = this login's own id (kept across refreshes), so signing out can end just this device's session.
+export async function mintSession(env, email, iat, jti) {
   const now = Math.floor(Date.now() / 1000);
-  const payload = { v: 1, e: email, i: iat || now, x: now + Math.floor(sessionHours(env) * 3600) };
+  const id = typeof jti === "string" && jti.length >= 8 && jti.length <= 40 ? jti : b64uEncode(crypto.getRandomValues(new Uint8Array(12)));
+  const payload = { v: 1, e: email, i: iat || now, x: now + Math.floor(sessionHours(env) * 3600), j: id };
   const body = b64uEncode(enc.encode(JSON.stringify(payload)));
   const sig = await crypto.subtle.sign("HMAC", await hmacKey(env, "sign"), enc.encode(body));
-  return { token: body + "." + b64uEncode(sig), exp: payload.x, iat: payload.i };
+  return { token: body + "." + b64uEncode(sig), exp: payload.x, iat: payload.i, jti: id };
 }
 
-// Returns { email, exp, iat } or null.
+// Returns { email, exp, iat, jti } or null.
 export async function verifySession(env, token) {
   if (typeof token !== "string" || token.length > 1000) return null;
   const parts = token.split(".");
@@ -166,7 +173,7 @@ export async function verifySession(env, token) {
     const now = Math.floor(Date.now() / 1000);
     if (p.v !== 1 || typeof p.e !== "string" || typeof p.x !== "number" || typeof p.i !== "number") return null;
     if (p.x <= now) return null;
-    return { email: p.e, exp: p.x, iat: p.i };
+    return { email: p.e, exp: p.x, iat: p.i, jti: typeof p.j === "string" ? p.j : undefined };
   } catch (e) {
     return null;
   }

@@ -453,3 +453,14 @@ Facts only you can add: if you want a named operator or a contact address on the
 ## Add to home screen guide
 
 The "Install the app" card has an Add button. It opens a step by step guide with an iPhone tab and an Android tab. On Android, if the browser offers a real install prompt, an "Install now" button also shows.
+
+## Blocking, lock the door, sign out everywhere, erase a person
+
+All four are on the admin page (owners only). Nothing to set up. The first request after deploy creates the small tables they need.
+
+- **Block.** A Block button sits on each person's row. A blocked account cannot sign in or watch, even while `DEFAULT_ROLE` is `viewer`, and any open page is closed. They are listed under Blocked, with Unblock, and every block is in Recent changes with Undo. Owners (the ROLES secret) cannot be blocked from the page. A block is per Google account, so someone can make a new account. For that, use Lock the door.
+- **Lock the door.** One button. While locked, people who are on no list and sign in after the lock are turned away with a "paused" message. People already signed in keep watching and can refresh, people you added still sign in, and owners are unaffected. Lock state is stored in the database, so it survives deploys. Remember to open the door again after the stream.
+- **Sign out.** The Sign out button now also ends that session on the server, only that device. An owner can press Sign out everywhere on any person's row to end all of their sessions at once. This ends sessions, not accounts. Emergency switch for everyone is still re-setting `SESSION_SECRET`.
+- **Erase a person's records.** Type a name, handle or email, review everything that mentions them, untick anything that is not theirs, then erase. Daters, their match log entries, seats showing them, chat handles on questions (or the whole question), sign-in and access records. The change history keeps its entry but the email becomes "(erased)". Downloaded backups are not changed. People in the ROLES secret cannot be erased here.
+
+Note: a page that has stayed completely silent since it opened may not be closed until its next message. Nothing is sent to a blocked or signed-out person in the meantime, because every broadcast checks their role first.

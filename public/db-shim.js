@@ -116,6 +116,8 @@
               } else if (x.status === 403 && x.body.error === "no_access") {
                 info = { email: x.body.email, noAccess: true }; bootPromise = Promise.resolve(false);
                 done({ ok: false, noAccess: true, email: x.body.email });
+              } else if (x.status === 403 && x.body.error === "locked") {
+                done({ ok: false, error: "Sign-ins are paused right now. If you were already watching, you can keep watching. Please try again in a little while." });
               } else {
                 done({ ok: false, error: "Sign-in failed. Try again." });
               }
@@ -128,6 +130,8 @@
   }
 
   function signOut() {
+    // Tell the server too, so a copied session stops working. keepalive lets it finish while the page reloads.
+    if (session && session.token) { try { fetch("/api/signout", { method: "POST", headers: { Authorization: "Bearer " + session.token }, keepalive: true }).catch(function () {}); } catch (e) { /* ignore */ } }
     clearTimeout(refreshTimer);
     session = null; saveSession(); bootPromise = Promise.resolve(false); authFailed = true;
     try { window.google.accounts.id.disableAutoSelect(); } catch (e) { /* not loaded */ }
