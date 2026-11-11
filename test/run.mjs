@@ -560,6 +560,8 @@ try {
   const ranks = await A.locator("#pickList .pickrow[data-fit]").evaluateAll((els) => els.map((e) => ({ mutual: 0, close: 1, nofit: 2 })[e.getAttribute("data-fit")]));
   check("for a panel seat the list puts the best fits first (green, then yellow, then red)", ranks.length > 5 && ranks.every((r, i) => i === 0 || r >= ranks[i - 1]) && ranks[0] === 0, ranks.slice(0, 12));
   check("each row shows its fit (label) so you can tell at a glance", /Fits both|Off by|Mismatch/.test(await A.locator("#pickList .pickrow[data-fit]").first().innerText()));
+  const rowFit = await A.locator("#pickList .pickrow").evaluateAll((els) => els.map((e, i) => ({ over: e.scrollHeight > e.clientHeight + 1, gap: i ? Math.round(e.getBoundingClientRect().top - els[i - 1].getBoundingClientRect().bottom) : 99 })));
+  check("picker rows are tall enough for their text and never overlap the next row", rowFit.length > 5 && rowFit.every((r) => !r.over && r.gap >= 0), rowFit.filter((r) => r.over || r.gap < 0).slice(0, 3));
   const bestName = (await A.locator("#pickList .pickrow .t").first().innerText()).split(",")[0];
   await A.locator("#pickList .pickrow").first().click();
   check("a panel pick lands in the seat that was tapped (Seat 4), not the first empty one", await until(async () => (await text(A, "#rMid .heart:nth-child(1)")).includes(bestName), 5000), bestName);
@@ -666,6 +668,44 @@ try {
   const logoBox = await A.locator("h1 svg.logo").boundingBox(), logoPhone = await PH.locator("h1 svg.logo").boundingBox();
   check("the headline is sized sensibly on laptop and phone and fits the screen", logoBox.width > 400 && logoBox.width <= 521 && logoPhone.width >= 260 && logoPhone.width <= 390 - 32 + 1, { laptop: logoBox.width, phone: logoPhone.width });
   check("the headline fits inside its box (nothing clipped or spilling)", await A.evaluate(() => { const t = document.getElementById("lgText").getBBox(), vb = document.querySelector("svg.logo").viewBox.baseVal; return t.x >= vb.x && t.x + t.width <= vb.x + vb.width && t.y >= vb.y && t.y + t.height <= vb.y + vb.height; }));
+
+  // colour scheme (banner palette)
+  const rgbOf = (c) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+  const lum = (c) => { const [r, g, b] = rgbOf(c).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const cr = (c1, c2) => { const a = lum(c1), b = lum(c2); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+  const dist = (c1, c2) => { const x = rgbOf(c1), y = rgbOf(c2); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
+  const th = await A.evaluate(() => {
+    const cs = (el, p) => getComputedStyle(el)[p];
+    const heart = (cls) => { const b = document.createElement("button"); b.className = "heart " + cls; b.innerHTML = '<svg viewBox="0 0 100 88"><path d="M0 0"/></svg>'; document.body.appendChild(b); const p = b.querySelector("path"); const r = { fill: cs(p, "fill"), stroke: cs(p, "stroke") }; b.remove(); return r; };
+    const row = document.createElement("div"); row.className = "row"; row.innerHTML = '<div class="main"><div class="m">x</div></div>'; document.body.appendChild(row);
+    const rowBg = cs(row, "backgroundColor"), rowMuted = cs(row.querySelector(".m"), "color"); row.remove();
+    const pb = document.querySelector("button.primary"); 
+    return { body: cs(document.body, "backgroundColor"), bodyImg: cs(document.body, "backgroundImage"), fg: cs(document.body, "color"), rowBg, rowMuted,
+      nofit: heart("nofit"), hot: heart("hot"), mutual: heart("mutual"), close: heart("close"), vacant: heart("vacant"), kim: heart("kim"),
+      btnImg: cs(pb, "backgroundImage"), btnColor: cs(pb, "color") };
+  });
+  check("page background is the banner's red-black", rgbOf(th.body).join() === "27,2,3", th.body);
+  check("there is a subtle sparkle field behind everything", (th.bodyImg.match(/radial-gradient/g) || []).length === 5, th.bodyImg.slice(0, 80));
+  const nf = rgbOf(th.nofit.fill), ns = rgbOf(th.nofit.stroke);
+  check("a mismatch heart is dark with a bright red edge", lum(th.nofit.fill) < 0.01 && ns[0] > 220 && ns[1] < 110 && ns[2] < 110, th.nofit);
+  const fills = ["nofit", "hot", "mutual", "close", "vacant"].map((k) => [k, th[k].fill]); let minD = 1e9, pair = "";
+  for (let i = 0; i < fills.length; i++) for (let j = i + 1; j < fills.length; j++) { const d = dist(fills[i][1], fills[j][1]); if (d < minD) { minD = d; pair = fills[i][0] + "/" + fills[j][0]; } }
+  check("fit hearts stay easy to tell apart: mismatch, hot seat, both fit, off by 1 to 2, empty", minD >= 25, { minD, pair });
+  check("mismatch heart is clearly darker than the hot seat and empty seats", lum(th.hot.fill) > lum(th.nofit.fill) * 8 && lum(th.vacant.fill) > lum(th.nofit.fill) * 3, { hot: th.hot.fill, vacant: th.vacant.fill });
+  check("body text is easy to read on the page background", cr(th.fg, th.body) >= 12, cr(th.fg, th.body));
+  check("secondary text is readable on cards and rows (at least 4.5 to 1)", cr(th.rowMuted, th.rowBg) >= 4.5, cr(th.rowMuted, th.rowBg));
+  const stops = (th.btnImg.match(/rgb\([^)]*\)/g) || []); const mid = stops.length >= 2 ? "rgb(" + [0, 1, 2].map((i) => Math.round((rgbOf(stops[0])[i] + rgbOf(stops[1])[i]) / 2)).join(",") + ")" : "";
+  check("button text is readable on the glossy red buttons, even at the middle of the gradient", stops.length >= 2 && cr(th.btnColor, mid) >= 4.5, { stops, mid, ratio: stops.length ? cr(th.btnColor, mid) : 0 });
+  const pages = {}; for (const f of ["index.html", "admin.html", "backup.html", "privacy.html"]) pages[f] = await (await fetch(BASE + "/" + f)).text();
+  check("no old plum colours are left on any page", Object.values(pages).every((t) => !/#12030a|#4a1429|#ff4f9a|#260a17|#3b1a5c|#b58cff|#1a0610/i.test(t)));
+  const gateCtx = await browser.newContext({ viewport: { width: 390, height: 844 } }); await gateCtx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
+  const gatePg = await gateCtx.newPage(); await gatePg.goto(BASE + "/"); await gatePg.waitForSelector("#gate:not([hidden])");
+  const gateInfo = await gatePg.evaluate(() => ({ bodyH: document.body.getBoundingClientRect().height, vh: innerHeight, rep: getComputedStyle(document.body).backgroundRepeat }));
+  check("on a short page (the sign-in screen) the glow fills the screen and does not restart halfway down", gateInfo.bodyH >= gateInfo.vh - 1 && gateInfo.rep.startsWith("no-repeat"), gateInfo);
+  check("the sign-in screen offers Google sign-in and says what viewers get", /watch the board and get random questions/.test(await gatePg.locator("#gateMsg").innerText()));
+  await gateCtx.close();
+  for (const f of ["admin.html", "backup.html", "privacy.html"]) check(`${f} also fills the screen without a repeat seam`, /no-repeat/.test(pages[f]) && /min-height:100vh/.test(pages[f]));
+  check("the admin, backup and privacy pages use the same red-black palette and sparkle", ["admin.html", "backup.html", "privacy.html"].every((f) => pages[f].includes("#1b0203") && (pages[f].match(/radial-gradient/g) || []).length >= 5));
 
   // sign out
   check("every signed-in role sees a Sign out button", (await Promise.all([A, B, K, V].map((p) => p.locator("#signOut").isVisible()))).every(Boolean));
