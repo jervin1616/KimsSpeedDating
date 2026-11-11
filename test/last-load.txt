@@ -1,0 +1,13 @@
+Load test: 500 viewers + 15 hosts/mods, MAX_VIEWERS=500
+memory before: 223 MB (all workerd processes)
+connect 500 viewers: 1.8 s, refused: 0
+  every viewer got its 3 snapshots: 500/500
+memory with 500 viewers: 616 MB
+connect 15 hosts/mods on top of the full viewer room: 15 ok, refused: 0
+viewer number 501 is refused: yes (503)
+1 write -> reached 500/500 viewers; delay p50 29 ms, p95 55 ms, max 58 ms
+busy moment (9 writes back to back): host saw all acks in 330 ms; 500/500 viewers received all 9 updates; slowest viewer finished 329 ms after start
+heartbeat: 500/500 answered; slowest 53 ms
+memory after traffic: 640 MB
+reconnect storm (all 500 at once): 1.5 s, refused: 0, got snapshots: 500/500
+memory after storm: 756 MB

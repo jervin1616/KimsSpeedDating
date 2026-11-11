@@ -319,6 +319,16 @@ Everyone has a **Sign out** pill at the top of the console (and a button on the 
 It does not sign the same person out on their other devices.
 Signing out only clears this device. To cut someone off everywhere right now, remove them on `/admin.html`: their open pages are disconnected at once.
 
+## How many people can use it at once
+
+- **Viewers (read-only watchers):** up to **500 at once** (`MAX_VIEWERS` in `wrangler.jsonc`).
+- **Hosts and mods:** **15 more places on top**, so a crowd of viewers can never lock them out. Hosts and mods can also use any viewer places that are empty.
+- **When viewers are full:** the next viewer's page shows a **Full** tag and a "busy right now" message. It stops retrying quickly (a few slow tries, then it waits for a tap on the tag) so a waiting crowd cannot use up the free daily allowance. People already in are not affected.
+- **Hidden tabs:** a viewer's tab that stays hidden for 10 minutes lets go of its place and reconnects when they come back. Hosts and mods stay connected.
+- **Changing the number:** edit `MAX_VIEWERS`, run `npx wrangler deploy`. Do it before a stream, not during one (everyone reconnects for a moment).
+- **What it was tested with:** `node test/load.mjs 500 15` runs 500 simulated viewers and 15 hosts against a local copy, with your real data. Everything connects in about a second or two, one change reaches all viewers in well under 0.1 seconds, and a full reconnect of everyone at once recovers in a few seconds. It also held up at 700. These are local numbers, not a promise about Cloudflare's network.
+- **After your first big stream:** open the Cloudflare dashboard, **Workers & Pages**, your Worker, **Metrics**, and look at requests for the day and (under **Durable Objects**) memory. If the daily requests are under about half of 100,000 and memory stays well under 128 MB, you can raise `MAX_VIEWERS` toward 600.
+
 ## Staying on the free plan
 
 Checked against Cloudflare's own docs (Workers Free plan, Durable Objects with SQLite):

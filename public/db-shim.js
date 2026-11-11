@@ -182,6 +182,7 @@
   var everOpened = false;
   var everHello = false;
   var connState = "connecting", everLive = false, connOffTimer = null;
+  var fullMode = false, fullTries = 0, fullTimer = null, attempts = 0; // "full" = the server said the room is at capacity
   function setConn(s) {
     if (s === connState) return;
     connState = s;
@@ -191,13 +192,13 @@
   function wsUrl() { return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/ws"; }
 
   function connectIfNeeded() {
-    if (state === "closed" && session && !authFailed) connect();
+    if (state === "closed" && session && !authFailed && !fullMode) connect();
   }
 
   function connect() {
     if (state !== "closed" || !session || authFailed) return;
     clearTimeout(retryTimer);
-    state = "connecting";
+    state = "connecting"; attempts++;
     var ws, opened = false;
     try { ws = new WebSocket(wsUrl(), ["kim-v1", session.token]); } catch (e) { state = "closed"; scheduleRetry(); return; }
     sock = ws;
@@ -205,6 +206,7 @@
       if (sock !== ws) return;
       opened = true; state = "open"; everOpened = true; lastRx = Date.now();
       everLive = true; clearTimeout(connOffTimer); connOffTimer = null; setConn("live");
+      fullMode = false; fullTries = 0; clearTimeout(fullTimer);
       startHeartbeat();
       clearTimeout(stableTimer); stableTimer = setTimeout(function () { backoff = 500; }, 10000);
       var w = waiters; waiters = []; w.forEach(function (f) { f(true); });
@@ -246,7 +248,7 @@
     sock = null; state = "closed";
     clearInterval(hbTimer);
     if (connState !== "offline") setConn(everLive ? "reconnecting" : "connecting"); // once red, stay red until live again
-    if (!connOffTimer && connState !== "offline") connOffTimer = setTimeout(function () { connOffTimer = null; if (connState !== "live") setConn("offline"); }, 10000);
+    if (!connOffTimer && connState !== "offline") connOffTimer = setTimeout(function () { connOffTimer = null; if (connState !== "live" && connState !== "full") setConn("offline"); }, 10000);
     var w = waiters; waiters = []; w.forEach(function (f) { f(false); });
     failPending("unavailable");
     Object.keys(subs).forEach(function (k) { subs[k].ready = false; });
@@ -256,27 +258,42 @@
     if (!wasOpen) {
       // The upgrade itself was refused or failed. Find out whether our login is the reason.
       if (!session) return;
-      fetch("/api/session", { headers: { Authorization: "Bearer " + session.token }, cache: "no-store" }).then(function (r) {
-        if (r.status === 401 || r.status === 403) { if (r.status === 403) { sessionLost(); } else { refreshSession(); scheduleRetry(true); } }
-        else scheduleRetry();
+      fetch("/api/session?probe=1", { headers: { Authorization: "Bearer " + session.token }, cache: "no-store" }).then(function (r) {
+        if (r.status === 401 || r.status === 403) { if (r.status === 403) { sessionLost(); } else { refreshSession(); scheduleRetry(true); } return; }
+        return r.json().catch(function () { return {}; }).then(function (j) { if (j && j.full) enterFull(); else scheduleRetry(); });
       }).catch(function () { scheduleRetry(); });
       return;
     }
     scheduleRetry(code === 1000 || code === 1001 ? true : false);
   }
 
+  // Viewers beat more slowly (a crowd of them would otherwise cost a lot of the free daily allowance).
+  function hbEvery() { return session && session.role === "viewer" ? 45000 : 15000; }
   function startHeartbeat() {
     clearInterval(hbTimer);
+    var every = hbEvery();
     hbTimer = setInterval(function () {
       if (state !== "open" || !sock) return;
-      if (Date.now() - lastRx > 40000) { try { sock.close(); } catch (e) { /* ignore */ } return; }
+      if (Date.now() - lastRx > every * 2.7) { try { sock.close(); } catch (e) { /* ignore */ } return; }
       try { sock.send("ping"); } catch (e) { /* close will follow */ }
-    }, 15000);
+    }, every);
+  }
+
+  // The room is at capacity. Do not hammer the server: wait, retry a few times slowly, then wait for a tap.
+  function enterFull() {
+    clearTimeout(retryTimer); clearTimeout(offlineTimer); offlineTimer = null; clearInterval(offlineRepeat); offlineRepeat = null; wasOffline = false;
+    clearTimeout(connOffTimer); connOffTimer = null;
+    fullMode = true; setConn("full"); emit("full");
+    clearTimeout(fullTimer);
+    if (fullTries < 3) {
+      fullTries++;
+      fullTimer = setTimeout(function () { fullMode = false; connect(); }, Math.round(240000 * (0.8 + Math.random() * 0.4)));
+    }
   }
 
   // After the laptop wakes or the network returns, do not wait for the next timer.
   function nudge() {
-    if (!session || authFailed) return;
+    if (!session || authFailed || fullMode) return;
     if (state === "closed") { clearTimeout(retryTimer); backoff = 500; connect(); return; }
     if (state === "open" && sock) {
       var s = sock, t0 = Date.now();
@@ -284,8 +301,21 @@
       setTimeout(function () { if (sock === s && state === "open" && lastRx < t0) { try { s.close(); } catch (e) { /* ignore */ } } }, 5000);
     }
   }
+  // A viewer's tab that stays hidden for 10 minutes lets go of its connection (it frees a place and saves the
+  // free daily allowance) and reconnects the moment the tab is seen again. Hosts and mods never do this.
+  var idleTimer = null, IDLE_MS = 600000;
+  function idleClose() {
+    if (!session || session.role !== "viewer" || state === "closed") return;
+    clearInterval(hbTimer); closeSocket();
+    Object.keys(subs).forEach(function (k) { subs[k].ready = false; });
+    failPending("unavailable");
+  }
   window.addEventListener("online", nudge);
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) nudge(); });
+  document.addEventListener("visibilitychange", function () {
+    clearTimeout(idleTimer);
+    if (document.hidden) { if (session && session.role === "viewer") idleTimer = setTimeout(idleClose, IDLE_MS); }
+    else nudge();
+  });
 
   function failPending(code) {
     var p = pending; pending = {};
@@ -446,6 +476,12 @@
     signIn: signIn,
     signOut: signOut,
     connection: function () { return connState; },
+    // Used by the "Full" tag: try again now.
+    reconnect: function () {
+      if (!session || authFailed) return;
+      fullMode = false; fullTries = 0; clearTimeout(fullTimer); backoff = 500;
+      if (state === "closed") { if (connState !== "offline") setConn(everLive ? "reconnecting" : "connecting"); connect(); }
+    },
     authFetch: function (url, opts) {
       opts = Object.assign({}, opts); opts.headers = Object.assign({}, opts.headers, { Authorization: "Bearer " + (session ? session.token : "") });
       return fetch(url, opts);
@@ -453,7 +489,9 @@
     // For automated tests only.
     _test: {
       drop: function () { if (sock) { try { sock.close(); } catch (e) { /* ignore */ } } },
-      state: function () { return { state: state, subs: Object.keys(subs).length, backoff: backoff, everOpened: everOpened }; },
+      idleNow: function () { idleClose(); },
+      wake: function () { nudge(); },
+      state: function () { return { state: state, subs: Object.keys(subs).length, backoff: backoff, everOpened: everOpened, attempts: attempts, conn: connState, hb: hbEvery(), full: fullMode }; },
     },
   };
 })();

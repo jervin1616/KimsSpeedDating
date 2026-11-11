@@ -69,7 +69,9 @@ export default {
         const s = await sessionFromRequest(env, request);
         if (!s) return json({ error: "unauthorized" }, 401);
         if (s.role === "none") return json({ error: "no_access", email: s.email }, 403);
-        return json({ email: s.email, role: s.role, owner: s.owner, exp: s.exp });
+        // ?probe=1 is used by a page whose connection was refused, to find out if the room is simply full.
+        const full = url.searchParams.get("probe") ? await database(env).isFull(s.role) : undefined;
+        return json({ email: s.email, role: s.role, owner: s.owner, exp: s.exp, full });
       }
 
       if (path === "/api/refresh" && request.method === "POST") {

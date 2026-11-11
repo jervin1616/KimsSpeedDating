@@ -7,7 +7,14 @@ import {
 } from "./rules.js";
 import { resolveRole, secretEntries, validEmail, verifySession, defaultRole } from "./auth.js";
 
-const MAX_SOCKETS = 40;
+// Capacity: viewers (read-only watchers) are capped; hosts and mods keep STAFF_RESERVE extra places
+// so a crowd of viewers can never lock them out. MAX_VIEWERS can be changed in wrangler.jsonc.
+const STAFF_RESERVE = 15;
+const DEFAULT_MAX_VIEWERS = 500;
+function maxViewers(env) {
+  const n = Number(env.MAX_VIEWERS);
+  return Number.isFinite(n) && n >= 5 && n <= 5000 ? Math.floor(n) : DEFAULT_MAX_VIEWERS;
+}
 const BUCKET_SIZE = 200; // write/read messages allowed in a burst
 const BUCKET_REFILL_PER_SEC = 50;
 const MAX_VIOLATIONS = 200; // then the connection is closed
@@ -27,6 +34,54 @@ export class Database extends DurableObject {
     // Heartbeats are answered without waking the object, so they cost nothing.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
     this.buckets = new WeakMap();
+    this.meta = null; // ws -> attachment, built once per wake-up so a write never re-reads every socket
+    this.nv = 0; this.ns = 0; // open viewer / staff connections
+    this.snap = new Map(); // collection -> cached snapshot text (cleared on every change to that collection)
+    this.seenCount = null;
+  }
+
+  /* ---------- connections (cached per wake-up) ---------- */
+
+  loadMeta() {
+    if (!this.meta) {
+      this.meta = new Map(); this.nv = 0; this.ns = 0;
+      for (const ws of this.ctx.getWebSockets()) {
+        const a = ws.deserializeAttachment() || {};
+        if (!Array.isArray(a.colls)) a.colls = [];
+        this.meta.set(ws, a);
+        if (a.v) this.nv++; else this.ns++;
+      }
+    }
+    return this.meta;
+  }
+
+  attOf(ws) {
+    const m = this.loadMeta();
+    let a = m.get(ws);
+    if (!a) {
+      a = ws.deserializeAttachment() || {};
+      if (!Array.isArray(a.colls)) a.colls = [];
+      m.set(ws, a);
+      if (a.v) this.nv++; else this.ns++;
+    }
+    return a;
+  }
+
+  addMeta(ws, att) {
+    this.loadMeta().set(ws, att);
+    if (att.v) this.nv++; else this.ns++;
+  }
+
+  dropMeta(ws) {
+    if (!this.meta) return;
+    const a = this.meta.get(ws);
+    if (a) { if (a.v) this.nv--; else this.ns--; this.meta.delete(ws); }
+  }
+
+  isFull(role) {
+    this.loadMeta();
+    const v = maxViewers(this.env);
+    return role === "viewer" ? this.nv >= v : this.nv + this.ns >= v + STAFF_RESERVE;
   }
 
   /* ---------- roles ---------- */
@@ -48,11 +103,12 @@ export class Database extends DurableObject {
   // Called after an owner or editor changes someone's role: tell or disconnect their open pages.
   onRolesChanged(email) {
     const r = this.resolve(email);
-    for (const ws of this.ctx.getWebSockets()) {
-      const att = ws.deserializeAttachment();
-      if (!att || att.email !== email) continue;
-      if (r.role === "none") { try { ws.close(4403, "No access."); } catch (e) { /* gone */ } }
-      else this.send(ws, { t: "hello", role: r.role, owner: r.owner, email });
+    for (const [ws, att] of this.loadMeta()) {
+      if (att.email !== email) continue;
+      if (r.role === "none") { try { ws.close(4403, "No access."); } catch (e) { /* gone */ } continue; }
+      const v = r.role === "viewer";
+      if (!!att.v !== v) { if (att.v) this.nv--; else this.ns--; att.v = v; if (v) this.nv++; else this.ns++; try { ws.serializeAttachment(att); } catch (e) { /* gone */ } }
+      this.send(ws, { t: "hello", role: r.role, owner: r.owner, email });
     }
   }
 
@@ -68,8 +124,13 @@ export class Database extends DurableObject {
       const e = String(email).toLowerCase(), now = Date.now();
       const exists = this.sql.exec("SELECT 1 AS x FROM seen WHERE email = ?", e).toArray().length > 0;
       if (!exists) {
-        const n = this.sql.exec("SELECT COUNT(*) AS n FROM seen").one().n;
-        if (n >= MAX_SEEN) this.sql.exec("DELETE FROM seen WHERE email IN (SELECT email FROM seen ORDER BY last ASC LIMIT ?)", n - MAX_SEEN + 1);
+        if (this.seenCount === null) this.seenCount = this.sql.exec("SELECT COUNT(*) AS n FROM seen").one().n;
+        if (this.seenCount >= MAX_SEEN) {
+          const drop = this.seenCount - MAX_SEEN + 1;
+          this.sql.exec("DELETE FROM seen WHERE email IN (SELECT email FROM seen ORDER BY last ASC LIMIT ?)", drop);
+          this.seenCount -= drop;
+        }
+        this.seenCount++;
       }
       this.sql.exec("INSERT INTO seen (email, first, last, n) VALUES (?, ?, ?, 1) ON CONFLICT (email) DO UPDATE SET last = excluded.last, n = n + 1", e, now, now);
     }
@@ -95,13 +156,13 @@ export class Database extends DurableObject {
     if (!validEmail(target)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
     if (!["viewer", "contributor", "editor", "none", "forget"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
     if (role === "forget") {
-      this.sql.exec("DELETE FROM seen WHERE email = ?", target);
+      this.sql.exec("DELETE FROM seen WHERE email = ?", target); this.seenCount = null;
       return { ok: true, email: target, role };
     }
     const current = this.resolve(target);
     if (current.source === "secret") return { ok: false, code: "locked", message: "That person is set in the ROLES secret and can only be changed there." };
     const roles = this.loadRoles();
-    this.sql.exec("DELETE FROM seen WHERE email = ?", target); // they are on a list now (or were just removed)
+    this.sql.exec("DELETE FROM seen WHERE email = ?", target); this.seenCount = null; // they are on a list now (or were just removed)
     if (role === "none") {
       this.sql.exec("DELETE FROM roles WHERE email = ?", target);
       roles.delete(target);
@@ -122,15 +183,17 @@ export class Database extends DurableObject {
     const email = request.headers.get("x-user-email");
     const exp = Number(request.headers.get("x-session-exp"));
     if (!email || !exp) return new Response("Bad request.", { status: 400 });
-    if (this.ctx.getWebSockets().length >= MAX_SOCKETS) return new Response("Too many connections.", { status: 503 });
     const me = this.resolve(email);
     const role = me.role;
     if (role === "none") return new Response("No access.", { status: 403 });
+    if (this.isFull(role)) return new Response("The room is full right now.", { status: 503, headers: { "retry-after": "240" } });
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ email, exp, colls: [] });
+    const att = { email, exp, colls: [], v: role === "viewer" };
+    server.serializeAttachment(att);
+    this.addMeta(server, att);
     server.send(JSON.stringify({ t: "hello", role, owner: me.owner, email }));
     return new Response(null, { status: 101, webSocket: client, headers: { "Sec-WebSocket-Protocol": "kim-v1" } });
   }
@@ -147,7 +210,7 @@ export class Database extends DurableObject {
   }
 
   async webSocketMessage(ws, message) {
-    const att = ws.deserializeAttachment() || {};
+    const att = this.attOf(ws);
     if (typeof message !== "string") { ws.close(1003, "Text only."); return; }
     if (message.length > MAX_MESSAGE_BYTES) { ws.close(1009, "Message too big."); return; }
     const now = Math.floor(Date.now() / 1000);
@@ -175,10 +238,12 @@ export class Database extends DurableObject {
   }
 
   async webSocketClose(ws, code, reason) {
+    this.dropMeta(ws);
     try { ws.close(code && code >= 1000 && code < 5000 && code !== 1005 && code !== 1006 ? code : 1000, reason); } catch (e) { /* already closed */ }
   }
 
   async webSocketError(ws) {
+    this.dropMeta(ws);
     try { ws.close(1011, "Error."); } catch (e) { /* already closed */ }
   }
 
@@ -194,11 +259,20 @@ export class Database extends DurableObject {
     if (sid === null || !p) { this.send(ws, { t: "suberr", sid, code: "invalid-argument", message: "Bad path." }); return; }
     if (!canRead(role, p.coll)) { this.send(ws, { t: "suberr", sid, code: "permission-denied", message: "Not allowed." }); return; }
 
-    const rows = (p.id
-      ? this.sql.exec("SELECT id, data FROM docs WHERE coll = ? AND id = ?", p.coll, p.id)
-      : this.sql.exec("SELECT id, data FROM docs WHERE coll = ? ORDER BY id", p.coll)).toArray();
-    const docs = rows.map((r) => '{"id":' + JSON.stringify(r.id) + ',"data":' + r.data + "}");
-    this.send(ws, '{"t":"snap","sid":' + JSON.stringify(sid) + ',"docs":[' + docs.join(",") + "]}");
+    let docsText;
+    if (p.id) {
+      const rows = this.sql.exec("SELECT id, data FROM docs WHERE coll = ? AND id = ?", p.coll, p.id).toArray();
+      docsText = rows.map((r) => '{"id":' + JSON.stringify(r.id) + ',"data":' + r.data + "}").join(",");
+    } else {
+      // Whole collections are cached until they change, so a crowd connecting does not re-read the database for each person.
+      docsText = this.snap.get(p.coll);
+      if (docsText === undefined) {
+        const rows = this.sql.exec("SELECT id, data FROM docs WHERE coll = ? ORDER BY id", p.coll).toArray();
+        docsText = rows.map((r) => '{"id":' + JSON.stringify(r.id) + ',"data":' + r.data + "}").join(",");
+        this.snap.set(p.coll, docsText);
+      }
+    }
+    this.send(ws, '{"t":"snap","sid":' + JSON.stringify(sid) + ',"docs":[' + docsText + "]}");
 
     if (!att.colls.includes(p.coll)) {
       att.colls.push(p.coll);
@@ -296,10 +370,10 @@ export class Database extends DurableObject {
 
   broadcast(coll, id, text) {
     const out = '{"t":"chg","coll":' + JSON.stringify(coll) + ',"id":' + JSON.stringify(id) + ',"data":' + (text === null ? "null" : text) + "}";
+    this.snap.delete(coll);
     const now = Math.floor(Date.now() / 1000);
-    for (const ws of this.ctx.getWebSockets()) {
-      const att = ws.deserializeAttachment();
-      if (!att || !att.colls || !att.colls.includes(coll) || att.exp <= now) continue;
+    for (const [ws, att] of this.loadMeta()) {
+      if (!att.colls.includes(coll) || att.exp <= now) continue;
       if (!canRead(this.resolve(att.email).role, coll)) continue;
       this.send(ws, out);
     }

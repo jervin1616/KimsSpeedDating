@@ -126,7 +126,7 @@ function startJwks() {
 async function startWrangler(jwksPort) {
   const vars = {
     GOOGLE_CLIENT_ID: CLIENT_ID, GOOGLE_JWKS_URL: `http://127.0.0.1:${jwksPort}/jwks`, SESSION_SECRET, ADMIN_KEY, ROLES,
-    DEFAULT_ROLE: "none", ALLOWED_ORIGINS: `${PROXY_BASE},http://localhost:${PROXY_PORT}`,
+    DEFAULT_ROLE: "none", MAX_VIEWERS: "6", ALLOWED_ORIGINS: `${PROXY_BASE},http://localhost:${PROXY_PORT}`,
   };
   const args = ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--inspector-port", "9239", "--persist-to", join(logDir, "state"), "--local"];
   for (const [k, v] of Object.entries(vars)) args.push("--var", `${k}:${v}`);
@@ -377,6 +377,52 @@ try {
   idle.close();
   for (const c of Object.values(C)) c.close();
 
+  /* ===== capacity and cache ===== */
+  group("Capacity: viewers are capped, hosts and mods keep reserved room");
+  await sleep(700); // let the sockets from the groups above finish closing
+  const vsock = []; for (let i = 0; i < 6; i++) vsock.push(await connect(sessions.viewer));
+  check("6 viewers can connect (the limit used in this test)", vsock.every((c) => c.status.ok), vsock.map((c) => c.status));
+  const v7 = await connect(sessions.viewer);
+  check("the 7th viewer is told the room is full (503)", v7.status.status === 503, v7.status);
+  const probe = async (s) => (await (await fetch(BASE + "/api/session?probe=1", { headers: { Authorization: "Bearer " + s.token } })).json()).full;
+  check("a refused viewer can ask 'is it full?' and the answer is yes", (await probe(sessions.viewer)) === true);
+  const edC = await connect(sessions.editorA), ctC = await connect(sessions.contributor);
+  check("a host and a mod still get in while viewers are full", edC.status.ok && ctC.status.ok);
+  check("...and the room is not 'full' for them yet", (await probe(sessions.editorA)) === false);
+  await vsock[0].sub("questions");
+  const capQ = await edC.w("add", "questions", null, { ...dataFor.questions, text: "Capacity probe" });
+  check("people already connected keep getting live updates while the room is full", !!(await vsock[0].wait((m) => m.t === "chg" && m.data && m.data.text === "Capacity probe", 3000)));
+  await edC.w("delete", "questions", capQ.id, null);
+  vsock[5].close(); await sleep(600);
+  const v7b = await connect(sessions.viewer);
+  check("when a viewer leaves, the next viewer gets in", v7b.status.ok, v7b.status);
+  const staff = [edC, ctC]; for (let i = 0; i < 13; i++) staff.push(await connect(sessions.editorB));
+  check("hosts and mods can use the 15 reserved places on top of the viewers", staff.every((c) => c.status.ok), staff.map((c) => c.status.status).filter(Boolean));
+  const over = await connect(sessions.editorA);
+  check("beyond the reserve even a host is refused (hard ceiling = viewers + 15)", over.status.status === 503, over.status);
+  check("viewers stay refused while hosts and mods fill the room", (await connect(sessions.viewer)).status.status === 503);
+  for (const c of [...vsock, v7b, ...staff]) c.close();
+  await sleep(800);
+  const again = await connect(sessions.viewer); check("after everyone leaves, connecting works again", again.status.ok); again.close();
+
+  group("Snapshot cache never serves stale data");
+  const cA = await connect(sessions.editorA); await cA.sub("questions"); // warms the cache
+  const cq = await cA.w("add", "questions", null, { ...dataFor.questions, text: "Cache probe one" });
+  const cB = await connect(sessions.editorB);
+  check("a new subscriber sees a question added after the list was cached", (await cB.sub("questions")).docs.some((d) => d.data.text === "Cache probe one"));
+  await cA.w("update", "questions", cq.id, { text: "Cache probe two" });
+  const cC = await connect(sessions.editorB);
+  check("...and an edit", (await cC.sub("questions")).docs.some((d) => d.id === cq.id && d.data.text === "Cache probe two"));
+  await cA.w("delete", "questions", cq.id, null);
+  const cD = await connect(sessions.editorB);
+  check("...and a deletion", !(await cD.sub("questions")).docs.some((d) => d.id === cq.id));
+  const seatsBefore = (await cD.sub("seats")).docs.length;
+  await cA.w("set", "seats", "s3", { dater: null, view: null, since: null });
+  check("seats (whole collection) also reflect a change for the next subscriber", (await (await connect(sessions.editorB)).sub("seats")).docs.some((d) => d.id === "s3"));
+  await cA.w("delete", "seats", "s3", null);
+  check("...and its removal", !(await (await connect(sessions.editorB)).sub("seats")).docs.some((d) => d.id === "s3") && seatsBefore >= 0);
+  for (const c of [cA, cB, cC, cD]) c.close();
+
   /* ===== roles admin ===== */
   group("Role assignment: owners, editors, the admin page API");
   const rolesApi = async (session, method = "GET", body, extra = {}) => {
@@ -499,6 +545,7 @@ try {
   const subsOf = async (p) => (await p.evaluate(() => window.claude._test.state())).subs;
   check("Contributor page subscribes to 3 feeds only (no daters, no matches)", (await subsOf(K)) === 3, await subsOf(K));
   check("Viewer page subscribes to 3 feeds (seats, game, questions for the picker), never daters", (await subsOf(V)) === 3, await subsOf(V));
+  check("viewers send heartbeats every 45 s, hosts and mods every 15 s", (await V.evaluate(() => window.claude._test.state().hb)) === 45000 && (await A.evaluate(() => window.claude._test.state().hb)) === 15000 && (await K.evaluate(() => window.claude._test.state().hb)) === 15000);
   check("Editor page subscribes to 5 feeds", (await subsOf(A)) === 5, await subsOf(A));
 
   // two Editors, both directions
@@ -660,6 +707,31 @@ try {
   check("on a phone the picker fits the screen and does not scroll sideways", box && box.y >= 0 && box.y + box.height <= 844 && box.x >= 0 && box.x + box.width <= 390 && !(await PH.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), box);
   await PH.keyboard.press("Escape"); await PH.locator("#rTop .heart").nth(2).click();
 
+  // a full room, seen from a viewer's browser
+  const fillers = []; for (let i = 0; i < 12; i++) { const c = await connect(sessions.viewer); if (!c.status.ok) break; fillers.push(c); }
+  const VF = await mkPage(sessions.viewer);
+  check("when the room is full a viewer's page says so instead of looping", await until(async () => (await VF.evaluate(() => window.claude._test.state().conn)) === "full", 9000), await VF.evaluate(() => window.claude._test.state()));
+  check("...the tag reads Full and a plain message explains it", (await VF.locator("#connTxt").textContent()) === "Full" && /busy right now/.test(await VF.locator("#modeNote").innerText()));
+  const att0 = await VF.evaluate(() => window.claude._test.state().attempts); await sleep(4500);
+  check("...and it stops hammering the server (no retries for minutes)", (await VF.evaluate(() => window.claude._test.state().attempts)) === att0, att0);
+  check("hosts are not affected by a full viewer room", (await roleOf(A)) === "Host view" && (await A.evaluate(() => window.claude._test.state().state)) === "open");
+  fillers.pop().close(); await sleep(700);
+  await VF.click("#connPill");
+  check("tapping the Full tag after a place frees up connects the viewer", await until(async () => (await VF.locator("#connTxt").textContent()) === "Live" && (await roleOf(VF)) === "View only", 8000), await VF.locator("#connTxt").textContent());
+  check("...and the 'busy' message goes away", !/busy right now/.test(await VF.locator("#modeNote").innerText()));
+  for (const c of fillers) c.close();
+
+  // a viewer's hidden tab lets go of its place and comes back when seen
+  const VI = await mkPage(sessions.viewer);
+  await until(async () => (await roleOf(VI)) === "View only" && (await VI.evaluate(() => window.claude._test.state().state)) === "open", 8000);
+  await VI.evaluate(() => window.claude._test.idleNow());
+  check("a viewer's tab that stays hidden lets go of its connection", (await VI.evaluate(() => window.claude._test.state().state)) === "closed");
+  await VI.evaluate(() => window.claude._test.wake());
+  check("...and reconnects with fresh data as soon as the tab is seen again", await until(async () => (await VI.evaluate(() => window.claude._test.state().state)) === "open", 6000));
+  await A.evaluate(() => window.claude._test.idleNow()); await sleep(300);
+  check("hosts and mods never let go of their connection that way", (await A.evaluate(() => window.claude._test.state().state)) === "open");
+  await VI.context().close();
+
   // headline lettering
   check("the headline is the banner-style lettering and still reads 'Kim's Speed Dating' to screen readers", (await A.locator("h1 svg.logo").getAttribute("aria-label")) === "Kim's Speed Dating" && (await A.locator("h1 svg.logo").getAttribute("role")) === "img");
   check("the headline font file is served by the site itself", await (async () => { const r = await fetch(BASE + "/fonts/lobster-two-700-italic.woff2"); return r.status === 200 && /font\/woff2/.test(r.headers.get("content-type") || "") && /immutable/.test(r.headers.get("cache-control") || ""); })());
@@ -795,7 +867,7 @@ try {
   check("5 abrupt drops in a row: the page reconnected every time", okDrops === 5, okDrops);
   viaWs.close();
 
-  const errs = [A, B, K, V, P, AD, ADE, ADK, PH, VP, KP].flatMap((p) => p.errors);
+  const errs = [A, B, K, V, P, AD, ADE, ADK, PH, VP, KP, VF].flatMap((p) => p.errors);
   check("no JavaScript errors on any page during the whole run", errs.length === 0, errs);
 } catch (e) {
   console.error(e);

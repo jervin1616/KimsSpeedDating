@@ -26,6 +26,9 @@
     "DEFAULT_ROLE": "viewer",
     // How long a login lasts before the page quietly renews it (hours).
     "SESSION_HOURS": "12",
+    // Most viewers (read-only watchers) connected at once. Hosts and mods always have 15 more places on top,
+    // so a crowd can never lock them out. The free plan comfortably allows hundreds; see DEPLOY.md.
+    "MAX_VIEWERS": "500",
     // Extra allowed origins for WebSockets, comma separated. The Worker's own address is always allowed.
     "ALLOWED_ORIGINS": ""
   },

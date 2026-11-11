@@ -1,4 +1,4 @@
-Test results 2026-11-11T06:32:43.530Z
+Test results 2026-11-11T06:54:36.239Z
 
 
 == Import script and export endpoint (round trip)
@@ -116,6 +116,26 @@ PASS  ...and other users still get the change after the wake-up
 PASS  session refresh returns a new token
 PASS  an open connection accepts the refreshed session
 
+== Capacity: viewers are capped, hosts and mods keep reserved room
+PASS  6 viewers can connect (the limit used in this test)
+PASS  the 7th viewer is told the room is full (503)
+PASS  a refused viewer can ask 'is it full?' and the answer is yes
+PASS  a host and a mod still get in while viewers are full
+PASS  ...and the room is not 'full' for them yet
+PASS  people already connected keep getting live updates while the room is full
+PASS  when a viewer leaves, the next viewer gets in
+PASS  hosts and mods can use the 15 reserved places on top of the viewers
+PASS  beyond the reserve even a host is refused (hard ceiling = viewers + 15)
+PASS  viewers stay refused while hosts and mods fill the room
+PASS  after everyone leaves, connecting works again
+
+== Snapshot cache never serves stale data
+PASS  a new subscriber sees a question added after the list was cached
+PASS  ...and an edit
+PASS  ...and a deletion
+PASS  seats (whole collection) also reflect a change for the next subscriber
+PASS  ...and its removal
+
 == Role assignment: owners, editors, the admin page API
 PASS  the access API also says what unlisted people get (the default role)
 PASS  a person listed as owner logs in as editor-level with owner true
@@ -186,6 +206,7 @@ PASS  Contributor has Random question; Viewer does not
 PASS  Viewer sees no Questions panel
 PASS  Contributor page subscribes to 3 feeds only (no daters, no matches)
 PASS  Viewer page subscribes to 3 feeds (seats, game, questions for the picker), never daters
+PASS  viewers send heartbeats every 45 s, hosts and mods every 15 s
 PASS  Editor page subscribes to 5 feeds
 PASS  the add-dater form starts collapsed behind an Add dater button
 PASS  tapping Add dater opens the form and the button becomes Close
@@ -249,6 +270,15 @@ PASS  ...and the bar goes back to Match
 PASS  the logged match names the hot seat dater and the pick
 PASS  seats cleaned up
 PASS  on a phone the picker fits the screen and does not scroll sideways
+PASS  when the room is full a viewer's page says so instead of looping
+PASS  ...the tag reads Full and a plain message explains it
+PASS  ...and it stops hammering the server (no retries for minutes)
+PASS  hosts are not affected by a full viewer room
+PASS  tapping the Full tag after a place frees up connects the viewer
+PASS  ...and the 'busy' message goes away
+PASS  a viewer's tab that stays hidden lets go of its connection
+PASS  ...and reconnects with fresh data as soon as the tab is seen again
+PASS  hosts and mods never let go of their connection that way
 PASS  the headline is the banner-style lettering and still reads 'Kim's Speed Dating' to screen readers
 PASS  the headline font file is served by the site itself
 PASS  the font's license text is included
@@ -310,4 +340,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-289 passed, 0 failed, 289 total
+315 passed, 0 failed, 315 total
