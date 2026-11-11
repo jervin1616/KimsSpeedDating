@@ -36,6 +36,8 @@ body {
   padding-block: 20px 48px;
 }
 .wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+#app { width: 100%; } /* the board keeps the same width as the header in every mode, even with little content */
+#modeNote { text-align: center; }
 h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(2rem, 7vw, 3.2rem); margin: 0; text-shadow: 0 0 24px rgba(255,79,154,.55); text-wrap: balance; line-height: 1.1; }
 .sub { color: var(--muted); margin: 4px 0 0; }
 header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: center; text-align: center; }
