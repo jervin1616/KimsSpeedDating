@@ -1,4 +1,4 @@
-Test results 2026-11-11T05:42:11.737Z
+Test results 2026-11-11T05:48:04.547Z
 
 
 == Import script and export endpoint (round trip)
@@ -231,12 +231,21 @@ PASS  ...and the new question exists on the server
 PASS  every role sees the connection pill saying Live
 PASS  on a phone all four tabs fit on one row
 PASS  on a phone the page does not scroll sideways
-PASS  on a phone the question is below the fold, so the pinned bar shows
-PASS  Random question from the pinned bar works like the main button
-PASS  the bar shows the current question
-PASS  the pinned bar hides itself when the real question card is on screen
-PASS  Viewers never get the pinned bar
-PASS  Contributors get the pinned bar on a phone
+PASS  hosts get a bottom bar with Remove hot seat and Match
+PASS  the bottom bar has no Random question button
+PASS  Remove hot seat is greyed out while the hot seat is empty
+PASS  Viewers and Contributors never get the bottom bar
+PASS  with someone in the hot seat, Remove hot seat switches on
+PASS  Remove hot seat empties the hot seat in one tap
+PASS  ...and the other Editor sees the hot seat empty too
+PASS  ...and offers Undo
+PASS  Undo puts them back in the hot seat
+PASS  a panel dater is seated in Seat 1
+PASS  Match in the bar arms the pick: it turns green and says Pick?
+PASS  tapping the heart logs the match on the server
+PASS  ...and the bar goes back to Match
+PASS  the logged match names the hot seat dater and the pick
+PASS  seats cleaned up
 PASS  on a phone the picker fits the screen and does not scroll sideways
 PASS  every signed-in role sees a Sign out button
 PASS  cancelling the 'Sign out?' question keeps you signed in
@@ -275,4 +284,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-254 passed, 0 failed, 254 total
+263 passed, 0 failed, 263 total

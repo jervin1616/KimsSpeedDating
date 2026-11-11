@@ -168,7 +168,8 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color:
 #connPill[data-state="live"] #connTxt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 #connPill[data-state="offline"] .cd { background: var(--nofit); }
 .livebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; display: flex; gap: 8px; align-items: center; padding: 8px max(16px, calc((100vw - 980px) / 2)) calc(8px + env(safe-area-inset-bottom, 0px)); background: #1a0610; border-top: 1px solid var(--line); }
-.livebar .lbq { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.livebar button { flex: 1 1 0; min-height: 46px; font-weight: 700; }
+.livebar .armed { background: var(--mutual); color: #06210f; border-color: var(--mutual); animation: pulse 1s ease-in-out infinite alternate; }
 body.has-bar { padding-bottom: 96px; }
 body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 .tab[aria-selected="true"] { background: var(--pink); color: #1a0510; border-color: var(--pink); font-weight: 700; }
@@ -399,9 +400,8 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   </div>
 </div>
 <div class="livebar" id="liveBar" hidden>
-  <span class="lbq" id="lbQ"></span>
-  <button class="ghost small" id="lbBack" type="button" hidden>Back</button>
-  <button class="primary small" id="lbRandom" type="button">Random question</button>
+  <button class="danger" id="lbRemoveHot" type="button" disabled>Remove hot seat</button>
+  <button class="primary" id="lbMatch" type="button">Match</button>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -569,6 +569,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     if (state.mode === "host") {
       var mb = el("button", "primary matchbtn" + (state.matching ? " armed" : ""), state.matching ? "Pick?" : "Match");
       mb.type = "button"; mb.onclick = onMatch; $("rHot").appendChild(mb);
+      $("lbMatch").textContent = state.matching ? "Pick?" : "Match"; $("lbMatch").classList.toggle("armed", !!state.matching);
     } else state.matching = false;
     var side = $("side"); side.textContent = "";
     SIDE.forEach(function (k) {
@@ -586,7 +587,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     $("qtext").textContent = q && q.text ? q.text : "No question picked yet.";
     $("qby").textContent = q && q.text ? (q.handle ? "Asked by " + q.handle : "") : "";
     $("clearQ").hidden = !(state.mode === "host" && q && q.text); $("backQ").hidden = !(state.mode !== "viewer" && state.hist.length);
-    $("lbQ").textContent = $("qtext").textContent; $("lbBack").hidden = $("backQ").hidden;
+    $("lbRemoveHot").disabled = !(state.mode === "host" && byId(seatsNow().hot));
   }
 
   /* ---------- daters list ---------- */
@@ -1118,15 +1119,18 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   $("pickModal").addEventListener("click", function (ev) { if (ev.target === $("pickModal")) closePicker(); });
   document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("pickModal").hidden) closePicker(); });
 
-  /* ---------- pinned question bar (shows only when the question card is out of view) ---------- */
-  var qSeen = true;
+  /* ---------- bottom bar for hosts: Remove hot seat and Match ---------- */
   function syncBar() {
-    var show = state.mode !== "viewer" && !$("app").hidden && !qSeen;
+    var show = state.mode === "host" && !$("app").hidden;
     $("liveBar").hidden = !show; document.body.classList.toggle("has-bar", show);
   }
-  if ("IntersectionObserver" in window) new IntersectionObserver(function (es) { qSeen = es[0].isIntersecting; syncBar(); }).observe($("qtext").parentElement);
-  $("lbRandom").onclick = function () { $("randomQ").click(); };
-  $("lbBack").onclick = backQuestion;
+  $("lbMatch").onclick = onMatch;
+  $("lbRemoveHot").onclick = function () {
+    var s = seatsNow(), d = byId(s.hot); if (!d) return;
+    var before = {}; SEATS.forEach(function (k) { before[k] = s[k]; });
+    setSeat("hot", null);
+    toastUndo(d.name + " removed from the hot seat.", function () { state.selected = null; commitSeats(before); });
+  };
 
   /* ---------- connection pill ---------- */
   var CONN = { connecting: "Connecting", live: "Live", reconnecting: "Reconnecting", offline: "Offline" };
