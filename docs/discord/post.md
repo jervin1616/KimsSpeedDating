@@ -1,6 +1,6 @@
 # Discord post: Coming Soon (viewer screen)
 
-Attach: `coming-soon.png`. Replace [LINK] when the link is ready. Sample screens and names only.
+Attach `coming-soon.png` for the teaser and `its-here.png` for launch day. Replace [LINK] with your address. Sample screens and names only.
 
 ## Short version
 
