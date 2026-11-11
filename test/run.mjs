@@ -384,6 +384,7 @@ try {
     return { status: r.status, body: await r.json().catch(() => null) };
   };
   const loginRes = await login(EMAILS.editorA);
+  check("the access API also says what unlisted people get (the default role)", (await rolesApi(sessions.editorA)).body.defaultRole === "none");
   check("a person listed as owner logs in as editor-level with owner true", loginRes.body.role === "editor" && loginRes.body.owner === true, loginRes.body);
   const lb = await rolesApi(sessions.editorA);
   check("owner can list people (secret entries are included and marked)", lb.status === 200 && lb.body.you.owner === true && lb.body.people.some((p) => p.email === EMAILS.editorB && p.source === "secret"), lb);
@@ -699,6 +700,8 @@ try {
 
   // admin page in a real browser
   const AD = await mkPage(sessions.editorA, BASE, "/admin.html"); const ADE = await mkPage(sessions.editorB, BASE, "/admin.html"); const ADK = await mkPage(sessions.contributor, BASE, "/admin.html");
+  check("the admin page explains what each role can do and what an unlisted person gets", await until(async () => { const t = await text(AD, "#helpCard"); return ["Owner", "Editor", "Contributor", "Viewer"].every((r) => t.includes(r)) && /gets no access/.test(await text(AD, "#defaultNote")); }, 6000), await text(AD, "#helpCard"));
+  check("the role help is not shown to people who cannot manage access", await ADK.locator("#helpCard").isHidden() && await ADE.locator("#helpCard").isHidden());
   check("admin page (owner) lists people, marks secret ones locked", await until(async () => { const t = await text(AD, "#list"); return t.includes(EMAILS.editorB) && /locked/i.test(t); }, 6000));
   await AD.fill("#email", EMAILS.uipick); await AD.selectOption("#role", "viewer"); await AD.click("#addForm button[type=submit]");
   check("owner adds a person on the page and they appear in the list", await until(async () => (await text(AD, "#list")).includes(EMAILS.uipick), 6000));

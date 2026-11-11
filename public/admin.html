@@ -21,6 +21,9 @@
   button.danger{border-color:#7a1222;color:#ff9aa6}
   button:disabled,select:disabled{opacity:.5;cursor:not-allowed}
   .form{display:flex;flex-wrap:wrap;gap:8px}
+  dl{margin:0;display:flex;flex-direction:column;gap:10px}
+  dt{font-weight:700}
+  dd{margin:2px 0 0;color:#e9c9d3}
   .lock{font-size:12px;color:#ffb347;border:1px solid #ffb347;border-radius:999px;padding:1px 8px;white-space:nowrap}
   #msg{min-height:1.4em;color:#fff1f4}
   .err{color:#ff9aa6}
@@ -44,6 +47,16 @@
     <p id="seenNote"></p>
     <div id="seenList"></div>
   </section>
+  <section class="card" id="helpCard" hidden>
+    <h2>What each role can do</h2>
+    <dl id="roleHelp">
+      <div><dt>Owner</dt><dd>Everything an Editor can do, plus this page: deciding who gets in and what they can do. Owners are set by whoever manages the site, so they show as locked here.</dd></div>
+      <div><dt>Editor</dt><dd>Runs the show. Seats daters, adds, edits and removes daters, uses the match log, starts and ends streams, manages all questions (add, ask, remove, clear) and downloads backups. Cannot change who has access.</dd></div>
+      <div><dt>Contributor</dt><dd>Helps with questions. Sees the board and the current question, adds questions from chat, presses Random question and asks questions, and can go Back. Cannot see the daters list, the match log or past streams, change seats, remove questions or clear the question.</dd></div>
+      <div><dt>Viewer</dt><dd>Watches. Sees the board and the current question, and has a private "Random question for me" button that does not change the stream. Cannot change anything.</dd></div>
+    </dl>
+    <p id="defaultNote"></p>
+  </section>
   <section class="card" id="listCard" hidden>
     <h2>People</h2>
     <div id="list"></div>
@@ -64,7 +77,8 @@
 
   function render(data) {
     me = data.you;
-    $("addCard").hidden = false; $("listCard").hidden = false;
+    $("addCard").hidden = false; $("listCard").hidden = false; $("helpCard").hidden = false;
+    $("defaultNote").textContent = "Anyone else who signs in with Google " + ({ none: "gets no access.", viewer: "can watch as a Viewer.", contributor: "is a Contributor." }[data.defaultRole] || "gets no access.");
     $("rules").textContent = "You are an owner. Owners are locked on this page. They can only be changed by whoever manages this site's Cloudflare account.";
     renderSeen(data.seen || []);
     var list = $("list"); list.textContent = "";

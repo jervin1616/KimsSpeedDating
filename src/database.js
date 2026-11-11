@@ -5,7 +5,7 @@ import {
   RULES, MAX_MESSAGE_BYTES, RuleError, isKnownCollection, validDocId, canRead, canWrite,
   parsePath, validateDoc, newId,
 } from "./rules.js";
-import { resolveRole, secretEntries, validEmail, verifySession } from "./auth.js";
+import { resolveRole, secretEntries, validEmail, verifySession, defaultRole } from "./auth.js";
 
 const MAX_SOCKETS = 40;
 const BUCKET_SIZE = 200; // write/read messages allowed in a burst
@@ -83,7 +83,7 @@ export class Database extends DurableObject {
     const assigned = this.sql.exec("SELECT email, role, by, ts FROM roles ORDER BY email").toArray().map((r) => ({ ...r, source: "admin" }));
     const seen = this.sql.exec("SELECT email, first, last, n FROM seen ORDER BY last DESC LIMIT 100").toArray()
       .filter((r) => this.resolve(r.email).source === "default");
-    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen };
+    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, defaultRole: defaultRole(this.env) };
   }
 
   // role: "viewer" | "contributor" | "editor" | "none" (remove) | "forget" (delete from the recent sign-ins).

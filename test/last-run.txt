@@ -1,4 +1,4 @@
-Test results 2026-11-11T06:17:34.534Z
+Test results 2026-11-11T06:24:01.403Z
 
 
 == Import script and export endpoint (round trip)
@@ -117,6 +117,7 @@ PASS  session refresh returns a new token
 PASS  an open connection accepts the refreshed session
 
 == Role assignment: owners, editors, the admin page API
+PASS  the access API also says what unlisted people get (the default role)
 PASS  a person listed as owner logs in as editor-level with owner true
 PASS  owner can list people (secret entries are included and marked)
 PASS  a normal Editor cannot use the admin API at all (403)
@@ -266,6 +267,8 @@ PASS  ...never the same question twice in a row, and no repeats until every ques
 PASS  the picker writes nothing: ask counts unchanged on the server
 PASS  ...and the stream's current question is unchanged
 PASS  ...and the Editor's page still shows the stream's question, not the viewer's pick
+PASS  the admin page explains what each role can do and what an unlisted person gets
+PASS  the role help is not shown to people who cannot manage access
 PASS  admin page (owner) lists people, marks secret ones locked
 PASS  owner adds a person on the page and they appear in the list
 PASS  ...and the person can sign in as Viewer
@@ -291,4 +294,4 @@ PASS  writes work again after the reconnect
 PASS  5 abrupt drops in a row: the page reconnected every time
 PASS  no JavaScript errors on any page during the whole run
 
-270 passed, 0 failed, 270 total
+273 passed, 0 failed, 273 total
