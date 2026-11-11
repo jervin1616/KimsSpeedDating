@@ -52,7 +52,7 @@ ask("What's your idea of the perfect first date?");
 await sleep(500);
 
 const browser = await chromium.launch();
-const SIZE = { width: 390, height: 844 };
+const SIZE = { width: 390, height: 932 }; // tall enough to see the whole board, hot seat included
 const frameDir = join(dir, "frames"); mkdirSync(frameDir);
 const ctx = await browser.newContext({
   viewport: SIZE, deviceScaleFactor: 2, hasTouch: true, isMobile: true,
@@ -95,42 +95,46 @@ await card("Kim's Speed Dating", "Your own question screen", "Free. Watch live a
 await sleep(3400);
 await card(); await sleep(500);
 
-// 1. the board
-await cap("1. Watch the board live: who is in the hot seat and who is on the panel");
-await sleep(2200);
-seat("hot", P("Jordan", 28, "NC", "M · Straight", ["Wants 24-34"], "hot", "")); await sleep(1300);
-seat("s1", P("Ava", 26, "TX", "W · Straight", ["Wants 25-35"], "mutual", "Fits both")); await sleep(1100);
-seat("s2", P("Riley", 24, "OH", "W · Bi", ["Men 24-30", "Women 22-28"], "close", "Off by 2 yrs")); await sleep(1100);
-seat("s3", P("Sam", 36, "CA", "W · Straight", ["Wants 30-42"], "nofit", "Off by 5 yrs")); await sleep(1100);
-seat("s4", P("Taylor", 29, "GA", "W · Straight", ["Wants 26-36"], "mutual", "Fits both")); await sleep(1500);
-await cap("Green means they fit each other. Yellow is close. Red is not a match.");
-await sleep(3600);
-await cap("The question on the stream shows at the top");
-ask("What's one thing you'd never do on a first date?"); await sleep(3200);
+// 1. add to home screen first
+await cap("1. Add it to your home screen like an app");
+await sleep(1500); await page.tap("#installBtn"); await sleep(4200);
+await page.tap("#howTabAndroid"); await sleep(3200);
+await page.tap("#howClose"); await sleep(900);
+await cap("Then tap Not now to tuck the card away");
+await sleep(900); await page.tap("#installNo"); await sleep(2200);
 
-// 2. private random question
-await cap("2. Need a question? Tap Random question for me. Only you see it");
+// 2. the whole board on one screen
+await cap("2. Watch the board live: who is in the hot seat and who is on the panel");
+await sleep(2500);
+seat("hot", P("Jordan", 28, "NC", "M \u00b7 Straight", ["Wants 24-34"], "hot", "")); await sleep(1500);
+seat("s1", P("Ava", 26, "TX", "W \u00b7 Straight", ["Wants 25-35"], "mutual", "Fits both")); await sleep(1200);
+seat("s2", P("Riley", 24, "OH", "W \u00b7 Bi", ["Men 24-30", "Women 22-28"], "close", "Off by 2 yrs")); await sleep(1200);
+seat("s3", P("Sam", 36, "CA", "W \u00b7 Straight", ["Wants 30-42"], "nofit", "Off by 5 yrs")); await sleep(1200);
+seat("s4", P("Taylor", 29, "GA", "W \u00b7 Straight", ["Wants 26-36"], "mutual", "Fits both")); await sleep(1200);
+seat("s5", P("Casey", 27, "VA", "W \u00b7 Straight", ["Wants 24-34"], "close", "Off by 1 yr")); await sleep(1800);
+await cap("Green means they fit each other. Yellow is close. Red is not a match.");
+await sleep(4200);
+
+// 3. private random question
+await cap("3. Need a question? Tap Random question for me. Only you see it");
 await page.locator("#myQBox").scrollIntoViewIfNeeded(); await sleep(1500);
 for (let i = 0; i < 3; i++) { await page.tap("#myQBtn"); await sleep(2100); }
 
-// 3. categories
-await cap("3. Pick a category to narrow it down");
+// 4. categories
+await cap("4. Pick a category to narrow it down");
 const ring = async (sel) => page.evaluate((s) => { const e = document.querySelector(s); e.style.outline = "3px solid #ffd166"; e.style.borderRadius = "8px"; setTimeout(() => { e.style.outline = ""; }, 1400); }, sel);
 await ring("#myCat"); await sleep(1300);
 for (const k of ["wyr", "food", "flirty"]) { await page.selectOption("#myCat", k); await sleep(2300); }
 await page.selectOption("#myCat", ""); await sleep(400);
 
-// 4. live board moves on
-await cap("4. The stream moves on and your screen follows. Nothing to refresh");
-await page.evaluate(() => window.scrollTo({ top: 0, behavior: "smooth" })); await sleep(1100);
-seat("s3", null); seat("s5", P("Casey", 27, "VA", "W · Straight", ["Wants 24-34"], "close", "Off by 1 yr")); await sleep(1600);
-ask("If you could have dinner with anyone, who would it be?"); await sleep(3000);
-
-// 5. install
-await cap("5. Add it to your home screen like an app");
-await page.evaluate(() => window.scrollTo({ top: 0, behavior: "smooth" })); await sleep(1400); await page.tap("#installBtn"); await sleep(3800);
-await page.tap("#howTabAndroid"); await sleep(3000);
-await page.tap("#howClose"); await sleep(600);
+// 5. the stream moves on
+await cap("5. The stream moves on and your screen follows. Nothing to refresh");
+await page.evaluate(() => window.scrollTo({ top: 0, behavior: "smooth" })); await sleep(1300);
+ask("What's one thing you'd never do on a first date?"); await sleep(1500);
+seat("s3", null); await sleep(1300);
+seat("s3", P("Morgan", 30, "FL", "W \u00b7 Straight", ["Wants 27-37"], "mutual", "Fits both")); await sleep(1800);
+await page.evaluate(() => window.scrollTo({ top: 400, behavior: "smooth" })); await sleep(1300);
+ask("If you could have dinner with anyone, who would it be?"); await sleep(3200);
 await cap(); await card("Kim's Speed Dating", "Free. Sign in with Google.", "18+ only. The link is pinned in the server.");
 await sleep(3500);
 await cdp.send("Page.stopScreencast").catch(() => {});
@@ -145,19 +149,19 @@ const D = lastT - firstT + 0.6;
 console.log(frames.length + " frames, " + D.toFixed(1) + " s");
 
 // ---- the picture around the phone: background, phone frame, and one caption image per caption
-const W = 1080, H = 1920, BX = 189, BY = 70, BW = 702, BH = 1459, RING = 26; // phone body and its bezel
-const SX = BX + RING, SY = BY + RING, SW = BW - 2 * RING, SH = BH - 2 * RING; // screen
+const W = 1080, H = 1920, RING = 24, SW = 600, SH = Math.round(SW * SIZE.height / SIZE.width), BW = SW + 2 * RING, BH = SH + 2 * RING, BX = (W - BW) / 2, BY = 56; // phone body, bezel and screen
+const SX = BX + RING, SY = BY + RING;
 const assets = join(dir, "assets"); mkdirSync(assets);
 const art = await chromium.launch(); const ap = await art.newPage({ viewport: { width: W, height: H } });
 const snap = async (html, file, box, transparent) => { await ap.setContent(html, { waitUntil: "load" }); await ap.screenshot({ path: join(assets, file), omitBackground: !!transparent, ...(box ? { clip: box } : {}) }); };
 let sparks = ""; { let r = 7; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 70; i++) sparks += `<i style="left:${(rnd() * W).toFixed(0)}px;top:${(rnd() * H).toFixed(0)}px;width:${(2 + rnd() * 4).toFixed(1)}px;height:${(2 + rnd() * 4).toFixed(1)}px;opacity:${(0.2 + rnd() * 0.5).toFixed(2)}"></i>`; }
 const base = `*{box-sizing:border-box;margin:0}body{width:${W}px;height:${H}px;position:relative;overflow:hidden;font-family:system-ui,"Segoe UI",Roboto,Arial,sans-serif}`;
 await snap(`<style>${base}body{background:radial-gradient(circle at 50% 28%,#5a0a14 0%,#2a0508 55%,#140102 100%)}i{position:absolute;border-radius:50%;background:#ff7a93}.glow{position:absolute;left:${BX - 40}px;top:${BY - 30}px;width:${BW + 80}px;height:${BH + 60}px;border-radius:130px;background:rgba(255,45,85,.35);filter:blur(60px)}</style><body>${sparks}<div class="glow"></div></body>`, "bg.png");
-await snap(`<style>${base}body{background:transparent}.ph{position:absolute;left:${BX}px;top:${BY}px;width:${BW}px;height:${BH}px;border-radius:92px;border:${RING}px solid #0d0d11;box-shadow:0 0 0 4px #5b5b66,0 0 0 7px #26262d}.isl{position:absolute;left:${(W - 96) / 2}px;top:${SY + 8}px;width:96px;height:26px;border-radius:13px;background:#000}.b{position:absolute;background:#3a3a44;border-radius:4px}</style><body><div class="ph"></div><div class="isl"></div><div class="b" style="left:${BX - 11}px;top:${BY + 250}px;width:7px;height:80px"></div><div class="b" style="left:${BX - 11}px;top:${BY + 350}px;width:7px;height:120px"></div><div class="b" style="left:${BX - 11}px;top:${BY + 490}px;width:7px;height:120px"></div><div class="b" style="left:${BX + BW + 4}px;top:${BY + 380}px;width:7px;height:170px"></div></body>`, "bezel.png", null, true);
+await snap(`<style>${base}body{background:transparent}.ph{position:absolute;left:${BX}px;top:${BY}px;width:${BW}px;height:${BH}px;border-radius:88px;border:${RING}px solid #0d0d11;box-shadow:0 0 0 4px #5b5b66,0 0 0 7px #26262d}.isl{position:absolute;left:${(W - 96) / 2}px;top:${SY + 8}px;width:96px;height:26px;border-radius:13px;background:#000}.b{position:absolute;background:#3a3a44;border-radius:4px}</style><body><div class="ph"></div><div class="isl"></div><div class="b" style="left:${BX - 11}px;top:${BY + 250}px;width:7px;height:80px"></div><div class="b" style="left:${BX - 11}px;top:${BY + 350}px;width:7px;height:120px"></div><div class="b" style="left:${BX - 11}px;top:${BY + 490}px;width:7px;height:120px"></div><div class="b" style="left:${BX + BW + 4}px;top:${BY + 380}px;width:7px;height:170px"></div></body>`, "bezel.png", null, true);
 // captions: collapse the events into on/off spans
 const spans = []; const t0 = firstWall;
 capEvents.forEach((e, i) => { if (!e.text) return; const start = Math.max(0, (e.wall - t0) / 1000), end = i + 1 < capEvents.length ? (capEvents[i + 1].wall - t0) / 1000 : D; spans.push({ start, end: Math.min(end, D), text: e.text }); });
-const CY = BY + BH + 36, CH = H - CY - 40;
+const CY = BY + BH + 26, CH = H - CY - 24;
 for (let i = 0; i < spans.length; i++) {
   const m = /^(\d)\.\s*(.*)$/.exec(spans[i].text), num = m ? m[1] : "", body = m ? m[2] : spans[i].text;
   const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
