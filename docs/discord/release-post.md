@@ -35,3 +35,19 @@ Something broken, or a question you loved or hated? Tell us in this channel. We 
 ## Short ping
 
 💘 The viewer screen is OUT NOW. Link, how-to and the video are in the pinned post. Free, Google sign-in, 18+.
+
+
+## Short version (about 777 characters)
+
+**IT'S OUT NOW: your own question screen** 💘
+
+👉 https://kims-speed-dating.jervin5612.workers.dev/
+
+• **Watch the board live.** See who's in the hot seat, who's on the panel, and how well they fit: green (fits both), yellow (close), red (not a match).
+• **Random question for me.** Tap the button and get a question only you can see. It never changes what's on stream.
+• **Pick a category.** Dilemmas, confessions, hot takes, flirty, deep stuff, would you rather, and more.
+• **Add it to your home screen.** Tap **Add** on the install card and it opens full screen like an app.
+
+Free. Sign in with Google. 18+ only. View only, so you can't change anything on stream.
+
+On the panel? Use a second device or write your questions down first, so you don't lose time with your date. 💬
