@@ -62,3 +62,13 @@ Free. Sign in with Google. 18+ only. Panel members: use a second device or write
 **Want a seat on the show?** Sign up right in the app. Open it, add your TikTok username, tap **Want to be a speed dater?**, fill in your age, state and who you're looking for, and confirm you're 18+. The host approves you live. ❤️‍🔥
 
 **Never miss the start.** Turn on live notifications in the app and we'll nudge you 1 hour before, 30 minutes before, and the moment we go live. iPhone: add the app to your home screen first and open it from there. ❤️‍🔥
+
+## More viewer cards (captions)
+
+**card-question-button.png:** Stuck for something to ask your date? Tap **Random question for me** in the app for a question only you can see. Narrow it by category: first dates, flirty, would you rather, what would you do, confessions and more. ❤️‍🔥
+
+**card-board.png:** How to read the board: the big heart is the hot seat, the panel hearts are the people waiting, and the colors show the fit. 🟢 fits both, 🟡 close, 🔴 not a match. It updates live. ❤️‍🔥
+
+**card-home-screen.png:** Put it on your home screen for one-tap, full-screen access. Tap **Add** on the install card in the app and follow the steps for your phone. iPhone notifications need this. ❤️‍🔥
+
+**card-good-to-know.png:** Quick answers: it's free, it's view only, 18+, any email works with a Google account, and if you see "Full" just tap it and try again in a minute. ❤️‍🔥
