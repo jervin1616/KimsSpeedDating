@@ -1069,6 +1069,34 @@ try {
         await catE.keyboard.press("Escape");
         check("Escape closes it", await catE.locator("#annModal").isHidden());
       }
+      // everyone who signs in is a Viewer automatically, so they are listed under Viewers (no "not on the list" section)
+      {
+        const autos = ["autoa", "autob", "autoc", "autod"].map((n) => n + "@example.com");
+        for (const e of autos) await login(e);
+        const rl = (await fetch(API_BASE + "/api/roles", { headers: { Authorization: "Bearer " + O.token } }).then((r) => r.json()));
+        check("the access list says how many people joined automatically, and lists the newest of them (never the owners)", typeof rl.defaultMembers === "number" && rl.defaultMembers >= 4 && autos.every((e) => rl.seen.some((m) => m.email === e)) && !rl.seen.some((m) => m.email === EMAILS.editorA), rl.defaultMembers);
+        await adm.reload(); await until(async () => (await adm.locator("#viewerList").innerText()).includes(autos[3]), 8000);
+        check("with default access Viewer, there is no 'Signed in, not on the list' section", await adm.locator("#seenCard").isHidden());
+        check("people who just signed in are in the Viewers list, marked as joined automatically", /Joined automatically/.test(await adm.locator("#viewerList .row", { hasText: autos[3] }).innerText()) && /Everyone who signs in with Google joins here automatically/.test(await adm.locator("#viewerNote").innerText()));
+        check("the Viewers count includes them", Number(await adm.locator("#viewerCount").innerText()) >= rl.defaultMembers);
+        check("a person with a TikTok username shows it on their row", /TikTok @viewer_ui/.test(await adm.locator("#viewerList").innerText()));
+        // promote one: they move up into the staff section
+        await adm.locator("#viewerList .row", { hasText: autos[0] }).locator("select").selectOption("contributor");
+        check("choosing a role for an automatic viewer promotes them: they move into the Owners, editors and contributors section", await until(async () => (await adm.locator("#staffList").innerText()).includes(autos[0]) && !(await adm.locator("#viewerList").innerText()).includes(autos[0]), 6000));
+        check("...and they can sign in as that role", (await login(autos[0])).body.role === "contributor");
+        await post("/api/roles", { email: autos[0], role: "none" }, { Authorization: "Bearer " + O.token }); // put them back as an automatic viewer
+        // block one and bring them back
+        adm.once("dialog", (d) => d.accept());
+        await adm.locator("#viewerList .row", { hasText: autos[1] }).getByRole("button", { name: "Block", exact: true }).click();
+        check("Block on an automatic viewer moves them to Blocked, and they cannot sign in", await until(async () => (await adm.locator("#blockedList").innerText()).includes(autos[1]), 6000) && (await login(autos[1])).status === 403);
+        await adm.locator("#blockedList .row", { hasText: autos[1] }).getByRole("button", { name: "Unblock" }).click();
+        check("Unblock puts them straight back among the viewers", await until(async () => (await adm.locator("#viewerList").innerText()).includes(autos[1]) && !(await adm.locator("#blockedList").innerText()).includes(autos[1]), 6000) && (await login(autos[1])).status === 200);
+        // forget
+        adm.once("dialog", (d) => d.accept());
+        await adm.locator("#viewerList .row", { hasText: autos[2] }).getByRole("button", { name: "Forget" }).click();
+        check("Forget clears an entry from the list, and they reappear the next time they sign in", await until(async () => !(await adm.locator("#viewerList").innerText()).includes(autos[2]), 6000) && (await login(autos[2])).status === 200 && await (async () => { await adm.reload(); return until(async () => (await adm.locator("#viewerList").innerText()).includes(autos[2]), 6000); })());
+        check("every row in the Viewers list has a role menu, Sign out everywhere, Forget and Block", await (async () => { const r = adm.locator("#viewerList .row", { hasText: autos[3] }); return (await r.locator("select").count()) === 1 && (await r.getByRole("button", { name: /Sign out everywhere/ }).count()) === 1 && (await r.getByRole("button", { name: "Forget" }).count()) === 1 && (await r.getByRole("button", { name: "Block", exact: true }).count()) === 1; })());
+      }
       check("the sign-up screens show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0 && adm.errors.length === 0, [...catV.errors, ...catE.errors, ...adm.errors]);
     }
 

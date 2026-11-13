@@ -209,7 +209,11 @@ export class Database extends DurableObject {
     const seen = this.sql.exec("SELECT email, first, last, n, handle FROM members ORDER BY last DESC LIMIT 400").toArray()
       .filter((r) => this.resolve(r.email).source === "default").slice(0, 100);
     const log = this.sql.exec("SELECT id, ts, actor, email, from_role, to_role FROM role_log ORDER BY id DESC LIMIT 25").toArray();
-    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, log, defaultRole: defaultRole(this.env), locked: this.loadLock() };
+    // everyone who signed in and was never given a role (they get the default role, so when that is Viewer they are viewers)
+    const secretSet = new Set(secretEntries(this.env).map((x) => x.email));
+    let defaultMembers = this.sql.exec("SELECT COUNT(*) AS n FROM members WHERE email NOT IN (SELECT email FROM roles)").one().n;
+    for (const e of secretSet) if (this.sql.exec("SELECT 1 AS x FROM members WHERE email = ? AND email NOT IN (SELECT email FROM roles)", e).toArray().length) defaultMembers--;
+    return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, defaultMembers, log, defaultRole: defaultRole(this.env), locked: this.loadLock() };
   }
 
   // role: "viewer" | "contributor" | "editor" | "blocked" | "none" (remove) | "forget" (delete from the recent sign-ins).

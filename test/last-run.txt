@@ -399,6 +399,17 @@
   PASS it can be cancelled
   PASS 'Send me a test' tells you to turn notifications on first when none of your phones are signed up
   PASS Escape closes it
+  PASS the access list says how many people joined automatically, and lists the newest of them (never the owners)
+  PASS with default access Viewer, there is no 'Signed in, not on the list' section
+  PASS people who just signed in are in the Viewers list, marked as joined automatically
+  PASS the Viewers count includes them
+  PASS a person with a TikTok username shows it on their row
+  PASS choosing a role for an automatic viewer promotes them: they move into the Owners, editors and contributors section
+  PASS ...and they can sign in as that role
+  PASS Block on an automatic viewer moves them to Blocked, and they cannot sign in
+  PASS Unblock puts them straight back among the viewers
+  PASS Forget clears an entry from the list, and they reappear the next time they sign in
+  PASS every row in the Viewers list has a role menu, Sign out everywhere, Forget and Block
   PASS the sign-up screens show no JavaScript errors
   PASS previewing a merge lists exactly what would change, and the old name that stays searchable
   PASS previewing changes nothing, and only hosts may (403 for a Contributor)
@@ -672,4 +683,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-637 passed, 0 failed, 637 total
+648 passed, 0 failed, 648 total

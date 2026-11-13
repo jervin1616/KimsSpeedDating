@@ -550,3 +550,9 @@ If nobody looks similar, approving works as before, with no extra tap. On the ad
 **Free plan limits.** The free plan allows 50 outgoing requests and about 10 ms of processing per invocation, so the app sends in small batches (10 phones about every second) using Durable Object alarms. 500 phones take about a minute. Set `PUSH_BATCH` in `wrangler.jsonc` vars (up to 40) to speed this up if your Cloudflare metrics show no CPU limit errors. Phones the push services say are gone are removed automatically.
 
 **What is stored:** one record per phone (its push address and keys, and the account email, so blocked people can be skipped). Turning notifications off removes it. The Privacy page says this.
+
+## Automatic viewers on the admin page
+
+With `DEFAULT_ROLE` set to `viewer` (the setting you use), everyone who signs in with Google is a Viewer automatically. There is no approval step, and the old "Signed in, not on the list" section is gone. Those people now appear in the **Viewers** list, marked "Joined automatically", showing everyone you added by hand first and then the 100 newest sign-ins (the heading shows the real total). Each row has a role menu (choosing Contributor or Editor promotes them), **Sign out everywhere**, **Forget** (clears their entry; they come back the next time they sign in) and **Block**. To find someone who is not in the newest 100, use **Find a person**. If `DEFAULT_ROLE` is ever set to `none`, the old "Signed in, not on the list" section comes back, because those people would have no access.
+
+Someone you add as a Viewer by hand still has one real advantage over an automatic viewer: they can sign in while **Lock the door** is on.

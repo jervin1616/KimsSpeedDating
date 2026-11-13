@@ -165,10 +165,20 @@
     var who = document.createElement("div"); who.className = "who";
     who.appendChild(document.createTextNode(p.email));
     var meta = document.createElement("div"); meta.className = "meta";
-    meta.textContent = p.source === "secret" ? "Set in the ROLES secret" : "Last changed by " + p.by + " " + ago(p.ts);
+    meta.textContent = p.source === "secret" ? "Set in the ROLES secret" : p.source === "default" ? (p.handle ? "TikTok @" + p.handle + " \u00b7 " : "") + "Joined automatically. Signed in " + p.n + (p.n === 1 ? " time" : " times") + ", last " + ago(p.last) : "Added by " + p.by + " " + ago(p.ts);
     who.appendChild(meta); row.appendChild(who);
     var right = document.createElement("div"); right.className = "form";
-    if (p.role === "blocked") {
+    if (p.source === "default") {
+      var asel = document.createElement("select"); asel.setAttribute("aria-label", "Role for " + p.email);
+      ["viewer", "contributor", "editor"].forEach(function (r) { var o = document.createElement("option"); o.value = r; o.textContent = LABEL[r]; if (r === "viewer") o.selected = true; asel.appendChild(o); });
+      asel.onchange = function () { change(p.email, asel.value); };
+      var fg = document.createElement("button"); fg.type = "button"; fg.textContent = "Forget";
+      fg.title = "Clears their entry here. They come back the next time they sign in.";
+      fg.onclick = function () { if (window.confirm("Forget " + p.email + "? Their TikTok username and any dater sign-up are removed. They can still sign in again.")) change(p.email, "forget"); };
+      var ab = document.createElement("button"); ab.type = "button"; ab.className = "danger"; ab.textContent = "Block";
+      ab.onclick = function () { if (window.confirm("Block " + p.email + "? They cannot sign in or watch. You can undo it from Recent changes.")) change(p.email, "blocked"); };
+      right.appendChild(asel); right.appendChild(signOutBtn(p.email)); right.appendChild(fg); right.appendChild(ab);
+    } else if (p.role === "blocked") {
       row.className = "row blockedrow";
       var ub = document.createElement("button"); ub.type = "button"; ub.className = "primary"; ub.textContent = "Unblock";
       ub.onclick = function () { change(p.email, "none"); };
@@ -207,7 +217,7 @@
     var def = { none: "gets no access.", viewer: "can watch as a Viewer.", contributor: "is a Contributor." }[data.defaultRole] || "gets no access.";
     $("defaultNote").textContent = "Anyone else who signs in with Google " + def;
     $("rules").textContent = "You are an owner. Owners are locked on this page. They can only be changed by whoever manages this site's Cloudflare account.";
-    renderSeen(data.seen || []);
+    renderSeen(data.seen || [], data.defaultRole === "viewer");
     renderLog(data.log || []);
 
     // above: everyone with more than watch-only access, grouped by role
@@ -224,8 +234,13 @@
 
     // their own section: viewers
     var viewers = data.people.filter(function (p) { return p.role === "viewer"; }).sort(byRoleThenEmail);
-    $("viewerCount").textContent = viewers.length;
-    $("viewerNote").textContent = data.defaultRole === "viewer" ? "People you added as watch-only. Anyone else who signs in with Google can also watch, so they only appear here if you added them." : "People you added as watch-only.";
+    var auto = data.defaultRole === "viewer"; // everyone who signs in is a Viewer automatically, so they live here
+    var assignedViewers = viewers.length;
+    if (auto) viewers = viewers.concat((data.seen || []).map(function (m) { return { email: m.email, role: "viewer", source: "default", first: m.first, last: m.last, n: m.n, handle: m.handle }; }));
+    $("viewerCount").textContent = auto ? assignedViewers + (data.defaultMembers || 0) : viewers.length;
+    $("viewerNote").textContent = auto
+      ? "Everyone who signs in with Google joins here automatically as a Viewer. No approval is needed. Showing everyone you added, then the " + (data.seen || []).length + " newest sign-ins" + ((data.defaultMembers || 0) > (data.seen || []).length ? " (of " + data.defaultMembers + ")" : "") + ". To find anyone else, use Find a person."
+      : "People you added as watch-only.";
     var vl = $("viewerList"); vl.textContent = "";
     viewers.forEach(function (p) { vl.appendChild(personRow(p)); });
     var blocked = data.people.filter(function (p) { return p.role === "blocked"; }).sort(byRoleThenEmail);
@@ -400,8 +415,8 @@
     });
   }
 
-  function renderSeen(seen) {
-    $("seenCard").hidden = !seen.length;
+  function renderSeen(seen, auto) {
+    $("seenCard").hidden = !seen.length || auto; // with default access Viewer these people are listed under Viewers instead
     $("seenNote").textContent = "These people signed in with Google but are not on the list, so they only get the default access (watching). Add them to give more, or forget them to clear the entry.";
     var box = $("seenList"); box.textContent = "";
     seen.forEach(function (p) {
