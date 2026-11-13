@@ -1,0 +1,262 @@
+<title>Host and Owner Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+/* Layout: a narrow reading column with a jump list that sits beside it on wide screens and above it on phones. */
+:root {
+  --bg: #fbf9f9; --panel: #ffffff; --fg: #231a1c; --muted: #6c5d61; --line: #e6dcde;
+  --accent: #b8113a; --accent-soft: #fbe6ec; --warn: #8a5a00; --warn-soft: #fdf1d8; --ok: #1f6b45; --ok-soft: #e3f4ea;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-head: "Space Grotesk", "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #170d10; --panel: #21141a; --fg: #f4e9eb; --muted: #b9a5aa; --line: #3a262d;
+  --accent: #ff6b8a; --accent-soft: #3a1620; --warn: #f1c05a; --warn-soft: #33260c; --ok: #6fd3a1; --ok-soft: #12301f; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #170d10; --panel: #21141a; --fg: #f4e9eb; --muted: #b9a5aa; --line: #3a262d;
+  --accent: #ff6b8a; --accent-soft: #3a1620; --warn: #f1c05a; --warn-soft: #33260c; --ok: #6fd3a1; --ok-soft: #12301f; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; align-items: start; }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+header.top { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+h1 { font-family: var(--font-head); font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+nav { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; min-width: 0; }
+@media (max-width: 860px) { nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px 14px; } }
+nav a { color: var(--muted); text-decoration: none; padding: 3px 0; }
+nav a:hover, nav a:focus-visible { color: var(--accent); }
+nav .h { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; width: 100%; }
+main { display: flex; flex-direction: column; gap: 40px; min-width: 0; }
+section { display: flex; flex-direction: column; gap: 12px; min-width: 0; scroll-margin-top: 16px; }
+h2 { font-family: var(--font-head); font-size: 1.5rem; line-height: 1.2; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--font-head); font-size: 1.08rem; margin: 10px 0 0; }
+p { margin: 0; max-width: 68ch; }
+ul, ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; max-width: 68ch; }
+b { font-weight: 600; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .04em; border-radius: 999px; padding: 2px 9px; background: var(--accent-soft); color: var(--accent); vertical-align: 2px; }
+.box { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.box.warn { border-color: var(--warn); background: var(--warn-soft); }
+.box.ok { border-color: var(--ok); background: var(--ok-soft); }
+.box .t { font-weight: 600; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 560px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--accent-soft); }
+tr:last-child td { border-bottom: 0; }
+td.y { color: var(--ok); font-weight: 600; } td.n { color: var(--muted); }
+.step { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+.step .n { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 14px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .step .n { color: #1b0a10; } }
+:root[data-theme="dark"] .step .n { color: #1b0a10; }
+footer { grid-column: 1 / -1; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+@media (prefers-reduced-motion: no-preference) { nav a { transition: color .15s; } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <h1>Host and Owner Guide</h1>
+  <p class="lede">For Kim and Eddey. How to run a stream, approve sign-ups, look after the people on the app, and send the "we are going live" messages. Plain steps, nothing technical.</p>
+</header>
+
+<nav aria-label="Sections">
+  <div class="h">Jump to</div>
+  <a href="#quick">The short version</a>
+  <a href="#before">Before the stream</a>
+  <a href="#show">Running the show</a>
+  <a href="#signups">Sign-ups and merging</a>
+  <a href="#announce">Going-live messages</a>
+  <a href="#questions">Questions</a>
+  <a href="#people">People and safety</a>
+  <a href="#wrong">If something goes wrong</a>
+  <a href="#who">Who can do what</a>
+  <a href="#care">Keep it safe</a>
+</nav>
+
+<main>
+
+<section id="quick">
+  <h2>The short version</h2>
+  <div class="grid2">
+    <div class="box"><span class="t">Hosts <span class="tag">Editor</span></span>
+      <p>Run the board: seat daters, ask questions, press Match, start and end the stream. Everything you need is on the main screen.</p></div>
+    <div class="box"><span class="t">Owners <span class="tag">Kim, Eddey</span></span>
+      <p>Everything a host does, plus the <b>Admin</b> page (people, sign-ups, blocking) and the <b>Announce</b> button (going-live messages).</p></div>
+  </div>
+  <ol>
+    <li>An hour or more before: press <b>Announce</b> and schedule the go-live time.</li>
+    <li>Open <b>Admin</b> and check <b>Pending dater sign-ups</b>.</li>
+    <li>During the stream: tap an empty seat, search a name or username, tap the person.</li>
+    <li>Ask questions from the Questions tab. Use the category menu next to <b>Random question</b>.</li>
+    <li>If a raid or fake accounts show up: Admin, then <b>Lock the door</b>.</li>
+  </ol>
+</section>
+
+<section id="before">
+  <h2>Before the stream</h2>
+  <div class="step"><span class="n">1</span><div><b>Schedule the announcement.</b> Tap <b>Announce</b> (next to Admin), pick the date, leave the time at the one you want (it is Eastern time), and press <b>Schedule it</b>. Do this at least an hour ahead, or the 1 hour and 30 minute messages are skipped. See <a href="#announce">Going-live messages</a>.</div></div>
+  <div class="step"><span class="n">2</span><div><b>Check sign-ups.</b> On the Admin page, the <b>Pending dater sign-ups</b> card lists everyone who asked to be a speed dater. Approve the ones you want. You can also leave them and approve people live from the seat picker.</div></div>
+  <div class="step"><span class="n">3</span><div><b>Look at the dater list.</b> On the main screen, open the <b>Daters</b> tab. Remove anyone who is not coming. Edit anything that is wrong.</div></div>
+  <div class="step"><span class="n">4</span><div><b>Check the question box.</b> Open the <b>Questions</b> tab. Make sure the category menu is there (if not, see <a href="#questions">Questions</a>).</div></div>
+  <div class="step"><span class="n">5</span><div><b>Start the stream</b> from the stream bar at the top when you go live. End it when you finish. It saves a summary under <b>Past streams</b>.</div></div>
+  <div class="box ok"><span class="t">Good habit</span><p>Download a backup from the Backup page after every stream. Keep the file private.</p></div>
+</section>
+
+<section id="show">
+  <h2>Running the show <span class="tag">Hosts and owners</span></h2>
+  <h3>Putting someone in a seat</h3>
+  <ul>
+    <li><b>Tap an empty seat.</b> A picker opens with your dater list. When the hot seat is filled, daters are sorted by how well they fit.</li>
+    <li><b>Search</b> by name or state at the top. People who signed up but are not approved yet also show up here, marked <b>Sign-up</b>, but only when you type something.</li>
+    <li><b>Tap a person</b> to seat them. Tapping a pending sign-up approves them and seats them in one move.</li>
+    <li><b>+ Add new dater</b> at the bottom adds someone by hand and seats them.</li>
+    <li>Tap a seated person, then another seat, to move or swap them.</li>
+  </ul>
+  <h3>The colors</h3>
+  <p>Hearts turn <b>green</b> (fits both), <b>yellow</b> (close, off by 1 to 2 years) or <b>red</b> (off by 3 or more years, or an orientation mismatch) compared with whoever is in the hot seat. Tap a seat to see the reason.</p>
+  <h3>The bottom bar</h3>
+  <ul>
+    <li><b>Remove hot seat</b> takes the hot seat person out. An Undo appears for a few seconds.</li>
+    <li><b>Match</b>: press it, then tap the panelist the hot seat picked. It saves the pick to the <b>Match log</b>.</li>
+  </ul>
+  <h3>Tabs</h3>
+  <ul>
+    <li><b>Daters</b>: add, edit, remove, search and sort everyone.</li>
+    <li><b>Questions</b>: see <a href="#questions">Questions</a>.</li>
+    <li><b>Match log</b>: every pick, with a way to remove one or clear them all.</li>
+    <li><b>Past streams</b>: summaries of finished streams.</li>
+  </ul>
+</section>
+
+<section id="signups">
+  <h2>Sign-ups and merging</h2>
+  <p>Viewers can add their TikTok username and sign up to be a speed dater. Nothing they enter reaches the board until you approve it.</p>
+  <h3>Where sign-ups appear</h3>
+  <ul>
+    <li><b>Admin page, Pending dater sign-ups</b> (owners): search by username or email. Buttons: <b>Approve</b>, <b>Merge with existing...</b>, <b>Decline</b>, and <b>Clear all</b>. It refreshes every 20 seconds.</li>
+    <li><b>Seat picker</b> (hosts and owners): type a username and the sign-up appears in the same list.</li>
+    <li><b>Add dater form</b>: if what you type looks like a sign-up, it asks <b>Is this them?</b></li>
+  </ul>
+  <h3>Someone is already on your list</h3>
+  <p>When a sign-up looks like a dater you already have (a similar name, a misspelling, a first name against a username), a window opens: <b>Is @username already on your list?</b></p>
+  <ol>
+    <li>It lists up to six possible matches, with the reasons (for example "sounds alike, same state, same age").</li>
+    <li>Tap <b>Merge into this one</b> on the right person. Not listed? Use the search box in the window.</li>
+    <li>It shows exactly what changes, such as <b>Age 30 → 31</b>. Tap <b>Confirm merge</b>.</li>
+    <li>You keep their history (panel and hot seat time, match log) and get their new details. Their old name stays searchable.</li>
+    <li>Made a mistake? Tap <b>Undo</b> right after. It puts everything back.</li>
+  </ol>
+  <p>Not the same person? Tap <b>No, add as a new dater</b>.</p>
+  <h3>When someone changes their TikTok username</h3>
+  <p>If their dater is linked to their account and still carries their old username, it renames itself. A name you set by hand is left alone. Old usernames still turn up in search, and the owner search shows "was @oldname".</p>
+  <div class="box warn"><span class="t">Check on camera</span>
+    <p>The app cannot prove a TikTok username belongs to the person who typed it, and the 18+ box is only a checkbox. Confirm who someone is before you seat them. If someone claims a username that is not theirs, an owner can free it up (Admin, <b>Find a person</b>, <b>Release username</b>).</p></div>
+</section>
+
+<section id="announce">
+  <h2>Going-live messages <span class="tag">Owners only</span></h2>
+  <div class="step"><span class="n">1</span><div>Tap <b>Announce</b> at the top of the main screen.</div></div>
+  <div class="step"><span class="n">2</span><div>Pick the date and time. The time is <b>Eastern</b>. It shows when the three messages will go out.</div></div>
+  <div class="step"><span class="n">3</span><div>Tick <b>Phone notifications</b> and <b>Post to Discord</b>. Leave <b>Ping @everyone</b> off unless you want it.</div></div>
+  <div class="step"><span class="n">4</span><div>Press <b>Schedule it</b>. You will see three lines, all <b>Waiting</b>.</div></div>
+  <p>Messages sent: <b>"We go live in 1 hour"</b>, <b>"30 minutes until we go live"</b> and <b>"We are live now!"</b>.</p>
+  <ul>
+    <li><b>Send me a test</b> sends one message to your own phone only.</li>
+    <li><b>Cancel schedule</b> removes what has not been sent yet.</li>
+    <li>Scheduling again replaces the old schedule.</li>
+    <li>A message whose time has already passed is <b>skipped</b>, not sent late. Schedule at least an hour ahead to get all three.</li>
+  </ul>
+  <div class="box warn"><span class="t">Not everyone is reached</span>
+    <p>Phone notifications go only to people who turned them on in the app. On iPhone that means the app added to the home screen. Silent or Focus modes block them. The Discord post reaches everyone in the channel, so keep it on.</p></div>
+</section>
+
+<section id="questions">
+  <h2>Questions</h2>
+  <h3>Asking</h3>
+  <ul>
+    <li><b>Random question</b> picks one, and prefers ones that have been asked least. Use the menu next to it to limit it to a category, such as <b>What would you do?</b> or <b>About your date</b>.</li>
+    <li><b>Ask this</b> (or <b>Ask again</b>) on any question in the Questions tab puts it on the stream. <b>Back</b> goes to the previous one. <b>Clear question</b> empties it.</li>
+    <li><b>Question from chat</b>: type it in the box, add the @handle if you want, and press <b>Add question</b>. It goes under the category "From chat".</li>
+    <li>Hosts can <b>Remove</b> a question. The list shows 150 at a time, with <b>Show more</b> at the bottom.</li>
+  </ul>
+  <h3>Categories</h3>
+  <p>Each question has a category. Use the filter above the list to browse one. Each row has a dropdown to fix a wrong category. Viewers see a category picker on their own random question button.</p>
+  <h3>Owner setup, once</h3>
+  <ul>
+    <li><b>Question categories</b> card on the Admin page: press <b>Sort ... questions into categories</b> if it says some are unsorted.</li>
+    <li><b>Question packs</b> card: press <b>Add ... questions</b> to add the 265-question "Hot seat" set. Pressing it again does nothing, and your existing questions are never changed.</li>
+  </ul>
+</section>
+
+<section id="people">
+  <h2>People and safety <span class="tag">Owners only</span></h2>
+  <p>Open <b>Admin</b> from the main screen. Everyone who signs in lands on a member list automatically as a Viewer. You do not need to add them.</p>
+  <h3>Roles</h3>
+  <ul>
+    <li><b>Add or change someone:</b> type their email, choose a role, press <b>Save</b>. People you add can sign in with that Google account.</li>
+    <li>Change a role from the dropdown on their row. <b>Remove</b> takes them off the list.</li>
+    <li><b>Recent changes</b> lists the last changes with an <b>Undo</b> button, and a quick Undo bar appears at the top right after a change. Use it if someone's role was changed by accident.</li>
+    <li>Owners (you, Kim and Eddey) are locked on this page. They can only be changed in Cloudflare.</li>
+  </ul>
+  <h3>Dealing with trouble</h3>
+  <div class="grid2">
+    <div class="box"><span class="t">Block</span><p>Stops one account completely: it cannot sign in or watch, and any open page is closed. They appear under <b>Blocked</b> with <b>Unblock</b> and an Undo in Recent changes. A person can make a new account, so for a wave of accounts use Lock the door.</p></div>
+    <div class="box"><span class="t">Lock the door</span><p>Turns away new sign-ins from people who are on no list. People already watching keep watching, and anyone you added can still sign in. Turn it back off after the stream with <b>Open the door</b>.</p></div>
+    <div class="box"><span class="t">Sign out everywhere</span><p>On any person's row. Ends their sessions on every device. They can sign in again, so also Block or Remove them if you want them gone.</p></div>
+    <div class="box"><span class="t">Find a person</span><p>Search everyone who has signed in, by email or TikTok username (old usernames too). From there: <b>Release username</b>, <b>Block</b>, <b>Sign out everywhere</b>.</p></div>
+  </div>
+  <h3>Someone asks to be removed</h3>
+  <p>Use <b>Erase a person's records</b> on the Admin page. Type a name, handle or email. You see everything that mentions them. Untick anything that is not theirs, then press <b>Erase the ticked items</b>. It removes their daters, match log entries, seats, chat handles on questions and account records. Erasing a blocked person lifts the block, so it leaves blocked accounts unticked. Backups you already downloaded are not changed.</p>
+</section>
+
+<section id="wrong">
+  <h2>If something goes wrong</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>A viewer says they cannot get in</td><td>Admin, <b>Find a person</b>, search their email. If they are Blocked, press <b>Unblock</b>. If the door is locked, open it. If they are not found, they may have used a different Google account.</td></tr>
+      <tr><td>Viewers see "Full"</td><td>The room holds 500 at a time (plus places kept for hosts). Tell them to tap it and try again in a minute. Do not change anything mid-stream.</td></tr>
+      <tr><td>Fake accounts or a raid</td><td>Admin, <b>Lock the door</b>. Block the worst accounts. Open the door again afterwards.</td></tr>
+      <tr><td>The wrong person got a role</td><td>Admin, <b>Recent changes</b>, tap <b>Undo</b> on that line, or change it from their row.</td></tr>
+      <tr><td>A merge went to the wrong dater</td><td>Tap <b>Undo</b> right after. If it is gone, edit the dater in the Daters tab.</td></tr>
+      <tr><td>Two entries for the same dater</td><td>Remove the extra one in the Daters tab. Matches already logged for it stay in the log.</td></tr>
+      <tr><td>A sign-up looks like someone pretending</td><td>Decline it, or confirm on camera. Admin, <b>Find a person</b>, <b>Release username</b> frees a name that belongs to someone else.</td></tr>
+      <tr><td>Phone notifications did not arrive</td><td>Normal for people who have not turned them on or are on silent. Use <b>Send me a test</b> to check your own phone. Post in Discord too.</td></tr>
+      <tr><td>The pill says Offline or Reconnecting</td><td>The page lost its connection. It reconnects by itself. If it stays red, reload the page.</td></tr>
+      <tr><td>The category menu is missing</td><td>Admin, <b>Question categories</b>, press the sort button.</td></tr>
+      <tr><td>Everything looks broken after an update</td><td>Reload the page. If it persists, tell whoever manages the site.</td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="who">
+  <h2>Who can do what</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Action</th><th>Viewer</th><th>Contributor</th><th>Editor (host)</th><th>Owner</th></tr></thead>
+    <tbody>
+      <tr><td>Watch the board, random question for me</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+      <tr><td>Add a username, sign up to be a dater, turn on notifications</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+      <tr><td>Add and ask questions, Random question</td><td class="n">No</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+      <tr><td>See daters, match log, past streams</td><td class="n">No</td><td class="n">No</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+      <tr><td>Seat daters, Match, start and end streams, download backups</td><td class="n">No</td><td class="n">No</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+      <tr><td>Search and approve pending sign-ups in the seat picker, merge</td><td class="n">No</td><td class="n">No</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+      <tr><td>Admin page, pending list, people, block, lock, erase</td><td class="n">No</td><td class="n">No</td><td class="n">No</td><td class="y">Yes</td></tr>
+      <tr><td>Announce, question packs and categories</td><td class="n">No</td><td class="n">No</td><td class="n">No</td><td class="y">Yes</td></tr>
+      <tr><td>See email addresses</td><td class="n">No</td><td class="n">No</td><td class="n">No</td><td class="y">Yes</td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="care">
+  <h2>Keep it safe</h2>
+  <ul>
+    <li><b>Do not post or screenshot</b> the Admin page, the pending list or a backup file. They hold emails, usernames and ages.</li>
+    <li><b>Never share a secret.</b> Keys and the Discord webhook are set in Cloudflare only. If one is ever shown or pasted somewhere, tell the site manager so it can be replaced.</li>
+    <li><b>18 and over only.</b> The sign-up box is a checkbox, so the real check is you seeing the person.</li>
+    <li><b>Be careful with sensitive details.</b> Gender, sexuality, age and state are shown on the board once someone is seated. Ask permission, and remove anyone who asks.</li>
+    <li><b>Backups:</b> download one after each stream and keep it somewhere private.</li>
+  </ul>
+</section>
+
+</main>
+<footer>Questions about this guide, or something that does not match what you see? Tell the person who manages the site and it can be updated.</footer>
+</div>
