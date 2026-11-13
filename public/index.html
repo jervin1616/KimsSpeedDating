@@ -1214,7 +1214,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     box.hidden = !hits.length; box.textContent = ""; if (!hits.length) return;
     hits.forEach(function (h) {
       var su = h.signup, row = el("div", "mrow");
-      row.appendChild(el("div", "", "Is this them? @" + su.handle + ", " + su.age + ", " + su.location + " (" + (h.level === "strong" ? "same username" : "similar") + ")"));
+      row.appendChild(el("div", "", "Is this them? @" + su.handle + ", " + su.age + ", " + su.location + " (" + (h.level === "strong" ? "same username" : "similar") + (h.reasons && h.reasons.length ? ": " + h.reasons.join(", ") : "") + ")"));
       var acts = el("div", "racts");
       var yes = el("button", "small primary", "Yes, use their sign-up"); yes.type = "button"; yes.onclick = function () { fillFromSignup(su); };
       var no = el("button", "small ghost", "No, different person"); no.type = "button"; no.onclick = function () { state.matchNo[su.id] = true; renderMatch(); };

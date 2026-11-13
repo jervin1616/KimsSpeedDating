@@ -195,10 +195,13 @@
   PASS usernames: @ is optional, 2 to 24 letters, numbers, dots and underscores, capitals kept
   PASS sign-up checks mirror the host's dater form (18+, ranges, state only, confirmation)
   PASS a sign-up cannot smuggle extra fields into the dater record
-  PASS matching: same username ignoring @, capitals, dots and underscores is a strong match
-  PASS matching: a similar username counts only with the same state or an age within a year
-  PASS matching: short or unrelated names do not match
-  PASS matching: the strongest match is listed first, at most three, and dismissed ones are skipped
+  PASS matching: same name ignoring @, capitals, dots, underscores and spaces is a strong match, and trailing numbers do not matter
+  PASS matching: misspellings, transposed letters and sounds-alike spellings are found
+  PASS matching: a first name finds the username that starts with it, and a username finds a full name
+  PASS matching: the state is written either way (NC or North Carolina)
+  PASS matching: unrelated names do not match, even with the same state and age, and very short names are not guessed
+  PASS matching: every match says why (so the host can judge it)
+  PASS matching: the closest match is listed first, the number shown is limited, and dismissed ones are skipped
   PASS DEFAULT_ROLE can be none, viewer or contributor
   PASS DEFAULT_ROLE can never make strangers editors or owners
   PASS ROLES accepts commas, semicolons, new lines and any letter case
@@ -617,4 +620,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-582 passed, 0 failed, 582 total
+585 passed, 0 failed, 585 total

@@ -13,20 +13,21 @@
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function who(d) { return [d.location, d.gender, d.sexuality].filter(Boolean).join(" · "); }
 
-  // Existing daters (not already linked to an account) that look like this sign-up, closest first.
+  // Existing daters (not already linked to an account) that might be this sign-up, best first. Each name a dater has
+  // (current name and old names) is tried, so a first name, a misspelling or a username with numbers on the end still turns up.
   function candidates(su, daters) {
     var M = g.SignupMatch, out = [];
     (daters || []).forEach(function (d) {
       if (d.acct) return;
       var best = null;
       [d.name].concat(Array.isArray(d.aka) ? d.aka : []).forEach(function (n) {
-        var lv = M.compare({ name: su.handle, age: su.age, location: su.location }, { handle: n, age: d.age, location: d.location });
-        if (lv === "strong" || (lv && !best)) best = lv;
+        var r = M.score({ name: su.handle, age: su.age, location: su.location }, { handle: n, age: d.age, location: d.location });
+        if (r.level && (!best || r.name > best.name || (r.name === best.name && r.score > best.score))) best = r;
       });
-      if (best) out.push({ d: d, level: best });
+      if (best) out.push({ d: d, level: best.level, score: best.score, name: best.name, reasons: best.reasons });
     });
-    out.sort(function (a, b) { return (a.level === "strong" ? 0 : 1) - (b.level === "strong" ? 0 : 1); });
-    return out.slice(0, 4);
+    out.sort(function (a, b) { return (b.name - a.name) || (b.score - a.score); });
+    return out.slice(0, 6);
   }
 
   // opts: { su, daters, searchOnly, preview(daterId) -> Promise<{changes, keepsName}> }. Resolves { action: "merge", daterId } | { action: "new" } | { action: "cancel" }.
@@ -47,7 +48,7 @@
         var cands = opts.searchOnly ? [] : candidates(su, daters);
         if (cands.length) {
           card.appendChild(el("div", "mu-sub", "These look like the same person:"));
-          cands.forEach(function (c) { card.appendChild(row(c.d, c.level === "strong" ? "same name" : "similar")); });
+          cands.forEach(function (c) { card.appendChild(row(c.d, c.level === "strong" ? "very likely" : "possible", c.reasons)); });
         }
         card.appendChild(el("div", "mu-sub", cands.length ? "Someone else? Search your daters:" : "Search your daters:"));
         var q = el("input"); q.type = "search"; q.placeholder = "Name or state"; q.setAttribute("aria-label", "Search daters"); card.appendChild(q);
@@ -64,10 +65,11 @@
         if (!opts.searchOnly) { var nw = el("button", "mu-go", "No, add as a new dater"); nw.type = "button"; nw.onclick = function () { done({ action: "new" }); }; acts.appendChild(nw); }
         card.appendChild(acts);
       }
-      function row(d, tag) {
+      function row(d, tag, reasons) {
         var r = el("div", "mu-row"), main = el("div");
         main.appendChild(el("b", "", d.name + ", " + d.age + (tag ? "  (" + tag + ")" : "")));
         main.appendChild(el("span", "", who(d) + (d.aka && d.aka.length ? " · also " + d.aka.join(", ") : "")));
+        if (reasons && reasons.length) { var why = el("span", "", "Why: " + reasons.join(", ")); why.style.display = "block"; main.appendChild(why); }
         var b = el("button", "", "Merge into this one"); b.type = "button"; b.onclick = function () { diffScreen(d); };
         r.appendChild(main); r.appendChild(b); return r;
       }
