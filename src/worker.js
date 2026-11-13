@@ -267,6 +267,19 @@ export default {
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }
 
+      if (path === "/api/shelf" && (request.method === "GET" || request.method === "POST")) {
+        // Owners only. Whole question categories: put away for now, bring back, or delete for good.
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (!s.owner) return json({ error: "forbidden", message: "Only owners can do that." }, 403);
+        if (request.method === "GET") return json({ ok: true, ...(await database(env).shelfStatus()) });
+        let body; try { body = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+        const r = await database(env).shelfAction(s.email, String(body.action || ""), String(body.cat || ""), CATEGORY_KEYS);
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
+      }
+
       if (path === "/api/export" && request.method === "GET") {
         const s = await sessionFromRequest(env, request);
         if (!s) return json({ error: "unauthorized" }, 401);

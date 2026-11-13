@@ -581,3 +581,16 @@ The admin page (`/admin.html`) has six tabs. Owners and hosts see the same six.
 On the Questions tab, each pack now lists its categories in plain words with counts, for example `What would you do? 31, Deep & personal 28`. If only some of a category is in the bank it shows `12/31`.
 
 Each pack also has a **Remove from the bank** button (owners only). It asks first, then deletes only the questions that came from that pack, matched by id. Your own questions and questions from chat are never touched. How often a removed question was asked is lost. Adding the pack back restores the questions, with fresh counts. Open pages drop the removed questions at once. No new secrets or settings.
+
+## Categories as packs: put away, bring back, delete for good
+
+Under Question packs on the Questions tab, every question category is listed as its own pack (including "Not sorted yet"), with how many questions are in the bank and how many are put away. Owners only. Each has three buttons:
+
+- **Put away for now:** moves the whole category out of the bank. Hosts and viewers stop seeing it at once. The questions are kept in a separate shelf, so nothing is lost.
+- **Bring back:** returns them exactly as they were, with how often each was asked.
+- **Delete for good:** removes the category, including anything put away. You must type `delete` to confirm. It cannot be undone, though backups you already downloaded still have the questions.
+
+Notes:
+- Adding a ready-made pack does not bring back questions that are put away.
+- A backup file includes put-away questions under `shelved`. Importing a backup does not put them back on the shelf, so restore from a backup only if you accept that.
+- No new secrets or settings. It uses one new small table, created automatically.

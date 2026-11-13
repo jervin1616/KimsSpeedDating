@@ -317,6 +317,28 @@
   PASS adding the pack back restores every question
   PASS removing twice is harmless (the second time removes 0)
   PASS the pack tools show no JavaScript errors
+  PASS every category is listed with how many questions are in the bank
+  PASS only owners can use it (403 for an Editor, 401 with no login, 403 from a wrong origin)
+  PASS a made-up category or action is refused (400)
+  PASS putting a category away removes all of it from the bank and nothing else
+  PASS the status says they are put away, not gone
+  PASS a viewer's open page drops that category at once
+  PASS adding the ready-made pack does not bring put-away questions back
+  PASS a backup keeps the put-away questions (under 'shelved')
+  PASS bringing a category back restores every question exactly as it was, with its history
+  PASS ...and a viewer's page gets the category back at once
+  PASS putting away or bringing back twice is harmless (0 moved)
+  PASS deleting for good removes the category including what was put away, and leaves the rest
+  PASS a deleted category cannot be brought back
+  PASS the Questions tab lists every category as its own pack with counts
+  PASS cancelling 'put away for now' does nothing
+  PASS put away from the page works, and the row then offers Bring back
+  PASS bring back from the page works
+  PASS cancelling the delete prompt keeps everything
+  PASS typing anything other than 'delete' keeps everything
+  PASS typing 'delete' removes the category for good
+  PASS on a phone the category list fits without sideways scrolling
+  PASS the category tools show no JavaScript errors
   PASS everyone who signs in lands on the member list automatically (owners can search it by email)
   PASS only owners can search people (403 for an Editor and a Contributor, 401 with no login, 400 for a one-letter search)
   PASS a new viewer has no username and no sign-up yet
@@ -716,4 +738,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-681 passed, 0 failed, 681 total
+703 passed, 0 failed, 703 total

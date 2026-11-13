@@ -67,6 +67,7 @@
   .statuslist{display:flex;flex-direction:column;gap:8px}.srow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between;border:1px solid #4a0d12;border-radius:10px;padding:9px 12px;background:#240306}
   .srow .l{font-weight:600}.srow .n{flex-basis:100%;color:#d9a39b;font-size:13px}
   .pill{font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;border:1px solid}.pill.ok{color:#7ee2ae;border-color:#2a7a52;background:rgba(46,160,100,.12)}.pill.warn{color:#ffb347;border-color:#9a6a1a;background:rgba(255,179,71,.1)}.pill.info{color:#ffd5dc;border-color:#6e1518}
+.card h3{margin:18px 0 4px;font-size:1rem}
 </style></head><body><main>
   <a class="back" href="/">&larr; Back to the board</a>
   <h1>Kim's Speed Dating admin</h1>
@@ -177,6 +178,9 @@
     <h2>Question packs</h2>
     <p>Add a ready-made set of questions to the bank, or take one back out. Adding only adds new ones and never changes questions you already have. Removing only removes questions that came from that pack.</p>
     <div id="packList"></div>
+    <h3>Every category is its own pack</h3>
+    <p>Put a whole category away for now (hidden from hosts and viewers, kept safe, and brought back with the same history), or delete it for good. Deleting cannot be undone.</p>
+    <div id="shelfList" class="scrolly" tabindex="0" role="region" aria-label="Categories, scrollable"></div>
   </section>
   </div>
   <div class="tabpanel" id="tab-help" role="tabpanel" aria-labelledby="t-help" hidden>
@@ -383,7 +387,7 @@
     $("blockedCard").hidden = !blocked.length; $("blockedCount").textContent = blocked.length;
     var bl = $("blockedList"); bl.textContent = ""; blocked.forEach(function (p) { bl.appendChild(personRow(p)); });
     renderLock(data);
-    loadCats(); loadPacks(); $("peopleCard").hidden = false; loadPend(); watchDaters();
+    loadCats(); loadPacks(); loadShelf(); $("peopleCard").hidden = false; loadPend(); watchDaters();
     $("eraseCard").hidden = false;
     if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
   }
@@ -442,7 +446,7 @@
           b.textContent = st.missing ? "Add " + st.missing + " questions" : "All added"; b.disabled = !st.missing;
           b.onclick = function () {
             say("Adding..."); b.disabled = true;
-            post("/api/pack", { name: p.name }).then(function (r) { say("Added " + r.added + " questions" + (r.skipped ? " (" + r.skipped + " were already there)" : "") + "."); loadPacks(); }).catch(function (e) { say(e.message, true); loadPacks(); });
+            post("/api/pack", { name: p.name }).then(function (r) { say("Added " + r.added + " questions" + (r.skipped ? " (" + r.skipped + " were already there)" : "") + "."); loadPacks(); loadShelf(); loadCats(); }).catch(function (e) { say(e.message, true); loadPacks(); });
           };
           right.appendChild(b);
           var rm = document.createElement("button"); rm.type = "button"; rm.textContent = "Remove from the bank"; rm.disabled = !st.present;
@@ -450,12 +454,45 @@
           rm.onclick = function () {
             if (!window.confirm("Remove " + st.present + " questions of this pack from the bank?\n\nOnly questions that came from this pack are removed. Your own questions, and questions from chat, are not touched. How often each was asked is lost for the removed ones. You can add the pack back at any time.")) return;
             say("Removing..."); rm.disabled = true;
-            post("/api/pack", { name: p.name, action: "remove" }).then(function (r) { say("Removed " + r.removed + " questions. You can add the pack back with the button."); loadPacks(); loadCats(); }).catch(function (e) { say(e.message, true); loadPacks(); });
+            post("/api/pack", { name: p.name, action: "remove" }).then(function (r) { say("Removed " + r.removed + " questions. You can add the pack back with the button."); loadPacks(); loadCats(); loadShelf(); }).catch(function (e) { say(e.message, true); loadPacks(); });
           };
           right.appendChild(rm); row.appendChild(right); box.appendChild(row);
         }).catch(function () { /* skip this pack */ });
       });
     }).catch(function () { $("packCard").hidden = true; });
+  }
+  function loadShelf() {
+    window.claude.authFetch("/api/shelf").then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) return;
+      var box = $("shelfList"); box.textContent = "";
+      var keys = Object.keys(CAT_NAMES).concat(["none"]).filter(function (k) { var c = j.cats[k]; return c && (c.bank || c.away); });
+      if (!keys.length) { box.textContent = "No questions yet."; return; }
+      keys.forEach(function (k) {
+        var c = j.cats[k], name = k === "none" ? "Not sorted yet" : CAT_NAMES[k];
+        var row = document.createElement("div"); row.className = "row";
+        var who = document.createElement("div"); who.className = "who"; who.appendChild(document.createTextNode(name));
+        var meta = document.createElement("div"); meta.className = "meta"; meta.textContent = c.bank + " in the bank" + (c.away ? ", " + c.away + " put away" : "");
+        who.appendChild(meta); row.appendChild(who);
+        var right = document.createElement("div"); right.className = "form";
+        function act(action, label, aria, confirmText, doneText) {
+          var b = document.createElement("button"); b.type = "button"; b.textContent = label; b.setAttribute("aria-label", aria + " " + name);
+          b.disabled = (action === "away" && !c.bank) || (action === "back" && !c.away);
+          b.onclick = function () {
+            if (confirmText) {
+              if (action === "delete") { var typed = window.prompt(confirmText + "\n\nType delete to confirm."); if (!typed || typed.trim().toLowerCase() !== "delete") return; }
+              else if (!window.confirm(confirmText)) return;
+            }
+            say("Saving..."); b.disabled = true;
+            post("/api/shelf", { action: action, cat: k }).then(function (r) { say(doneText(r)); loadShelf(); loadCats(); loadPacks(); }).catch(function (e) { say(e.message, true); loadShelf(); });
+          };
+          right.appendChild(b);
+        }
+        act("away", "Put away for now", "Put away", "Put away " + c.bank + " questions from " + name + "? Hosts and viewers will not see them. You can bring them back at any time.", function (r) { return "Put away " + r.moved + " questions. Bring them back when you want them."; });
+        act("back", "Bring back", "Bring back", "", function (r) { return "Brought back " + r.moved + " questions."; });
+        act("delete", "Delete for good", "Delete for good", "Delete all " + (c.bank + c.away) + " " + name + " questions for good? This cannot be undone. Backups you already downloaded still have them.", function (r) { return "Deleted " + r.removed + " questions for good."; });
+        row.appendChild(right); box.appendChild(row);
+      });
+    }).catch(function () { /* leave as is */ });
   }
   var adminDaters = [], daterSub = false;
   function watchDaters() { // owners can read the dater list; it lets the page suggest "is this someone already on your list?"

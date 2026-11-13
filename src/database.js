@@ -45,6 +45,7 @@ export class Database extends DurableObject {
     }
     this.sql.exec("CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, email TEXT NOT NULL, ts INTEGER NOT NULL, fails INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS announce_items (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, live_at INTEGER NOT NULL, kind TEXT NOT NULL, msg TEXT NOT NULL, push INTEGER NOT NULL, discord INTEGER NOT NULL, ping INTEGER NOT NULL, status TEXT NOT NULL, sent INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, cursor TEXT NOT NULL DEFAULT '', note TEXT)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS shelf (id TEXT PRIMARY KEY, cat TEXT NOT NULL, data TEXT NOT NULL, ts INTEGER NOT NULL) WITHOUT ROWID"); // questions put away for now
     this.sql.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS revoked (email TEXT PRIMARY KEY, after INTEGER NOT NULL) WITHOUT ROWID");
     // the old "recently signed in" list becomes the permanent member list (once)
@@ -1052,7 +1053,7 @@ export class Database extends DurableObject {
     this.ctx.storage.transactionSync(() => {
       for (const q of questions) {
         if (!q || typeof q.id !== "string" || typeof q.text !== "string" || !okKey.has(q.cat) || !validDocId("questions", q.id) || q.text.length < 3 || q.text.length > 300) throw new RuleError("invalid-argument", "The pack has a bad entry.");
-        if (this.getRow("questions", q.id) !== null) { skipped++; continue; }
+        if (this.getRow("questions", q.id) !== null || this.sql.exec("SELECT 1 AS x FROM shelf WHERE id = ?", q.id).toArray().length) { skipped++; continue; }
         this.ensureRoom("questions");
         const data = { text: q.text, handle: "", status: "ready", cat: q.cat, ts: base + add.length };
         this.upsert("questions", q.id, validateDoc(data));
@@ -1061,6 +1062,69 @@ export class Database extends DurableObject {
     });
     if (add.length) this.broadcastAdd("questions", add);
     return { ok: true, added: add.length, skipped };
+  }
+
+  /* ---------- whole categories: put away for now, bring back, delete for good ---------- */
+
+  static shelfKey(d) { return typeof d.cat === "string" && d.cat ? d.cat : "none"; }
+
+  shelfStatus() {
+    const cats = {};
+    const slot = (k) => (cats[k] = cats[k] || { bank: 0, away: 0 });
+    for (const r of this.sql.exec("SELECT data FROM docs WHERE coll = 'questions'").toArray()) { try { slot(Database.shelfKey(JSON.parse(r.data))).bank++; } catch (e) { /* skip */ } }
+    for (const r of this.sql.exec("SELECT cat, COUNT(*) AS n FROM shelf GROUP BY cat").toArray()) slot(r.cat).away = r.n;
+    return { cats };
+  }
+
+  shelfAction(actorEmail, action, cat, allowed) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    if (cat !== "none" && !allowed.includes(cat)) return { ok: false, code: "invalid-argument", message: "Unknown category." };
+    const ids = [], adds = [];
+    if (action === "away") {
+      this.ctx.storage.transactionSync(() => {
+        for (const r of this.sql.exec("SELECT id, data FROM docs WHERE coll = 'questions'").toArray()) {
+          let d; try { d = JSON.parse(r.data); } catch (e) { continue; }
+          if (Database.shelfKey(d) !== cat) continue;
+          this.sql.exec("INSERT OR REPLACE INTO shelf (id, cat, data, ts) VALUES (?, ?, ?, ?)", r.id, cat, r.data, Date.now());
+          this.sql.exec("DELETE FROM docs WHERE coll = 'questions' AND id = ?", r.id);
+          ids.push(r.id);
+        }
+      });
+      if (ids.length) this.broadcastDel("questions", ids);
+      return { ok: true, moved: ids.length };
+    }
+    if (action === "back") {
+      try {
+        this.ctx.storage.transactionSync(() => {
+          for (const r of this.sql.exec("SELECT id, data FROM shelf WHERE cat = ?", cat).toArray()) {
+            this.ensureRoom("questions");
+            this.upsert("questions", r.id, r.data);
+            this.sql.exec("DELETE FROM shelf WHERE id = ?", r.id);
+            adds.push([r.id, JSON.parse(r.data)]);
+          }
+        });
+      } catch (e) {
+        if (e instanceof RuleError) return { ok: false, code: e.code, message: "The question bank is full, so they could not all come back." };
+        throw e;
+      }
+      if (adds.length) this.broadcastAdd("questions", adds);
+      return { ok: true, moved: adds.length };
+    }
+    if (action === "delete") {
+      this.ctx.storage.transactionSync(() => {
+        for (const r of this.sql.exec("SELECT id, data FROM docs WHERE coll = 'questions'").toArray()) {
+          let d; try { d = JSON.parse(r.data); } catch (e) { continue; }
+          if (Database.shelfKey(d) !== cat) continue;
+          this.sql.exec("DELETE FROM docs WHERE coll = 'questions' AND id = ?", r.id);
+          ids.push(r.id);
+        }
+      });
+      const away = this.sql.exec("SELECT COUNT(*) AS n FROM shelf WHERE cat = ?", cat).one().n;
+      this.sql.exec("DELETE FROM shelf WHERE cat = ?", cat);
+      if (ids.length) this.broadcastDel("questions", ids);
+      return { ok: true, removed: ids.length + away };
+    }
+    return { ok: false, code: "invalid-argument", message: "Unknown action." };
   }
 
   broadcastAdd(coll, add) {
@@ -1090,7 +1154,8 @@ export class Database extends DurableObject {
   /* ---------- RPC used by the Worker (export / import) ---------- */
 
   exportAll() {
-    const out = { app: "kims-speed-dating", exportedAt: new Date().toISOString(), daters: [], questions: [], matches: [], streams: [], seats: [], game: null };
+    const out = { app: "kims-speed-dating", exportedAt: new Date().toISOString(), daters: [], questions: [], shelved: [], matches: [], streams: [], seats: [], game: null };
+    for (const r of this.sql.exec("SELECT id, data FROM shelf ORDER BY id").toArray()) { try { out.shelved.push({ ...JSON.parse(r.data), id: r.id }); } catch (e) { /* skip */ } }
     for (const r of this.sql.exec("SELECT coll, id, data FROM docs ORDER BY coll, id").toArray()) {
       const obj = JSON.parse(r.data);
       if (r.coll === "daters" || r.coll === "questions" || r.coll === "matches") out[r.coll].push({ ...obj, id: r.id });

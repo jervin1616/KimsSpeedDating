@@ -841,6 +841,71 @@ try {
       check("the pack tools show no JavaScript errors", adm.errors.length === 0, adm.errors);
       await adm.context().close();
     }
+    // ---- whole categories: put away for now, bring back, delete for good
+    {
+      const sh = (session, body, extra = {}) => api("/api/shelf", session, body, extra);
+      const shGet = (session) => fetch(API_BASE + "/api/shelf", { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+      const docsNow = async () => new Map((await (await connect(O)).sub("questions")).docs.map((d) => [d.id, d.data]));
+      const st0 = await shGet(O);
+      const dilemmaN = pack.questions.filter((q) => q.cat === "dilemma").length;
+      check("every category is listed with how many questions are in the bank", st0.status === 200 && st0.body.cats.dilemma && st0.body.cats.dilemma.bank >= dilemmaN - 1 && st0.body.cats.dilemma.away === 0, st0.body);
+      check("only owners can use it (403 for an Editor, 401 with no login, 403 from a wrong origin)", (await shGet(ED)).status === 403 && (await shGet(null)).status === 401 && (await sh(ED, { action: "away", cat: "dilemma" })).status === 403 && (await sh(O, { action: "away", cat: "dilemma" }, { Origin: "https://evil.example" })).status === 403);
+      check("a made-up category or action is refused (400)", (await sh(O, { action: "away", cat: "nope" })).status === 400 && (await sh(O, { action: "explode", cat: "dilemma" })).status === 400);
+      const before = await docsNow();
+      const inCat = [...before].filter(([, d]) => d.cat === "dilemma").map(([id]) => id);
+      const askedId = inCat[0];
+      await cz.w("update", "questions", askedId, { askCount: 7, lastAsked: 12345 });
+      const away = await sh(O, { action: "away", cat: "dilemma" });
+      const mid = await docsNow();
+      check("putting a category away removes all of it from the bank and nothing else", away.status === 200 && away.body.moved === inCat.length && inCat.every((id) => !mid.has(id)) && mid.size === before.size - inCat.length, away.body);
+      check("the status says they are put away, not gone", (await shGet(O)).body.cats.dilemma.away === inCat.length && (await shGet(O)).body.cats.dilemma.bank === 0);
+      check("a viewer's open page drops that category at once", await until(async () => !(await catV.locator("#myCat option").allTextContents()).some((o) => /^What would you do\?/.test(o)), 8000));
+      const pAdd = await packReq(O, "hot-seat", "POST");
+      check("adding the ready-made pack does not bring put-away questions back", pAdd.status === 200 && !(await docsNow()).has(inCat[0]) && (await shGet(O)).body.cats.dilemma.bank === 0, pAdd.body);
+      const exp = await (await fetch(API_BASE + "/api/export", { headers: { Authorization: "Bearer " + O.token } })).json();
+      check("a backup keeps the put-away questions (under 'shelved')", Array.isArray(exp.shelved) && exp.shelved.length === inCat.length && exp.shelved.some((q) => q.id === askedId));
+      const back = await sh(O, { action: "back", cat: "dilemma" });
+      const after = await docsNow();
+      check("bringing a category back restores every question exactly as it was, with its history", back.status === 200 && back.body.moved === inCat.length && inCat.every((id) => after.has(id)) && after.get(askedId).askCount === 7 && after.get(askedId).lastAsked === 12345 && after.get(askedId).text === before.get(askedId).text, back.body);
+      check("...and a viewer's page gets the category back at once", await until(async () => (await catV.locator("#myCat option").allTextContents()).some((o) => /^What would you do\?/.test(o)), 8000));
+      check("putting away or bringing back twice is harmless (0 moved)", (await sh(O, { action: "back", cat: "dilemma" })).body.moved === 0);
+      await sh(O, { action: "away", cat: "dilemma" });
+      const gone = await sh(O, { action: "delete", cat: "dilemma" });
+      const fin = await docsNow(); const stF = (await shGet(O)).body.cats;
+      check("deleting for good removes the category including what was put away, and leaves the rest", gone.status === 200 && gone.body.removed === inCat.length && inCat.every((id) => !fin.has(id)) && fin.size === before.size - inCat.length && (!stF.dilemma || (stF.dilemma.bank === 0 && stF.dilemma.away === 0)), gone.body);
+      check("a deleted category cannot be brought back", (await sh(O, { action: "back", cat: "dilemma" })).body.moved === 0);
+      // restore the fixture state for later tests
+      await packReq(O, "hot-seat", "POST");
+      // the page
+      const adm = await pageFor(O, "/admin.html#questions");
+      await until(async () => /Every category is its own pack/.test(await adm.locator("#packCard").innerText()) && (await adm.locator("#shelfList .row").count()) > 3, 8000);
+      const stxt = await adm.locator("#shelfList").innerText();
+      check("the Questions tab lists every category as its own pack with counts", /Confessions & icks\s+\d+ in the bank/.test(stxt) && /Deep & personal/.test(stxt) && !/\bconfess\b/.test(stxt), stxt.slice(0, 300));
+      const row = adm.locator("#shelfList .row", { hasText: "Confessions & icks" });
+      const nConf = (await shGet(O)).body.cats.confess.bank;
+      adm.once("dialog", (d) => d.dismiss());
+      await row.getByRole("button", { name: "Put away Confessions & icks" }).click(); await sleep(500);
+      check("cancelling 'put away for now' does nothing", (await shGet(O)).body.cats.confess.bank === nConf);
+      adm.once("dialog", (d) => d.accept());
+      await row.getByRole("button", { name: "Put away Confessions & icks" }).click();
+      check("put away from the page works, and the row then offers Bring back", await until(async () => /put away/.test(await adm.locator("#shelfList .row", { hasText: "Confessions & icks" }).innerText()) && await adm.locator("#shelfList .row", { hasText: "Confessions & icks" }).getByRole("button", { name: "Bring back Confessions & icks" }).isEnabled(), 8000));
+      await adm.locator("#shelfList .row", { hasText: "Confessions & icks" }).getByRole("button", { name: "Bring back Confessions & icks" }).click();
+      check("bring back from the page works", await until(async () => (await shGet(O)).body.cats.confess.bank === nConf && (await shGet(O)).body.cats.confess.away === 0, 8000));
+      adm.once("dialog", (d) => d.dismiss());
+      await adm.locator("#shelfList .row", { hasText: "Confessions & icks" }).getByRole("button", { name: "Delete for good Confessions & icks" }).click(); await sleep(500);
+      check("cancelling the delete prompt keeps everything", (await shGet(O)).body.cats.confess.bank === nConf);
+      adm.once("dialog", (d) => d.accept("nope"));
+      await adm.locator("#shelfList .row", { hasText: "Confessions & icks" }).getByRole("button", { name: "Delete for good Confessions & icks" }).click(); await sleep(500);
+      check("typing anything other than 'delete' keeps everything", (await shGet(O)).body.cats.confess.bank === nConf);
+      adm.once("dialog", (d) => d.accept("delete"));
+      await adm.locator("#shelfList .row", { hasText: "Confessions & icks" }).getByRole("button", { name: "Delete for good Confessions & icks" }).click();
+      check("typing 'delete' removes the category for good", await until(async () => { const c = (await shGet(O)).body.cats.confess; return !c || (c.bank === 0 && c.away === 0); }, 8000));
+      await packReq(O, "hot-seat", "POST");
+      await adm.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+      check("on a phone the category list fits without sideways scrolling", await adm.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+      check("the category tools show no JavaScript errors", adm.errors.length === 0, adm.errors);
+      await adm.context().close();
+    }
     // ---- member list, TikTok usernames, dater sign-ups and pending daters
     {
       const jget = (path, session) => fetch(API_BASE + path, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
