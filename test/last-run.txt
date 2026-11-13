@@ -627,6 +627,8 @@
   PASS both boxes can be reached by keyboard (Tab) and are labelled for screen readers
   PASS scrolling the box brings the last viewer into view, and the page does not scroll sideways
   PASS buttons on a row inside the scrolling box still work (Block then Unblock)
+  PASS every long list on the admin page (people, viewers, blocked, signed in, search results, pending sign-ups, recent changes, erase results) is a scrollable, keyboard-reachable, labelled box
+  PASS a list with nothing in it does not show an empty box (search results before you search)
   PASS changing a viewer to Contributor moves them up into the staff section
   PASS ...and the change shows up under Recent changes with an Undo
   PASS ...and an Undo button appears right at the top of the page
@@ -670,4 +672,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-635 passed, 0 failed, 635 total
+637 passed, 0 failed, 637 total

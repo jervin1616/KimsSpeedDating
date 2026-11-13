@@ -19,6 +19,7 @@
   .scrolly{max-height:min(420px,60vh);overflow-y:auto;overscroll-behavior:contain;border:1px solid #4a0d12;border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:#6e1518 #1b0203}
   .scrolly:focus-visible{outline:2px solid #ff8fa8;outline-offset:2px}
   .scrolly .row{flex:0 0 auto}
+  .scrolly:empty{display:none}
   .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border:1px solid #6e1518;border-radius:10px;padding:8px 10px;background:#240306}
   .row .who{min-width:0;overflow-wrap:anywhere}
   .row .meta{color:#d9a39b;font-size:12px}
@@ -74,13 +75,13 @@
     <h2>Pending dater sign-ups <span class="count" id="pendCount">0</span></h2>
     <p>People who signed up to be a speed dater. Approve adds them to the dater list. Hosts can also find them by typing their username in the seat picker.</p>
     <form class="form" id="pendForm"><input id="pendQ" type="search" maxlength="60" placeholder="Search username or email" autocomplete="off" aria-label="Search pending sign-ups"><button class="danger" id="pendClear" type="button">Clear all</button></form>
-    <div id="pendList"></div>
+    <div id="pendList" class="scrolly" tabindex="0" role="region" aria-label="Pending dater sign-ups, scrollable"></div>
   </section>
   <section class="card" id="peopleCard" hidden>
     <h2>Find a person <span class="count" id="peopleTotal">0</span></h2>
     <p>Everyone who has signed in is on this list. Search by email or TikTok username.</p>
     <form class="form" id="peopleForm"><input id="peopleQ" type="search" required minlength="2" maxlength="60" placeholder="email or @username" autocomplete="off" aria-label="Search people"><button class="primary" type="submit">Search</button></form>
-    <div id="peopleOut"></div>
+    <div id="peopleOut" class="scrolly" tabindex="0" role="region" aria-label="Search results, scrollable"></div>
   </section>
   <section class="card" id="catCard" hidden>
     <h2>Question categories</h2>
@@ -95,7 +96,7 @@
   <section class="card" id="listCard" hidden>
     <h2>Owners, editors and contributors <span class="count" id="staffCount">0</span></h2>
     <p>People with more than watch-only access.</p>
-    <div id="staffList"></div>
+    <div id="staffList" class="scrolly" tabindex="0" role="region" aria-label="Owners, editors and contributors, scrollable"></div>
   </section>
   <section class="card" id="logCard" hidden>
     <h2>Recent changes</h2>
@@ -110,12 +111,12 @@
   <section class="card" id="blockedCard" hidden>
     <h2>Blocked <span class="count" id="blockedCount">0</span></h2>
     <p>These accounts cannot use the app at all, even though other people can watch. A block applies to one Google account, so someone can make a new account. If that happens, use Lock the door.</p>
-    <div id="blockedList"></div>
+    <div id="blockedList" class="scrolly" tabindex="0" role="region" aria-label="Blocked accounts, scrollable"></div>
   </section>
   <section class="card" id="seenCard" hidden>
     <h2>Signed in, not on the list</h2>
     <p id="seenNote"></p>
-    <div id="seenList"></div>
+    <div id="seenList" class="scrolly" tabindex="0" role="region" aria-label="Signed in, not on the list, scrollable"></div>
   </section>
   <section class="card tool" id="eraseCard" hidden>
     <h2>Erase a person's records</h2>
@@ -124,7 +125,7 @@
       <input id="findQ" type="text" required minlength="2" maxlength="80" placeholder="name, @handle or email" autocomplete="off" aria-label="Name, handle or email">
       <button type="submit" class="primary">Find</button>
     </form>
-    <div id="findOut"></div>
+    <div id="findOut" class="scrolly" tabindex="0" role="region" aria-label="Records found, scrollable"></div>
   </section>
   <section class="card" id="helpCard" hidden>
     <h2>What each role can do</h2>

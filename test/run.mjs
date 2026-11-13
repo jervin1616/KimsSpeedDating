@@ -1665,6 +1665,10 @@ try {
   await AD.evaluate(() => { const e = document.getElementById("viewerList"); e.scrollTop = e.scrollHeight; });
   check("scrolling the box brings the last viewer into view, and the page does not scroll sideways", await AD.locator("#viewerList .row", { hasText: many[13] }).isVisible() && vBox.pageW <= vBox.winW);
   check("buttons on a row inside the scrolling box still work (Block then Unblock)", await (async () => { AD.once("dialog", (d) => d.accept()); await AD.locator("#viewerList .row", { hasText: many[13] }).getByRole("button", { name: "Block", exact: true }).click(); const ok = await until(async () => (await text(AD, "#blockedList")).includes(many[13]), 6000); await AD.locator("#blockedList .row", { hasText: many[13] }).getByRole("button", { name: "Unblock" }).click(); return ok && await until(async () => !(await text(AD, "#blockedList")).includes(many[13]), 6000); })());
+  const allLists = ["staffList", "viewerList", "logList", "blockedList", "seenList", "peopleOut", "pendList", "findOut"];
+  const lists = await AD.evaluate((ids) => ids.map((id) => { const e = document.getElementById(id), c = getComputedStyle(e); return { id, cls: e.classList.contains("scrolly"), tab: e.getAttribute("tabindex"), role: e.getAttribute("role"), label: e.getAttribute("aria-label"), oy: c.overflowY, max: c.maxHeight, shown: c.display !== "none" }; }), allLists);
+  check("every long list on the admin page (people, viewers, blocked, signed in, search results, pending sign-ups, recent changes, erase results) is a scrollable, keyboard-reachable, labelled box", lists.every((l) => l.cls && l.tab === "0" && l.role === "region" && /scrollable/.test(l.label) && l.oy === "auto" && l.max !== "none"), lists.filter((l) => !(l.cls && l.tab === "0" && l.oy === "auto")));
+  check("a list with nothing in it does not show an empty box (search results before you search)", lists.find((l) => l.id === "peopleOut").shown === false);
   for (const e of many) await adminApi(e, "none");
   await AD.reload(); await sleep(600);
 
