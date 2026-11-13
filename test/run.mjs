@@ -1653,6 +1653,20 @@ try {
   check("viewers are in a section of their own, below that, and never mixed into the staff list", await until(async () => { const t = await text(AD, "#viewerList"); return t.includes(mk.v1) && t.includes(mk.v2) && t.includes(EMAILS.viewer) && !t.includes(mk.mod) && !t.includes(mk.ed); }, 6000));
   const ys = await AD.evaluate(() => ({ staff: document.getElementById("listCard").getBoundingClientRect().top, viewers: document.getElementById("viewerCard").getBoundingClientRect().top }));
   check("...and the Viewers section sits below the staff section", ys.viewers > ys.staff, ys);
+  // long lists scroll inside their own box instead of making the page endless
+  const many = Array.from({ length: 14 }, (_, n) => `scrolltest${String(n).padStart(2, "0")}@example.com`);
+  for (const e of many) await adminApi(e, "viewer");
+  await AD.reload(); await until(async () => (await text(AD, "#viewerList")).includes(many[13]), 8000);
+  const scrollBox = (sel) => AD.evaluate((q) => { const e = document.querySelector(q), c = getComputedStyle(e); return { oy: c.overflowY, max: c.maxHeight, ch: e.clientHeight, sh: e.scrollHeight, pageW: document.documentElement.scrollWidth, winW: window.innerWidth }; }, sel);
+  const vBox = await scrollBox("#viewerList"), lBox = await scrollBox("#logList");
+  check("the Viewers list is a scrollable box with a fixed height, so many viewers do not stretch the page", vBox.oy === "auto" && vBox.ch <= 421 && vBox.sh > vBox.ch, vBox);
+  check("Recent changes is a scrollable box too", lBox.oy === "auto" && lBox.ch <= 421 && lBox.sh > lBox.ch, lBox);
+  check("both boxes can be reached by keyboard (Tab) and are labelled for screen readers", await AD.locator("#viewerList").getAttribute("tabindex") === "0" && /Viewers/.test(await AD.locator("#viewerList").getAttribute("aria-label")) && await AD.locator("#logList").getAttribute("tabindex") === "0" && /Recent changes/.test(await AD.locator("#logList").getAttribute("aria-label")));
+  await AD.evaluate(() => { const e = document.getElementById("viewerList"); e.scrollTop = e.scrollHeight; });
+  check("scrolling the box brings the last viewer into view, and the page does not scroll sideways", await AD.locator("#viewerList .row", { hasText: many[13] }).isVisible() && vBox.pageW <= vBox.winW);
+  check("buttons on a row inside the scrolling box still work (Block then Unblock)", await (async () => { AD.once("dialog", (d) => d.accept()); await AD.locator("#viewerList .row", { hasText: many[13] }).getByRole("button", { name: "Block", exact: true }).click(); const ok = await until(async () => (await text(AD, "#blockedList")).includes(many[13]), 6000); await AD.locator("#blockedList .row", { hasText: many[13] }).getByRole("button", { name: "Unblock" }).click(); return ok && await until(async () => !(await text(AD, "#blockedList")).includes(many[13]), 6000); })());
+  for (const e of many) await adminApi(e, "none");
+  await AD.reload(); await sleep(600);
 
   await AD.locator("#viewerList .row", { hasText: mk.v1 }).locator("select").selectOption("contributor");
   check("changing a viewer to Contributor moves them up into the staff section", await until(async () => (await text(AD, "#staffList")).includes(mk.v1) && !(await text(AD, "#viewerList")).includes(mk.v1), 6000));

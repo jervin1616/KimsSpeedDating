@@ -622,6 +622,11 @@
   PASS ...with a count that matches
   PASS viewers are in a section of their own, below that, and never mixed into the staff list
   PASS ...and the Viewers section sits below the staff section
+  PASS the Viewers list is a scrollable box with a fixed height, so many viewers do not stretch the page
+  PASS Recent changes is a scrollable box too
+  PASS both boxes can be reached by keyboard (Tab) and are labelled for screen readers
+  PASS scrolling the box brings the last viewer into view, and the page does not scroll sideways
+  PASS buttons on a row inside the scrolling box still work (Block then Unblock)
   PASS changing a viewer to Contributor moves them up into the staff section
   PASS ...and the change shows up under Recent changes with an Undo
   PASS ...and an Undo button appears right at the top of the page
@@ -665,4 +670,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-630 passed, 0 failed, 630 total
+635 passed, 0 failed, 635 total
