@@ -5,7 +5,7 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#1b0203">
-<title>Kim's Speed Dating access</title>
+<title>Kim's Speed Dating admin</title>
 <style>
   :root{color-scheme:dark}
   *{box-sizing:border-box}
@@ -48,22 +48,47 @@
   #lockState{font-weight:600}
   #lockState.on{color:#ffb347}
   .blockedrow .meta{color:#ff9aa6}
+  .tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;position:sticky;top:0;z-index:5;background:rgba(27,2,3,.92);backdrop-filter:blur(6px);padding-top:6px;margin-top:-6px}
+  .tabs button{flex:0 0 auto;border-radius:999px;padding:7px 16px;min-height:38px;background:#2a0508;border-color:#6e1518;color:#e9c2bc;font-weight:600;display:inline-flex;gap:8px;align-items:center}
+  .tabs button[aria-selected="true"]{background:linear-gradient(180deg,#e63a63,#bf0f38);border-color:#ffd3d9;color:#fff4f2}
+  .tabs button:focus-visible,.linkbtn:focus-visible,#allToggle:focus-visible{outline:2px solid #ff8fa8;outline-offset:2px}
+  .badge{min-width:20px;height:20px;border-radius:10px;background:#fff4f2;color:#a10d30;font-size:12px;font-weight:800;display:inline-grid;place-items:center;padding:0 6px}
+  .allrow{text-align:right;margin-top:-6px;font-size:13px}.allrow a{color:#ff8fa8}
+  .tabpanel{display:flex;flex-direction:column;gap:16px}
+  .linkbtn{display:inline-block;text-decoration:none;border-radius:10px;border:1px solid #6e1518;background:#4a0b0f;padding:9px 14px;font-weight:600;color:inherit}
+  .linkbtn.primary{background:linear-gradient(180deg,#e63a63,#bf0f38);border-color:#ffd3d9;color:#fff4f2;font-weight:700}
+  .tag{font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid #6e1518;border-radius:999px;padding:1px 8px;color:#d9a39b;margin-left:6px;font-weight:600}
+  ul.help,.help3 ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;color:#ecd0cb}
+  .help3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.help3>div{border:1px solid #4a0d12;border-radius:10px;padding:10px 12px;background:#240306;color:#ecd0cb}
+  .help3 ol{margin-top:6px}
+  .warnline{border:1px solid #ffb347;border-radius:10px;padding:8px 12px;color:#ffe3b8;background:rgba(255,179,71,.08)}
+  .tblwrap{overflow-x:auto;border:1px solid #4a0d12;border-radius:10px}.tbl{border-collapse:collapse;width:100%;min-width:520px;font-size:14px}
+  .tbl th,.tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid #4a0d12;vertical-align:top;color:#ecd0cb}.tbl th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#d9a39b;background:#240306}.tbl tr:last-child td{border-bottom:0}
+  .statuslist{display:flex;flex-direction:column;gap:8px}.srow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between;border:1px solid #4a0d12;border-radius:10px;padding:9px 12px;background:#240306}
+  .srow .l{font-weight:600}.srow .n{flex-basis:100%;color:#d9a39b;font-size:13px}
+  .pill{font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;border:1px solid}.pill.ok{color:#7ee2ae;border-color:#2a7a52;background:rgba(46,160,100,.12)}.pill.warn{color:#ffb347;border-color:#9a6a1a;background:rgba(255,179,71,.1)}.pill.info{color:#ffd5dc;border-color:#6e1518}
 </style></head><body><main>
   <a class="back" href="/">&larr; Back to the board</a>
-  <h1>Who can use Kim's Speed Dating</h1>
-  <p>Owners only. People you add can sign in with the Google account for that email.</p>
+  <h1>Kim's Speed Dating admin</h1>
+  <p>Owners only.</p>
   <div id="gsi"></div>
   <p id="msg" role="status"></p>
   <div id="undoRow" hidden><button id="undoBtn" type="button" class="primary"></button></div>
   <div><button id="signOut" type="button" hidden>Sign out</button></div>
-  <section class="card" id="addCard" hidden>
-    <h2>Add or change someone</h2>
-    <form class="form" id="addForm">
-      <input id="email" type="email" required placeholder="their-google-email@gmail.com" autocomplete="off" aria-label="Email">
-      <select id="role" aria-label="Role"><option value="viewer">Viewer (watch only)</option><option value="contributor">Contributor (questions)</option><option value="editor" id="editorOpt">Editor (everything)</option><option value="blocked">Blocked (no access)</option></select>
-      <button class="primary" type="submit">Save</button>
-    </form>
-    <p id="rules"></p>
+  <nav id="tabs" class="tabs" role="tablist" aria-label="Admin sections" hidden>
+    <button type="button" role="tab" id="t-today" data-tab="today" aria-controls="tab-today" aria-selected="true">Today<span class="badge" id="badgeToday" hidden>0</span></button>
+    <button type="button" role="tab" id="t-people" data-tab="people" aria-controls="tab-people" aria-selected="false">People</button>
+    <button type="button" role="tab" id="t-safety" data-tab="safety" aria-controls="tab-safety" aria-selected="false">Safety</button>
+    <button type="button" role="tab" id="t-questions" data-tab="questions" aria-controls="tab-questions" aria-selected="false">Questions</button>
+    <button type="button" role="tab" id="t-help" data-tab="help" aria-controls="tab-help" aria-selected="false">Help</button>
+    <button type="button" role="tab" id="t-status" data-tab="status" aria-controls="tab-status" aria-selected="false">Status</button>
+  </nav>
+  <div id="allRow" class="allrow" hidden><a href="#all" id="allToggle">Show everything on one page</a></div>
+  <div class="tabpanel" id="tab-today" role="tabpanel" aria-labelledby="t-today" hidden>
+  <section class="card" id="goCard" hidden>
+    <h2>Going live</h2>
+    <p id="goNote">Checking the schedule...</p>
+    <div class="form"><a class="linkbtn primary" id="goLink" href="/#announce">Open the announcer</a></div>
   </section>
   <section class="card" id="lockCard" hidden>
     <h2>Lock the door</h2>
@@ -77,31 +102,21 @@
     <form class="form" id="pendForm"><input id="pendQ" type="search" maxlength="60" placeholder="Search username or email" autocomplete="off" aria-label="Search pending sign-ups"><button class="danger" id="pendClear" type="button">Clear all</button></form>
     <div id="pendList" class="scrolly" tabindex="0" role="region" aria-label="Pending dater sign-ups, scrollable"></div>
   </section>
-  <section class="card" id="peopleCard" hidden>
-    <h2>Find a person <span class="count" id="peopleTotal">0</span></h2>
-    <p>Everyone who has signed in is on this list. Search by email or TikTok username.</p>
-    <form class="form" id="peopleForm"><input id="peopleQ" type="search" required minlength="2" maxlength="60" placeholder="email or @username" autocomplete="off" aria-label="Search people"><button class="primary" type="submit">Search</button></form>
-    <div id="peopleOut" class="scrolly" tabindex="0" role="region" aria-label="Search results, scrollable"></div>
-  </section>
-  <section class="card" id="catCard" hidden>
-    <h2>Question categories</h2>
-    <p id="catNote"></p>
-    <div><button id="catBtn" type="button" class="primary">Sort the questions into categories</button></div>
-  </section>
-  <section class="card" id="packCard" hidden>
-    <h2>Question packs</h2>
-    <p>Add a ready-made set of questions to the bank. It only adds new ones and never changes questions you already have.</p>
-    <div id="packList"></div>
+  </div>
+  <div class="tabpanel" id="tab-people" role="tabpanel" aria-labelledby="t-people" hidden>
+  <section class="card" id="addCard" hidden>
+    <h2>Add or change someone</h2>
+    <form class="form" id="addForm">
+      <input id="email" type="email" required placeholder="their-google-email@gmail.com" autocomplete="off" aria-label="Email">
+      <select id="role" aria-label="Role"><option value="viewer">Viewer (watch only)</option><option value="contributor">Contributor (questions)</option><option value="editor" id="editorOpt">Editor (everything)</option><option value="blocked">Blocked (no access)</option></select>
+      <button class="primary" type="submit">Save</button>
+    </form>
+    <p id="rules"></p>
   </section>
   <section class="card" id="listCard" hidden>
     <h2>Owners, editors and contributors <span class="count" id="staffCount">0</span></h2>
     <p>People with more than watch-only access.</p>
     <div id="staffList" class="scrolly" tabindex="0" role="region" aria-label="Owners, editors and contributors, scrollable"></div>
-  </section>
-  <section class="card" id="logCard" hidden>
-    <h2>Recent changes</h2>
-    <p>Changed someone by accident? Tap <b>Undo</b> and they go straight back.</p>
-    <div id="logList" class="scrolly" tabindex="0" role="region" aria-label="Recent changes, scrollable"></div>
   </section>
   <section class="card" id="viewerCard" hidden>
     <h2>Viewers <span class="count" id="viewerCount">0</span></h2>
@@ -118,6 +133,19 @@
     <p id="seenNote"></p>
     <div id="seenList" class="scrolly" tabindex="0" role="region" aria-label="Signed in, not on the list, scrollable"></div>
   </section>
+  <section class="card" id="peopleCard" hidden>
+    <h2>Find a person <span class="count" id="peopleTotal">0</span></h2>
+    <p>Everyone who has signed in is on this list. Search by email or TikTok username.</p>
+    <form class="form" id="peopleForm"><input id="peopleQ" type="search" required minlength="2" maxlength="60" placeholder="email or @username" autocomplete="off" aria-label="Search people"><button class="primary" type="submit">Search</button></form>
+    <div id="peopleOut" class="scrolly" tabindex="0" role="region" aria-label="Search results, scrollable"></div>
+  </section>
+  </div>
+  <div class="tabpanel" id="tab-safety" role="tabpanel" aria-labelledby="t-safety" hidden>
+  <section class="card" id="logCard" hidden>
+    <h2>Recent changes</h2>
+    <p>Changed someone by accident? Tap <b>Undo</b> and they go straight back.</p>
+    <div id="logList" class="scrolly" tabindex="0" role="region" aria-label="Recent changes, scrollable"></div>
+  </section>
   <section class="card tool" id="eraseCard" hidden>
     <h2>Erase a person's records</h2>
     <p>For when someone asks to be removed. Type a name, chat handle or email. You see everything that mentions them and choose what to erase. Backups you already downloaded are not changed.</p>
@@ -126,6 +154,95 @@
       <button type="submit" class="primary">Find</button>
     </form>
     <div id="findOut" class="scrolly" tabindex="0" role="region" aria-label="Records found, scrollable"></div>
+  </section>
+  <section class="card" id="safetyInfo">
+    <h2>How the safety tools fit together</h2>
+    <ul class="help">
+      <li><b>Block</b> one account. <b>Lock the door</b> for a wave. <b>Sign out everywhere</b> to end live sessions. <b>Undo</b> anything in Recent changes. <b>Erase</b> only when someone asks to be removed.</li>
+      <li>Owners cannot be blocked or changed on this page. They live in Cloudflare.</li>
+    </ul>
+  </section>
+  </div>
+  <div class="tabpanel" id="tab-questions" role="tabpanel" aria-labelledby="t-questions" hidden>
+  <section class="card" id="qIntro">
+    <h2>The question bank</h2>
+    <p>Hosts ask from these on the main screen, and viewers get a private random one. Sort questions into categories, and add ready-made sets with one tap.</p>
+  </section>
+  <section class="card" id="catCard" hidden>
+    <h2>Question categories</h2>
+    <p id="catNote"></p>
+    <div><button id="catBtn" type="button" class="primary">Sort the questions into categories</button></div>
+  </section>
+  <section class="card" id="packCard" hidden>
+    <h2>Question packs</h2>
+    <p>Add a ready-made set of questions to the bank. It only adds new ones and never changes questions you already have.</p>
+    <div id="packList"></div>
+  </section>
+  </div>
+  <div class="tabpanel" id="tab-help" role="tabpanel" aria-labelledby="t-help" hidden>
+  <section class="card" id="hStart">
+    <h2>Start here</h2>
+    <div class="help3">
+      <div><b>Before a stream</b><ol><li>Today tab: look at <b>Pending dater sign-ups</b> and approve the ones you want.</li><li>Open the announcer and schedule the go-live time, at least an hour ahead.</li><li>On the main screen, check the <b>Daters</b> and <b>Questions</b> tabs.</li></ol></div>
+      <div><b>During a stream</b><ol><li>Tap an empty seat to pick someone. Type to search.</li><li>Press <b>Match</b>, then tap the panelist the hot seat picked.</li><li>Raid or fake accounts? Today tab, <b>Lock the door</b>.</li></ol></div>
+      <div><b>After a stream</b><ol><li>End the stream from the stream bar so it saves a summary.</li><li>Download a backup from the <a href="/backup.html">Backup page</a>.</li><li>If the door is locked, open it again.</li></ol></div>
+    </div>
+  </section>
+  <section class="card" id="hBoard">
+    <h2>On the main screen <span class="tag">hosts and owners</span></h2>
+    <ul class="help">
+      <li><b>Seats:</b> tap an empty seat to open the picker. Search by name, state or username. Tap a person to seat them. Tap a seated person, then another seat, to move or swap.</li>
+      <li><b>Colors:</b> green fits both, yellow is close (off by 1 to 2 years), red is 3 or more years off or a mismatch with the hot seat.</li>
+      <li><b>Bottom bar:</b> <b>Remove hot seat</b> (with Undo) and <b>Match</b> (saves the pick to the Match log).</li>
+      <li><b>Questions tab:</b> <b>Random question</b> with a category menu, <b>Ask this</b> on any question, <b>Back</b>, <b>Clear question</b>. Add chat questions in the box at the top.</li>
+      <li><b>Stream bar:</b> start the stream when you go live and end it when you finish.</li>
+    </ul>
+  </section>
+  <section class="card" id="hSignups">
+    <h2>Sign-ups and merging</h2>
+    <p>Viewers can add a TikTok username and sign up to be a speed dater. Nothing reaches the board until you approve it.</p>
+    <ul class="help">
+      <li><b>Approve</b> (Today tab, or from the seat picker) adds them to your dater list. Tapping a sign-up in the seat picker approves and seats them in one move.</li>
+      <li>If a sign-up looks like someone already on your list, <b>Is this person already on your list?</b> opens with the likely matches and why. Tap <b>Merge into this one</b>, check the before and after, then <b>Confirm merge</b>. You keep their history. <b>Undo</b> is right there if it was wrong.</li>
+      <li>Someone with a different name? Use <b>Merge with existing...</b> and search your daters.</li>
+      <li>When someone changes their TikTok username, their linked dater renames itself unless you set the name by hand.</li>
+    </ul>
+    <p class="warnline"><b>Check on camera.</b> The app cannot prove a username belongs to the person who typed it, and the 18+ box is only a checkbox. If someone claims a name that is not theirs, use <b>Release username</b> in People.</p>
+  </section>
+  <section class="card" id="hGoLive">
+    <h2>Going-live messages</h2>
+    <ul class="help">
+      <li>Tap <b>Open the announcer</b> on the Today tab (or <b>Announce</b> on the main screen). Pick the date and time, which is Eastern. Tick phones and Discord. Press <b>Schedule it</b>.</li>
+      <li>Three messages go out: 1 hour before, 30 minutes before, and "We are live now!".</li>
+      <li><b>Send me a test</b> goes to your own phone only. <b>Cancel schedule</b> removes what has not been sent. Messages whose time has already passed are skipped, so schedule at least an hour ahead.</li>
+      <li>Phones reach only people who turned notifications on. Discord reaches everyone in the channel, so keep it on.</li>
+    </ul>
+  </section>
+  <section class="card" id="hPeople">
+    <h2>People and safety</h2>
+    <ul class="help">
+      <li>Everyone who signs in joins <b>Viewers</b> automatically. You never need to add them.</li>
+      <li><b>Promote:</b> use the role menu on someone's row. <b>Remove</b> takes away a role you gave. <b>Recent changes</b> (Safety tab) lists changes with <b>Undo</b>.</li>
+      <li><b>Block</b> stops one account. A new account gets around it, so for a wave of accounts use <b>Lock the door</b>: new sign-ins from people you have not added are turned away, and everyone already watching stays.</li>
+      <li><b>Sign out everywhere</b> ends someone's sessions on every device. They can sign in again unless you also block them.</li>
+      <li><b>Erase a person's records</b> (Safety tab) is for removal requests. You see everything that mentions them and choose what to erase.</li>
+    </ul>
+  </section>
+  <section class="card" id="hWrong">
+    <h2>If something goes wrong</h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>A viewer cannot get in</td><td>People tab, <b>Find a person</b>. If they are Blocked, unblock them. If the door is locked, open it. Not found? They may have used a different Google account.</td></tr>
+        <tr><td>Viewers see "Full"</td><td>The room holds 500 at a time. Tell them to tap it and retry in a minute.</td></tr>
+        <tr><td>Fake accounts or a raid</td><td>Today tab, <b>Lock the door</b>. Block the worst accounts. Open the door afterwards.</td></tr>
+        <tr><td>Wrong role given</td><td>Safety tab, <b>Recent changes</b>, tap <b>Undo</b>.</td></tr>
+        <tr><td>A merge went to the wrong dater</td><td>Tap <b>Undo</b> straight away. Later, edit the dater on the main screen.</td></tr>
+        <tr><td>A sign-up looks fake</td><td>Decline it, or confirm on camera. People tab, <b>Find a person</b>, <b>Release username</b> frees a stolen name.</td></tr>
+        <tr><td>Phone notifications did not arrive</td><td>Normal for people who have not turned them on or are on silent. Use <b>Send me a test</b>, and post in Discord too. The Status tab shows whether phones and Discord are set up.</td></tr>
+        <tr><td>The category menu is missing</td><td>Questions tab, press the sort button.</td></tr>
+        <tr><td>A page looks broken after an update</td><td>Reload it. If it persists, tell whoever manages the site.</td></tr>
+      </tbody></table></div>
   </section>
   <section class="card" id="helpCard" hidden>
     <h2>What each role can do</h2>
@@ -138,10 +255,29 @@
     </dl>
     <p id="defaultNote"></p>
   </section>
+  <section class="card" id="hKeep">
+    <h2>Keep it safe</h2>
+    <ul class="help">
+      <li>Do not post or screenshot this page, the pending list or a backup file. They hold emails, usernames and ages.</li>
+      <li>Never share a key or the Discord link. They are set in Cloudflare only. If one is ever shown, tell whoever manages the site so it can be replaced.</li>
+      <li>18 and over only. The checkbox is not proof, so you seeing the person is the real check.</li>
+      <li>Gender, sexuality, age and state show on the board once someone is seated. Ask first, and remove anyone who asks.</li>
+    </ul>
+  </section>
+  </div>
+  <div class="tabpanel" id="tab-status" role="tabpanel" aria-labelledby="t-status" hidden>
+  <section class="card" id="statusCard">
+    <h2>Status</h2>
+    <p>What is switched on, and what is not. Nothing here can be changed from this page.</p>
+    <div id="statusList" class="statuslist"></div>
+    <div class="form"><button type="button" id="statusRefresh">Refresh</button></div>
+  </section>
+  </div>
 </main>
 <script src="/db-shim.js"></script>
 <script src="/match.js"></script>
 <script src="/mergeui.js"></script>
+<script src="/ettime.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -211,7 +347,7 @@
   function byRoleThenEmail(a, b) { return (RANK[a.role] - RANK[b.role]) || (a.email < b.email ? -1 : 1); }
 
   function render(data) {
-    me = data.you;
+    me = data.you; lastData = data;
     roleMap = new Map(data.people.map(function (p) { return [p.email, p.role]; }));
     $("addCard").hidden = false; $("listCard").hidden = false; $("viewerCard").hidden = false; $("helpCard").hidden = false;
     var def = { none: "gets no access.", viewer: "can watch as a Viewer.", contributor: "is a Contributor." }[data.defaultRole] || "gets no access.";
@@ -336,6 +472,7 @@
   }
   function renderPend() {
     $("pendCard").hidden = false; $("pendCount").textContent = pendAll.length;
+    $("badgeToday").hidden = !pendAll.length; $("badgeToday").textContent = pendAll.length; $("badgeToday").setAttribute("aria-label", pendAll.length + " sign-ups waiting");
     var q = $("pendQ").value.trim().toLowerCase().replace(/^@/, ""), box = $("pendList"); box.textContent = "";
     $("pendClear").disabled = !pendAll.length;
     var rows = pendAll.filter(function (su) { return !q || su.handle.toLowerCase().indexOf(q) >= 0 || (su.email || "").toLowerCase().indexOf(q) >= 0; });
@@ -515,12 +652,78 @@
     change(email, $("role").value).then(function () { $("email").value = ""; });
   };
 
+  /* ---------- tabs ---------- */
+  var TAB_NAMES = ["today", "people", "safety", "questions", "help", "status"], lastData = null, tabsReady = false;
+  function currentTab() { var h = (location.hash || "").replace("#", ""); return h === "all" || TAB_NAMES.indexOf(h) >= 0 ? h : "today"; }
+  function showTab(name, focus) {
+    var all = name === "all";
+    TAB_NAMES.forEach(function (t) { var on = all || t === name; $("tab-" + t).hidden = !on; $("t-" + t).setAttribute("aria-selected", String(t === name)); $("t-" + t).tabIndex = t === name || (all && t === "today") ? 0 : -1; });
+    $("allToggle").textContent = all ? "Back to tabs" : "Show everything on one page"; $("allToggle").setAttribute("href", all ? "#today" : "#all");
+    if (name === "status" || all) loadStatus();
+    if (name === "today" || all) loadGo();
+    if (focus) $("t-" + name).focus();
+  }
+  function setTab(name, focus) { try { history.replaceState(null, "", "#" + name); } catch (e) { location.hash = name; } showTab(name, focus); }
+  function initTabs() {
+    if (tabsReady) return; tabsReady = true;
+    $("tabs").hidden = false; $("allRow").hidden = false;
+    TAB_NAMES.forEach(function (t, i) {
+      var b = $("t-" + t);
+      b.onclick = function () { setTab(t, false); };
+      b.onkeydown = function (ev) {
+        var k = ev.key, to = k === "ArrowRight" ? (i + 1) % 6 : k === "ArrowLeft" ? (i + 5) % 6 : k === "Home" ? 0 : k === "End" ? 5 : -1;
+        if (to >= 0) { ev.preventDefault(); setTab(TAB_NAMES[to], true); }
+      };
+    });
+    $("allToggle").onclick = function (ev) { ev.preventDefault(); setTab(currentTab() === "all" ? "today" : "all", false); };
+    window.addEventListener("hashchange", function () { showTab(currentTab(), false); });
+    showTab(currentTab(), false);
+  }
+
+  /* ---------- Today: going live ---------- */
+  function loadGo() {
+    window.claude.authFetch("/api/announce").then(function (r) { return r.json(); }).then(function (a) {
+      if (!a.ok) return; $("goCard").hidden = false;
+      var next = (a.items || []).filter(function (i) { return i.status === "pending" || i.status === "sending"; })[0], F = window.EtTime.fmtEt;
+      $("goNote").textContent = next
+        ? "Scheduled: live at " + F(next.live_at, true) + " ET. The next message goes out at " + F(next.at, true) + " ET (" + ({ "1h": "1 hour before", "30m": "30 minutes before", "live": "we are live" })[next.kind] + ")."
+        : "Nothing is scheduled. Set the go-live time and the app sends the 1 hour, 30 minute and live messages for you.";
+    }).catch(function () {});
+  }
+
+  /* ---------- Status ---------- */
+  function srow(label, pill, kind, note) {
+    var r = document.createElement("div"); r.className = "srow";
+    var l = document.createElement("span"); l.className = "l"; l.textContent = label; r.appendChild(l);
+    var p = document.createElement("span"); p.className = "pill " + kind; p.textContent = pill; r.appendChild(p);
+    if (note) { var n = document.createElement("span"); n.className = "n"; n.textContent = note; r.appendChild(n); }
+    return r;
+  }
+  function loadStatus() {
+    var get = function (path) { return window.claude.authFetch(path).then(function (r) { return r.json(); }).catch(function () { return {}; }); };
+    Promise.all([get("/api/announce"), get("/api/categorize"), get("/api/signups"), api("GET").catch(function () { return null; })]).then(function (r) {
+      var an = r[0] || {}, cat = r[1] || {}, su = r[2] || {}, d = r[3] || lastData || {};
+      var box = $("statusList"); box.textContent = "";
+      var people = d.people || [], staff = people.filter(function (p) { return p.role !== "viewer" && p.role !== "blocked"; }).length, blocked = people.filter(function (p) { return p.role === "blocked"; }).length;
+      var viewers = people.filter(function (p) { return p.role === "viewer"; }).length + (d.defaultRole === "viewer" ? (d.defaultMembers || 0) : 0);
+      box.appendChild(srow("Phone notifications", an.pushOn ? "Set up" : "Not set up", an.pushOn ? "ok" : "warn", an.pushOn ? an.devices + (an.devices === 1 ? " phone has" : " phones have") + " turned them on." : "The notification key has not been saved on the site yet. Whoever manages the site does this once (see the deploy guide)."));
+      box.appendChild(srow("Discord posts", an.discordOn ? "Connected" : "Not connected", an.discordOn ? "ok" : "warn", an.discordOn ? "Going-live messages can post to your Discord channel." : "No Discord link has been saved on the site, so the Discord box in the announcer stays off."));
+      box.appendChild(srow("Default access", d.defaultRole === "viewer" ? "Viewer" : d.defaultRole === "none" ? "Invite only" : "Contributor", "info", d.defaultRole === "viewer" ? "Everyone who signs in with Google can watch. No approval needed." : "Only people you add can get in."));
+      box.appendChild(srow("The door", d.locked ? "Locked" : "Open", d.locked ? "warn" : "ok", d.locked ? "New sign-ins from people you have not added are turned away." : "Anyone with a Google account can sign in."));
+      box.appendChild(srow("People", viewers + " viewers", "info", staff + " owners, editors and contributors. " + blocked + " blocked."));
+      box.appendChild(srow("Questions", (cat.total || 0) + " in the bank", cat.total && cat.categorized === cat.total ? "ok" : "warn", cat.total ? cat.categorized + " are sorted into categories." + (cat.categorized < cat.total ? " Sort the rest on the Questions tab." : "") : "No questions yet."));
+      box.appendChild(srow("Dater sign-ups waiting", String((su.pending || []).length), (su.pending || []).length ? "warn" : "ok", "Approve them on the Today tab."));
+      box.appendChild(srow("This page", "Signed in", "ok", "As " + (window.claude.status().email || "") + " (owner). Site address: " + location.origin));
+    });
+  }
+  $("statusRefresh").onclick = loadStatus;
+
   function ready() {
     window.claude.use("user").then(function (u) {
       if (!u) return needSignIn();
       return Promise.resolve(window.claude.status().owner).then(function (ok) {
         if (!ok) { say("This account is not an owner, so it cannot manage access.", true); return; }
-        $("gsi").textContent = ""; $("signOut").hidden = false; say("Signed in as " + window.claude.status().email + "."); return load();
+        $("gsi").textContent = ""; $("signOut").hidden = false; say("Signed in as " + window.claude.status().email + "."); initTabs(); return load();
       });
     });
   }

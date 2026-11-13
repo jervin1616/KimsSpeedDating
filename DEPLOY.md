@@ -556,3 +556,22 @@ If nobody looks similar, approving works as before, with no extra tap. On the ad
 With `DEFAULT_ROLE` set to `viewer` (the setting you use), everyone who signs in with Google is a Viewer automatically. There is no approval step, and the old "Signed in, not on the list" section is gone. Those people now appear in the **Viewers** list, marked "Joined automatically", showing everyone you added by hand first and then the 100 newest sign-ins (the heading shows the real total). Each row has a role menu (choosing Contributor or Editor promotes them), **Sign out everywhere**, **Forget** (clears their entry; they come back the next time they sign in) and **Block**. To find someone who is not in the newest 100, use **Find a person**. If `DEFAULT_ROLE` is ever set to `none`, the old "Signed in, not on the list" section comes back, because those people would have no access.
 
 Someone you add as a Viewer by hand still has one real advantage over an automatic viewer: they can sign in while **Lock the door** is on.
+
+## The admin page tabs
+
+The admin page (`/admin.html`) has six tabs. Owners and hosts see the same six.
+
+| Tab | What is on it |
+| --- | --- |
+| Today | The door (lock), sign-ups waiting (with a count badge), and a Going live card that says what is scheduled and opens the announcer |
+| People | Add a person, staff, viewers, blocked people, find a person |
+| Safety | Recent changes and Erase a person's records |
+| Questions | The question bank, the category sorter and the packs |
+| Help | A how-to built into the page (start here, sign-ups and merging, going-live messages, troubleshooting, roles, keeping it safe) |
+| Status | What is switched on: phone notifications, Discord, default access, the door, people, questions, sign-ups waiting |
+
+- The address bar follows the tab, for example `/admin.html#safety`, so a tab can be bookmarked or sent.
+- `/admin.html#all` (or the "Show everything on one page" link) shows every tab at once.
+- `/#announce` opens the announcer on the main screen for an owner. The Today tab's Going live card uses it.
+- The Help tab replaces the Word and HTML guides for day to day use. Those files stay in `docs/`.
+- Nothing to configure and no new secrets. Deploy as usual.

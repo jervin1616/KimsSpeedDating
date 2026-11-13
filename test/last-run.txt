@@ -410,6 +410,28 @@
   PASS Unblock puts them straight back among the viewers
   PASS Forget clears an entry from the list, and they reappear the next time they sign in
   PASS every row in the Viewers list has a role menu, Sign out everywhere, Forget and Block
+  PASS the admin page has six tabs, in this order: Today, People, Safety, Questions, Help, Status
+  PASS it opens on Today and shows only that tab's cards
+  PASS the Today tab shows how many sign-ups are waiting as a badge
+  PASS People shows the people cards (add, staff, viewers, blocked, find a person) and hides Today's
+  PASS the address bar follows the tab, so it can be bookmarked or sent
+  PASS reloading stays on the same tab
+  PASS the arrow keys move between tabs (Safety: Recent changes and Erase a person's records)
+  PASS Questions shows the bank, the category sorter and the packs
+  PASS Help is a how-to built into the page: start here, the main screen, sign-ups and merging, going-live messages, people and safety, troubleshooting, roles, and keeping it safe
+  PASS ...with a link to the Backup page and the role definitions
+  PASS Status shows what is switched on: notifications, Discord, default access, the door, people, questions, sign-ups waiting
+  PASS 'Show everything on one page' shows every tab at once
+  PASS ...and 'Back to tabs' returns to Today
+  PASS a link straight to a tab (/admin.html#safety) opens that tab
+  PASS on a phone the tab bar scrolls sideways inside itself and the page does not
+  PASS a host who is not an owner sees no tabs and no cards
+  PASS Today says nothing is scheduled when nothing is
+  PASS ...and once something is scheduled it says when, in Eastern time
+  PASS the Open the announcer button points at the main screen's announcer
+  PASS /#announce opens the announcer on the main screen for an owner
+  PASS ...and does nothing for a host who is not an owner
+  PASS the admin tabs show no JavaScript errors
   PASS the sign-up screens show no JavaScript errors
   PASS previewing a merge lists exactly what would change, and the old name that stays searchable
   PASS previewing changes nothing, and only hosts may (403 for a Contributor)
@@ -683,4 +705,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-648 passed, 0 failed, 648 total
+670 passed, 0 failed, 670 total

@@ -1338,6 +1338,18 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   };
   document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("annModal").hidden) closeAnn(); });
   initPush();
+  // the admin page links here (/#announce) to open the announcer straight away
+  (function () {
+    var tries = 0;
+    function tryAnnounce() {
+      if (location.hash !== "#announce") return true;
+      var st = window.claude.status();
+      if (st.owner) { try { history.replaceState(null, "", location.pathname); } catch (x) {} openAnn(); return true; }
+      return false;
+    }
+    window.addEventListener("claude-conn", function (e) { if (e.detail && e.detail.state === "live") tryAnnounce(); });
+    var t = setInterval(function () { tries++; if (tryAnnounce() || tries > 40) clearInterval(t); }, 500);
+  })();
 
   /* ---------- question form ---------- */
   $("qForm").addEventListener("submit", function (ev) {

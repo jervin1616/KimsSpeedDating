@@ -905,7 +905,7 @@ try {
       await catE.click("#tabD");
       await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
       check("the main screen's Daters tab has no pending list and no count on the tab (that list lives on the admin page)", (await catE.locator("#pendBox").count()) === 0 && (await catE.locator("#tabD").innerText()) === "Daters");
-      const adm = await pageFor(O, "/admin.html");
+      const adm = await pageFor(O, "/admin.html#all");
       check("the admin page lists pending sign-ups with username, age, state, what they want and the email", await until(async () => { const t = await adm.locator("#pendList").innerText(); return /@viewer_ui, 29/.test(t) && /NC/.test(t) && /wants 26 to 38/.test(t) && /@example\.com/.test(t); }, 8000), await adm.locator("#pendList").innerText());
       check("...with a count", Number(await adm.locator("#pendCount").innerText()) >= 1);
       await adm.locator("#pendList").screenshot({ path: "/tmp/cat-shots/new-pending.png" }).catch(() => {});
@@ -1096,6 +1096,61 @@ try {
         await adm.locator("#viewerList .row", { hasText: autos[2] }).getByRole("button", { name: "Forget" }).click();
         check("Forget clears an entry from the list, and they reappear the next time they sign in", await until(async () => !(await adm.locator("#viewerList").innerText()).includes(autos[2]), 6000) && (await login(autos[2])).status === 200 && await (async () => { await adm.reload(); return until(async () => (await adm.locator("#viewerList").innerText()).includes(autos[2]), 6000); })());
         check("every row in the Viewers list has a role menu, Sign out everywhere, Forget and Block", await (async () => { const r = adm.locator("#viewerList .row", { hasText: autos[3] }); return (await r.locator("select").count()) === 1 && (await r.getByRole("button", { name: /Sign out everywhere/ }).count()) === 1 && (await r.getByRole("button", { name: "Forget" }).count()) === 1 && (await r.getByRole("button", { name: "Block", exact: true }).count()) === 1; })());
+      }
+      // the six tabs
+      {
+        const tp = await pageFor(O, "/admin.html");
+        await until(async () => await tp.locator("#tabs").isVisible(), 8000);
+        const names = await tp.locator('#tabs [role="tab"]').evaluateAll((els) => els.map((e) => e.childNodes[0].textContent.trim()));
+        check("the admin page has six tabs, in this order: Today, People, Safety, Questions, Help, Status", names.join() === "Today,People,Safety,Questions,Help,Status", names);
+        check("it opens on Today and shows only that tab's cards", await until(async () => await tp.locator("#t-today").getAttribute("aria-selected") === "true" && await tp.locator("#lockCard").isVisible() && await tp.locator("#pendCard").isVisible() && await tp.locator("#goCard").isVisible(), 8000) && await tp.locator("#lockCard").isVisible() && await tp.locator("#pendCard").isVisible() && await tp.locator("#goCard").isVisible() && await tp.locator("#staffList").isHidden() && await tp.locator("#logList").isHidden() && await tp.locator("#catCard").isHidden());
+        await jpost("/api/signup", (await login("tabtest@example.com")).session, { ...good, handle: "Tab_Test", age: 33 });
+        await tp.reload(); await until(async () => await tp.locator("#badgeToday").isVisible(), 8000);
+        check("the Today tab shows how many sign-ups are waiting as a badge", Number(await tp.locator("#badgeToday").innerText()) >= 1 && /sign-ups? waiting/.test(await tp.locator("#badgeToday").getAttribute("aria-label")));
+        await tp.click("#t-people");
+        check("People shows the people cards (add, staff, viewers, blocked, find a person) and hides Today's", await tp.locator("#addCard").isVisible() && await tp.locator("#listCard").isVisible() && await tp.locator("#viewerCard").isVisible() && await tp.locator("#peopleCard").isVisible() && await tp.locator("#lockCard").isHidden() && await tp.locator("#seenCard").isHidden());
+        check("the address bar follows the tab, so it can be bookmarked or sent", tp.url().endsWith("#people"));
+        await tp.reload(); await until(async () => await tp.locator("#tabs").isVisible(), 8000);
+        check("reloading stays on the same tab", await until(async () => await tp.locator("#t-people").getAttribute("aria-selected") === "true" && await tp.locator("#viewerCard").isVisible(), 8000));
+        await tp.locator("#t-people").focus(); await tp.keyboard.press("ArrowRight");
+        check("the arrow keys move between tabs (Safety: Recent changes and Erase a person's records)", await tp.locator("#t-safety").getAttribute("aria-selected") === "true" && await tp.locator("#logCard").isVisible() && await tp.locator("#eraseCard").isVisible() && await tp.locator("#safetyInfo").isVisible());
+        await tp.click("#t-questions");
+        check("Questions shows the bank, the category sorter and the packs", await tp.locator("#catCard").isVisible() && await tp.locator("#packCard").isVisible() && /question bank/i.test(await tp.locator("#qIntro").innerText()));
+        await tp.click("#t-help");
+        const help = await tp.locator("#tab-help").innerText();
+        check("Help is a how-to built into the page: start here, the main screen, sign-ups and merging, going-live messages, people and safety, troubleshooting, roles, and keeping it safe", ["Start here", "On the main screen", "Sign-ups and merging", "Going-live messages", "People and safety", "If something goes wrong", "What each role can do", "Keep it safe"].every((h) => help.includes(h)), help.slice(0, 200));
+        check("...with a link to the Backup page and the role definitions", (await tp.locator('#tab-help a[href="/backup.html"]').count()) === 1 && /Owner/.test(help) && /Contributor/.test(help) && /Blocked/.test(help));
+        await tp.click("#t-status");
+        await until(async () => /Phone notifications/.test(await tp.locator("#statusList").innerText()), 8000);
+        const st = (await tp.locator("#statusList").innerText()).replace(/\s+/g, " ");
+        check("Status shows what is switched on: notifications, Discord, default access, the door, people, questions, sign-ups waiting", /Phone notifications Set up/.test(st) && /Discord posts Connected/.test(st) && /Default access Viewer/.test(st) && /The door Open/.test(st) && /People \d+ viewers/.test(st) && /Questions \d+ in the bank/.test(st) && /Dater sign-ups waiting \d+/.test(st), st);
+        await tp.click("#allToggle");
+        check("'Show everything on one page' shows every tab at once", await tp.locator("#staffList").isVisible() && await tp.locator("#logList").isVisible() && await tp.locator("#lockCard").isVisible() && await tp.locator("#catCard").isVisible() && tp.url().endsWith("#all") && /Back to tabs/.test(await tp.locator("#allToggle").innerText()));
+        await tp.click("#allToggle");
+        check("...and 'Back to tabs' returns to Today", await tp.locator("#t-today").getAttribute("aria-selected") === "true" && await tp.locator("#staffList").isHidden());
+        const direct = await pageFor(O, "/admin.html#safety");
+        check("a link straight to a tab (/admin.html#safety) opens that tab", await until(async () => await direct.locator("#eraseCard").isVisible() && await direct.locator("#lockCard").isHidden(), 8000));
+        await tp.setViewportSize({ width: 390, height: 844 }); await tp.click("#t-today"); await sleep(300);
+        check("on a phone the tab bar scrolls sideways inside itself and the page does not", await tp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth && document.getElementById("tabs").scrollWidth >= document.getElementById("tabs").clientWidth));
+        await tp.locator("#tabs").screenshot({ path: "/tmp/cat-shots/new-tabs.png" }).catch(() => {});
+        const noOwner = await pageFor(ED, "/admin.html");
+        await sleep(1500);
+        check("a host who is not an owner sees no tabs and no cards", await noOwner.locator("#tabs").isHidden() && await noOwner.locator("#tab-today").isHidden() && await noOwner.locator("#lockCard").isHidden());
+        // Today: going live
+        await tp.reload(); await until(async () => /Nothing is scheduled|Scheduled/.test(await tp.locator("#goNote").innerText()), 8000);
+        check("Today says nothing is scheduled when nothing is", /Nothing is scheduled/.test(await tp.locator("#goNote").innerText()));
+        await jpost("/api/announce", O, { action: "schedule", liveAt: Date.now() + 26 * 3600000, push: true, discord: true });
+        await tp.reload(); await until(async () => /Scheduled: live at/.test(await tp.locator("#goNote").innerText()), 8000);
+        check("...and once something is scheduled it says when, in Eastern time", /Scheduled: live at .* ET\. The next message goes out at .* ET/.test(await tp.locator("#goNote").innerText()), await tp.locator("#goNote").innerText());
+        await jpost("/api/announce", O, { action: "cancel" });
+        check("the Open the announcer button points at the main screen's announcer", (await tp.locator("#goLink").getAttribute("href")) === "/#announce");
+        const ann = await pageFor(O, "/#announce");
+        check("/#announce opens the announcer on the main screen for an owner", await until(async () => await ann.locator("#annModal").isVisible(), 12000));
+        const ann2 = await pageFor(ED, "/#announce"); await sleep(3500);
+        check("...and does nothing for a host who is not an owner", await ann2.locator("#annModal").isHidden());
+        check("the admin tabs show no JavaScript errors", tp.errors.length === 0 && direct.errors.length === 0 && ann.errors.length === 0, [...tp.errors, ...direct.errors, ...ann.errors]);
+        for (const pg of [tp, direct, noOwner, ann, ann2]) await pg.context().close();
+        await jpost("/api/signups", O, { action: "clear" });
       }
       check("the sign-up screens show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0 && adm.errors.length === 0, [...catV.errors, ...catE.errors, ...adm.errors]);
     }
@@ -1648,7 +1703,7 @@ try {
   before.close();
 
   // admin page in a real browser
-  const AD = await mkPage(sessions.editorA, BASE, "/admin.html"); const ADE = await mkPage(sessions.editorB, BASE, "/admin.html"); const ADK = await mkPage(sessions.contributor, BASE, "/admin.html");
+  const AD = await mkPage(sessions.editorA, BASE, "/admin.html#all"); const ADE = await mkPage(sessions.editorB, BASE, "/admin.html"); const ADK = await mkPage(sessions.contributor, BASE, "/admin.html");
   check("the admin page explains what each role can do and what an unlisted person gets", await until(async () => { const t = await text(AD, "#helpCard"); return ["Owner", "Editor", "Contributor", "Viewer"].every((r) => t.includes(r)) && /gets no access/.test(await text(AD, "#defaultNote")); }, 6000), await text(AD, "#helpCard"));
   check("the role help is not shown to people who cannot manage access", await ADK.locator("#helpCard").isHidden() && await ADE.locator("#helpCard").isHidden());
   check("admin page (owner) lists people, marks secret ones locked", await until(async () => { const t = await text(AD, "#staffList"); return t.includes(EMAILS.editorB) && /locked/i.test(t); }, 6000));
