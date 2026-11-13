@@ -67,6 +67,12 @@
     <p id="lockState"></p>
     <div><button id="lockBtn" type="button" class="primary"></button></div>
   </section>
+  <section class="card" id="pendCard" hidden>
+    <h2>Pending dater sign-ups <span class="count" id="pendCount">0</span></h2>
+    <p>People who signed up to be a speed dater. Approve adds them to the dater list. Hosts can also find them by typing their username in the seat picker.</p>
+    <form class="form" id="pendForm"><input id="pendQ" type="search" maxlength="60" placeholder="Search username or email" autocomplete="off" aria-label="Search pending sign-ups"><button class="danger" id="pendClear" type="button">Clear all</button></form>
+    <div id="pendList"></div>
+  </section>
   <section class="card" id="peopleCard" hidden>
     <h2>Find a person <span class="count" id="peopleTotal">0</span></h2>
     <p>Everyone who has signed in is on this list. Search by email or TikTok username.</p>
@@ -220,7 +226,7 @@
     $("blockedCard").hidden = !blocked.length; $("blockedCount").textContent = blocked.length;
     var bl = $("blockedList"); bl.textContent = ""; blocked.forEach(function (p) { bl.appendChild(personRow(p)); });
     renderLock(data);
-    loadCats(); loadPacks(); $("peopleCard").hidden = false;
+    loadCats(); loadPacks(); $("peopleCard").hidden = false; loadPend();
     $("eraseCard").hidden = false;
     if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
   }
@@ -278,6 +284,39 @@
       });
     }).catch(function () { $("packCard").hidden = true; });
   }
+  var pendAll = [], GL = { man: "Man", woman: "Woman", nonbinary: "Non-binary" }, SL = { straight: "Straight", gay: "Gay or lesbian", bi: "Bisexual", other: "Other" };
+  function loadPend() {
+    window.claude.authFetch("/api/signups").then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || "Could not load sign-ups."); return j; }); })
+      .then(function (j) { pendAll = j.pending || []; renderPend(); }).catch(function (e) { say(e.message, true); });
+  }
+  function renderPend() {
+    $("pendCard").hidden = false; $("pendCount").textContent = pendAll.length;
+    var q = $("pendQ").value.trim().toLowerCase().replace(/^@/, ""), box = $("pendList"); box.textContent = "";
+    $("pendClear").disabled = !pendAll.length;
+    var rows = pendAll.filter(function (su) { return !q || su.handle.toLowerCase().indexOf(q) >= 0 || (su.email || "").toLowerCase().indexOf(q) >= 0; });
+    if (!rows.length) { var n = document.createElement("p"); n.textContent = pendAll.length ? "Nobody matches that search." : "Nobody is waiting."; box.appendChild(n); return; }
+    rows.forEach(function (su) {
+      var row = document.createElement("div"); row.className = "row";
+      var who = document.createElement("div"); who.className = "who"; who.appendChild(document.createTextNode("@" + su.handle + ", " + su.age));
+      var rng = su.sexuality === "bi" ? "men " + su.minM + " to " + su.maxM + ", women " + su.minW + " to " + su.maxW : su.min + " to " + su.max;
+      var meta = document.createElement("div"); meta.className = "meta";
+      meta.textContent = [su.location, GL[su.gender], SL[su.sexuality], "wants " + rng, su.email, "signed up " + ago(su.ts)].filter(Boolean).join(" \u00b7 ");
+      who.appendChild(meta); row.appendChild(who);
+      var right = document.createElement("div"); right.className = "form";
+      var ok = document.createElement("button"); ok.type = "button"; ok.className = "primary"; ok.textContent = "Approve";
+      ok.onclick = function () { say("Saving..."); post("/api/signups", { action: "approve", id: su.id }).then(function () { say("Added @" + su.handle + " to the dater list."); loadPend(); }).catch(function (e) { say(e.message, true); loadPend(); }); };
+      var no = document.createElement("button"); no.type = "button"; no.className = "danger"; no.textContent = "Decline";
+      no.onclick = function () { post("/api/signups", { action: "decline", id: su.id }).then(function () { say("Declined @" + su.handle + "."); loadPend(); }).catch(function (e) { say(e.message, true); }); };
+      right.appendChild(ok); right.appendChild(no); row.appendChild(right); box.appendChild(row);
+    });
+  }
+  $("pendQ").oninput = renderPend;
+  $("pendForm").onsubmit = function (ev) { ev.preventDefault(); };
+  $("pendClear").onclick = function () {
+    if (!window.confirm("Clear all " + pendAll.length + " pending sign-ups? Approved daters are not affected.")) return;
+    post("/api/signups", { action: "clear" }).then(function (r) { say("Cleared " + r.cleared + " sign-ups."); loadPend(); }).catch(function (e) { say(e.message, true); });
+  };
+  setInterval(function () { if (!document.hidden && !$("pendCard").hidden) loadPend(); }, 20000);
   function searchPeople() {
     var q = $("peopleQ").value.trim(); if (q.length < 2) return;
     window.claude.authFetch("/api/people?q=" + encodeURIComponent(q)).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || "Search failed."); return j; }); }).then(function (j) {

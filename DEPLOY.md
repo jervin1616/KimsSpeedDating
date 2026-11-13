@@ -509,10 +509,11 @@ On a phone browser the card shows every visit after sign-in. It stops when: the 
 
 **Dater sign-up.** Under the username box, **Want to be a speed dater?** opens a form: username, age, state, gender, sexuality, the age range they want, and an 18+ confirmation. One sign-up per account. They can edit or withdraw it until a host approves it. It is private to them and the hosts until approved.
 
-**Hosts (Editors and owners) see it three ways:**
-1. **Daters tab:** a "Pending sign-ups" box (with a count on the tab) with a search box, Approve, Decline and Clear all. Approve adds them to the dater list.
-2. **Seat picker:** pending sign-ups appear at the top. Tapping one approves them and seats them in one move. The picker's search covers them.
-3. **Add dater form:** if what you type looks like a pending sign-up (same username ignoring capitals, spaces, dots and underscores, or a close one plus the same state or an age within a year), it asks "Is this them?" with Yes (fills the form, links the sign-up when you add) and No (stops asking for that person).
+**The pending list is on the admin page (owners):** **Pending dater sign-ups** has a search box (username or email), **Approve** (adds them to the dater list), **Decline** and **Clear all**. It refreshes every 20 seconds.
+
+**Hosts find sign-ups two other ways, while running the show:**
+1. **Seat picker:** type a username in the picker's search and matching sign-ups appear in the same list, marked "Sign-up". Tapping one approves them and seats them in one move. With nothing typed, the picker looks exactly as before.
+2. **Add dater form:** if what you type looks like a pending sign-up (same username ignoring capitals, spaces, dots and underscores, or a close one plus the same state or an age within a year), it asks "Is this them?" with Yes (fills the form, links the sign-up when you add) and No (stops asking for that person).
 
 Contributors cannot see or approve sign-ups. Hosts never see email addresses. Pending sign-ups stay until approved, declined, withdrawn or cleared. If the host later removes the dater, that person can sign up again.
 

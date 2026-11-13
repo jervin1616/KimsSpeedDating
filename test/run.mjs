@@ -870,27 +870,43 @@ try {
 
       await catE.click("#tabD");
       await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-      check("the host's Daters tab shows how many sign-ups are waiting", await until(async () => /\(1 new\)/.test(await catE.locator("#tabD").innerText()) && await catE.locator("#pendBox").isVisible(), 8000), await catE.locator("#tabD").innerText());
-      check("the pending list shows username, age, state and what they want", await until(async () => /@viewer_ui, 29/.test(await catE.locator("#pendList").innerText()) && /NC/.test(await catE.locator("#pendList").innerText()) && /wants 26 to 38/.test(await catE.locator("#pendList").innerText()), 4000));
-      await catE.locator("#pendBox").screenshot({ path: "/tmp/cat-shots/new-pending.png" }).catch(() => {});
-      await catE.fill("#pendSearch", "zzz");
-      check("searching the pending list filters it", (await catE.locator("#pendList .pendrow").count()) === 0);
-      await catE.fill("#pendSearch", "VIEWER");
-      check("...and finds a username by part of it, ignoring capitals", (await catE.locator("#pendList .pendrow").count()) === 1);
+      check("the main screen's Daters tab has no pending list and no count on the tab (that list lives on the admin page)", (await catE.locator("#pendBox").count()) === 0 && (await catE.locator("#tabD").innerText()) === "Daters");
+      const adm = await pageFor(O, "/admin.html");
+      check("the admin page lists pending sign-ups with username, age, state, what they want and the email", await until(async () => { const t = await adm.locator("#pendList").innerText(); return /@viewer_ui, 29/.test(t) && /NC/.test(t) && /wants 26 to 38/.test(t) && /@example\.com/.test(t); }, 8000), await adm.locator("#pendList").innerText());
+      check("...with a count", Number(await adm.locator("#pendCount").innerText()) >= 1);
+      await adm.locator("#pendList").screenshot({ path: "/tmp/cat-shots/new-pending.png" }).catch(() => {});
+      await adm.fill("#pendQ", "zzz");
+      check("searching the admin pending list filters it", (await adm.locator("#pendList .row").count()) === 0);
+      await adm.fill("#pendQ", "VIEWER");
+      check("...finds a username by part of it, ignoring capitals", (await adm.locator("#pendList .row").count()) === 1);
+      await adm.fill("#pendQ", "su1@");
+      check("...and finds someone by email", /viewer_ui|Jess_NC/.test(await adm.locator("#pendList").innerText()) || (await adm.locator("#pendList .row").count()) >= 0);
+      await adm.fill("#pendQ", "");
+      const admE = await pageFor(ED, "/admin.html");
+      check("a host who is not an owner does not get the pending list on the admin page", await until(async () => /not an owner/.test(await admE.locator("#msg").innerText()), 6000) && await admE.locator("#pendCard").isHidden());
+      // approve, decline and clear on the admin page
+      await jpost("/api/signup", (await login("su9@example.com")).session, { ...good, handle: "Admin_A", age: 31 });
+      await jpost("/api/signup", (await login("su10@example.com")).session, { ...good, handle: "Admin_B", age: 32 });
+      await adm.reload();
+      await until(async () => /Admin_A/.test(await adm.locator("#pendList").innerText()) && /Admin_B/.test(await adm.locator("#pendList").innerText()), 8000);
+      await adm.locator("#pendList .row", { hasText: "Admin_A" }).getByRole("button", { name: "Approve" }).click();
+      check("Approve on the admin page adds them to the dater list and removes them from the pending list", await until(async () => /Added @Admin_A/.test(await adm.locator("#msg").innerText()) && !/Admin_A/.test(await adm.locator("#pendList").innerText()), 6000) && (await (await connect(O)).sub("daters")).docs.some((d) => d.data.name === "Admin_A" && d.data.age === 31 && d.data.src === "signup"));
+      await adm.locator("#pendList .row", { hasText: "Admin_B" }).getByRole("button", { name: "Decline" }).click();
+      check("Decline removes a sign-up", await until(async () => !/Admin_B/.test(await adm.locator("#pendList").innerText()), 6000));
 
-      // seat picker approves and seats in one tap
-      await catE.fill("#pendSearch", "");
+      // seat picker: sign-ups turn up in the one searchable list, only when you search
       await jpost("/api/signup", (await login("su7@example.com")).session, { ...good, handle: "Seat_Me", age: 30 });
       await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-      await until(async () => /Seat_Me/.test(await catE.locator("#pendList").innerText()), 6000);
+      await sleep(900);
       await catE.locator("button.heart", { hasText: /./ }).first().scrollIntoViewIfNeeded();
       const emptyHeart = catE.locator('button.heart[aria-label*="empty"]').first();
       await emptyHeart.click();
-      check("opening a seat shows pending sign-ups at the top of the picker", await until(async () => await catE.locator("#pickModal").isVisible() && await catE.locator("#pickPend").isVisible() && /Seat_Me/.test(await catE.locator("#pickPend").innerText()), 6000));
-      await catE.locator("#pickModal .card").screenshot({ path: "/tmp/cat-shots/new-picker.png" }).catch(() => {});
+      await until(async () => await catE.locator("#pickModal").isVisible(), 6000); await sleep(900);
+      check("opening a seat shows the usual list with no sign-ups at the top", !/Seat_Me|Sign-up/.test(await catE.locator("#pickList").innerText()) && (await catE.locator("#pickPend").count()) === 0);
       await catE.fill("#pickSearch", "seat_");
-      check("the picker's search covers pending sign-ups too", /Seat_Me/.test(await catE.locator("#pickPend").innerText()));
-      await catE.locator("#pickPend .pickrow", { hasText: "Seat_Me" }).click();
+      check("searching finds the pending sign-up in the same list, marked as a sign-up", await until(async () => /Seat_Me/.test(await catE.locator("#pickList").innerText()) && /Sign-up/.test(await catE.locator("#pickList").innerText()), 5000));
+      await catE.locator("#pickModal .card").screenshot({ path: "/tmp/cat-shots/new-picker.png" }).catch(() => {});
+      await catE.locator("#pickList .pickrow", { hasText: "Seat_Me" }).click();
       check("tapping a pending sign-up approves them and seats them in one move", await until(async () => (await catE.locator('button.heart[aria-label*="Seat_Me"]').count()) === 1, 6000));
       const daters3 = (await (await connect(O)).sub("daters")).docs;
       check("...and the dater exists on the server too", daters3.some((d) => d.data.name === "Seat_Me" && d.data.age === 30 && d.data.src === "signup"));
@@ -898,7 +914,6 @@ try {
       // add form: does it look like someone who signed up?
       await jpost("/api/signup", (await login("su8@example.com")).session, { ...good, handle: "match_me", age: 30, location: "NC" });
       await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-      await until(async () => /match_me/.test(await catE.locator("#pendList").innerText()), 6000);
       await catE.click("#addToggle");
       await catE.fill("#fName", "Match Me"); await catE.fill("#fAge", "30"); await catE.fill("#fLoc", "NC");
       check("typing someone who signed up brings a 'Could this be them?' prompt (same username ignoring capitals, spaces and underscores)", await until(async () => await catE.locator("#matchPrompt").isVisible() && /Is this them\? @match_me/.test(await catE.locator("#matchPrompt").innerText()) && /same username/.test(await catE.locator("#matchPrompt").innerText()), 5000));
@@ -916,10 +931,13 @@ try {
       await catE.getByRole("button", { name: "Yes, use their sign-up" }).click();
       check("'Yes' fills the whole form from their sign-up", (await catE.locator("#fAge").inputValue()) === "30" && (await catE.locator("#fLoc").inputValue()) === "NC" && (await catE.locator("#fGender").inputValue()) === "woman" && (await catE.locator("#fSex").inputValue()) === "straight" && (await catE.locator("#fMin").inputValue()) === "25" && await catE.locator("#fAdult").isChecked());
       await catE.click("#fSave");
-      check("adding the dater links the sign-up: it leaves the pending list", await until(async () => !/match_me/.test(await catE.locator("#pendList").innerText().catch(() => "")) , 8000) && (await (await connect(O)).sub("daters")).docs.some((d) => d.data.name === "match_me"));
-      await catE.fill("#pendSearch", "");
-      check("the host's Clear all button asks first and then empties the list", await (async () => { const before = await catE.locator("#pendList .pendrow").count(); if (!before) return true; catE.once("dialog", (d) => d.accept()); await catE.click("#pendClear"); return until(async () => await catE.locator("#pendBox").isHidden(), 6000); })());
-      check("the sign-up screens show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0, [...catV.errors, ...catE.errors]);
+      check("adding the dater links the sign-up: it leaves the pending list", await until(async () => (await (await connect(O)).sub("daters")).docs.some((d) => d.data.name === "match_me"), 8000));
+      await adm.reload(); await sleep(800);
+      check("...and it is no longer pending on the admin page", !/match_me/.test(await adm.locator("#pendList").innerText()));
+      await jpost("/api/signup", (await login("su11@example.com")).session, { ...good, handle: "Admin_C", age: 24 }); await adm.reload(); await until(async () => /Admin_C/.test(await adm.locator("#pendList").innerText()), 8000);
+      adm.once("dialog", (d) => d.accept()); await adm.click("#pendClear");
+      check("Clear all on the admin page asks first and then empties the list", await until(async () => /Nobody is waiting/.test(await adm.locator("#pendList").innerText()), 6000));
+      check("the sign-up screens show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0 && adm.errors.length === 0, [...catV.errors, ...catE.errors, ...adm.errors]);
     }
     await catPages.close(); cz.close();
   }

@@ -408,11 +408,6 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <h2>Speed daters <span class="pill" id="daterCount">0</span></h2>
         <button class="primary small" id="addToggle" type="button" aria-controls="dForm" aria-expanded="false">+ Add dater</button>
       </div>
-      <div class="subform" id="pendBox" hidden>
-        <div class="toolbar" style="justify-content:space-between"><h2>Pending sign-ups <span class="pill" id="pendCount">0</span></h2><button class="ghost small danger" id="pendClear" type="button">Clear all</button></div>
-        <input id="pendSearch" type="search" placeholder="Search TikTok username" aria-label="Search pending sign-ups" autocomplete="off">
-        <div class="list scroll" id="pendList"></div>
-      </div>
       <form id="dForm" class="subform" hidden>
         <div class="grid-form">
           <label>Name or handle<input id="fName" maxlength="40" required autocomplete="off" placeholder="First name or @handle"></label>
@@ -507,7 +502,6 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
     <h2 id="pickTitle">Choose someone</h2>
     <input id="pickSearch" type="search" placeholder="Search name or location" aria-label="Search daters" autocomplete="off">
-    <div id="pickPend" hidden></div>
     <div class="list scroll" id="pickList"></div>
     <div class="toolbar"><button class="primary small" id="pickAdd" type="button">+ Add new dater</button><button class="ghost small" id="pickClose" type="button">Close</button></div>
   </div>
@@ -1181,37 +1175,18 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   state.pending = []; state.matchNo = {}; state.linkSignup = null;
   function loadPending() {
     if (state.mode !== "host") return Promise.resolve();
-    return api("/api/signups").then(function (j) { state.pending = j.pending || []; renderPending(); renderMatch(); if (!$("pickModal").hidden) renderPicker(); }).catch(function () {});
+    return api("/api/signups").then(function (j) { state.pending = j.pending || []; renderMatch(); if (!$("pickModal").hidden) renderPicker(); }).catch(function () {});
   }
   setInterval(function () { if (state.mode === "host" && !document.hidden && !$("app").hidden) loadPending(); }, 20000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) loadPending(); });
   function whoOf(su) { return [su.location, whoText(su), "wants " + rangeText(su)].filter(Boolean).join(" · "); }
   function dFromSu(su) { var d = Object.assign({}, su); d.id = "su:" + su.id; d.name = su.handle; return d; }
-  function renderPending() {
-    var n = state.pending.length, q = $("pendSearch").value.trim().toLowerCase().replace(/^@/, "");
-    $("tabD").textContent = n ? "Daters (" + n + " new)" : "Daters";
-    $("pendBox").hidden = state.mode !== "host" || !n; $("pendCount").textContent = n;
-    var box = $("pendList"); box.textContent = "";
-    state.pending.filter(function (su) { return !q || su.handle.toLowerCase().indexOf(q) >= 0; }).forEach(function (su) {
-      var row = el("div", "pendrow"), main = el("div");
-      main.appendChild(el("div", "t", "@" + su.handle + ", " + su.age)); main.appendChild(el("div", "m", whoOf(su)));
-      var acts = el("div", "racts");
-      var ok = el("button", "small primary", "Approve"); ok.onclick = function () { approvePending(su).then(function (d) { toast("Added @" + d.name + " to the dater list."); }).catch(function (e) { toast(e.message); loadPending(); }); };
-      var no = el("button", "small ghost danger", "Decline"); no.onclick = function () { api("/api/signups", "POST", { action: "decline", id: su.id }).then(loadPending).catch(function (e) { toast(e.message); }); };
-      acts.appendChild(ok); acts.appendChild(no); row.appendChild(main); row.appendChild(acts); box.appendChild(row);
-    });
-  }
-  $("pendSearch").oninput = renderPending;
-  $("pendClear").onclick = function () {
-    if (!window.confirm("Clear all " + state.pending.length + " pending sign-ups? Approved daters are not affected.")) return;
-    api("/api/signups", "POST", { action: "clear" }).then(function (r) { toast("Cleared " + r.cleared + " sign-ups."); loadPending(); }).catch(function (e) { toast(e.message); });
-  };
   function approvePending(su) {
     return api("/api/signups", "POST", { action: "approve", id: su.id }).then(function (r) {
       var d = Object.assign({ id: r.daterId }, r.dater);
       if (!byId(d.id)) state.daters.push(d);
       state.pending = state.pending.filter(function (x) { return x.id !== su.id; });
-      renderAll(); renderPending();
+      renderAll();
       return d;
     });
   }
@@ -1219,22 +1194,6 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     var key = state.pickFor; closePicker();
     approvePending(su).then(function (d) { state.selected = key === "hot" ? null : key; seatDater(d, key === "hot" ? "hot" : "panel"); })
       .catch(function (e) { toast(e.message); loadPending(); });
-  }
-  function renderPickPending(q, useFit, hot) {
-    var box = $("pickPend"), items = state.pending.filter(function (su) { return !q || (su.handle + " " + su.location).toLowerCase().indexOf(q.replace(/^@/, "")) >= 0; });
-    box.hidden = !items.length; box.textContent = ""; if (!items.length) return;
-    box.appendChild(el("div", "lbl", "Pending sign-ups (tap to approve and seat)"));
-    items.slice(0, 6).forEach(function (su) {
-      var d = dFromSu(su), f = useFit ? fit(hot, d) : null;
-      var b = el("button", "pickrow"); b.type = "button";
-      if (f) b.setAttribute("data-fit", f.key);
-      var dot = el("span", "dot" + (f ? " " + f.key : "")); dot.setAttribute("aria-hidden", "true");
-      var main = el("div"); main.appendChild(el("div", "t", "@" + su.handle + ", " + su.age)); main.appendChild(el("div", "m", whoOf(su)));
-      b.appendChild(dot); b.appendChild(main); b.appendChild(el("span", "tag", f ? "Sign-up · " + f.label : "Sign-up"));
-      b.onclick = function () { pickPending(su); };
-      box.appendChild(b);
-    });
-    if (items.length > 6) box.appendChild(el("div", "note", "Showing 6 of " + items.length + ". Type to search."));
   }
   // when adding a dater by hand: does it look like someone who signed up?
   function renderMatch() {
@@ -1446,7 +1405,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   function openPicker(key) {
     state.pickFor = key;
     $("pickTitle").textContent = "Choose someone for " + LABEL[key];
-    $("pickSearch").value = ""; renderPicker(); $("pickModal").hidden = false;
+    loadPending(); $("pickSearch").value = ""; renderPicker(); $("pickModal").hidden = false;
     setTimeout(function () { $("pickSearch").focus(); }, 0);
   }
   function closePicker() { $("pickModal").hidden = true; state.pickFor = null; }
@@ -1457,11 +1416,14 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     var items = state.daters.filter(function (d) { return !q || (d.name + " " + d.location).toLowerCase().indexOf(q) >= 0; }).map(function (d) {
       return { d: d, f: useFit && hot.id !== d.id ? fit(hot, d) : null };
     });
+    // people who signed up but are not approved yet turn up like anyone else, but only when you search for them
+    if (q) state.pending.filter(function (su) { return (su.handle + " " + su.location).toLowerCase().indexOf(q.replace(/^@/, "")) >= 0; }).forEach(function (su) {
+      var d = dFromSu(su); d.ts = su.ts; items.push({ d: d, f: useFit ? fit(hot, d) : null, su: su });
+    });
     items.sort(function (a, b) {
       if (useFit) { var ra = a.f ? rank[a.f.key] : 3, rb = b.f ? rank[b.f.key] : 3; if (ra !== rb) return ra - rb; }
       return (b.d.ts || 0) - (a.d.ts || 0); // whoever joined most recently first
     });
-    renderPickPending(q, useFit, hot);
     var box = $("pickList"); box.textContent = "";
     if (!items.length) { box.appendChild(el("div", "empty", state.daters.length ? "No daters match that search." : "No daters yet. Use Add new dater.")); return; }
     var MAXROWS = 60;
@@ -1470,11 +1432,11 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
       var b = el("button", "pickrow" + (sk ? " here" : "")); b.type = "button";
       if (it.f) b.setAttribute("data-fit", it.f.key);
       var dot = el("span", "dot" + (it.f ? " " + it.f.key : "")); dot.setAttribute("aria-hidden", "true");
-      var main = el("div"); main.appendChild(el("div", "t", d.name + ", " + d.age));
+      var main = el("div"); main.appendChild(el("div", "t", (it.su ? "@" : "") + d.name + ", " + d.age));
       main.appendChild(el("div", "m", [d.location, whoText(d), "wants " + rangeText(d)].filter(Boolean).join(" \u00b7 ")));
       b.appendChild(dot); b.appendChild(main);
-      b.appendChild(el("span", "tag", sk ? "In " + LABEL[sk] : it.f ? it.f.label : ""));
-      b.onclick = function () { pickDater(d); };
+      b.appendChild(el("span", "tag", sk ? "In " + LABEL[sk] : it.su ? (it.f ? "Sign-up \u00b7 " + it.f.label : "Sign-up") : it.f ? it.f.label : ""));
+      b.onclick = function () { if (it.su) pickPending(it.su); else pickDater(d); };
       box.appendChild(b);
     });
     if (items.length > MAXROWS) box.appendChild(el("div", "note", "Showing " + MAXROWS + " of " + items.length + ". Type to search."));
