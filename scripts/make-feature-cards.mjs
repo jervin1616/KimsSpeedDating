@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Makes two shareable feature cards (PNG) for Discord: how to sign up as a speed dater, and how to turn on live notifications.
-//   node scripts/make-feature-cards.mjs     -> six PNG cards in docs/discord/ (sign up as a speed dater, notifications, question button, the board, home screen, good to know)
+//   node scripts/make-feature-cards.mjs     -> seven PNG cards in docs/discord/ (sign up as a speed dater, notifications, question button, the board, home screen, good to know, and an owner card on scheduling a live)
 // It runs a throwaway local copy of the app and takes real screenshots of the screens. No real people or data are involved.
 import { spawn, spawnSync } from "node:child_process";
 import WebSocket from "ws";
@@ -24,7 +24,7 @@ const dir = mkdtempSync(join(tmpdir(), "kim-cards-"));
 const jwks = createServer((q, r) => { r.writeHead(200, { "content-type": "application/json" }); r.end('{"keys":[]}'); }).listen(0, "127.0.0.1");
 await sleep(200);
 const vk = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey.export({ format: "jwk" });
-const vars = { GOOGLE_CLIENT_ID: "x.apps.googleusercontent.com", GOOGLE_JWKS_URL: `http://127.0.0.1:${jwks.address().port}/k`, SESSION_SECRET: SECRET, ROLES: "owner@demo.test=owner", ADMIN_KEY: crypto.randomBytes(24).toString("hex"), DEFAULT_ROLE: "viewer", MAX_VIEWERS: "50", ALLOWED_ORIGINS: "", VAPID_KEYS: [vk.x, vk.y, vk.d].join(".") };
+const vars = { GOOGLE_CLIENT_ID: "x.apps.googleusercontent.com", GOOGLE_JWKS_URL: `http://127.0.0.1:${jwks.address().port}/k`, SESSION_SECRET: SECRET, ROLES: "owner@demo.test=owner", ADMIN_KEY: crypto.randomBytes(24).toString("hex"), DEFAULT_ROLE: "viewer", MAX_VIEWERS: "50", ALLOWED_ORIGINS: "", VAPID_KEYS: [vk.x, vk.y, vk.d].join("."), DISCORD_WEBHOOK: "https://discord.com/api/webhooks/123456789/demo-not-real" };
 const args = ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--inspector-port", "9243", "--persist-to", join(dir, "state"), "--local"];
 for (const [k, v] of Object.entries(vars)) args.push("--var", `${k}:${v}`);
 const w = spawn("npx", args, { cwd: ROOT, detached: true, env: { ...process.env, NO_PROXY: "127.0.0.1,localhost", WRANGLER_SEND_METRICS: "false", CI: "1" } });
@@ -90,6 +90,16 @@ const shot2 = async (sel, name) => { const f = join(dir, name); await pg2.locato
 const imgInstall = await shot2("#installTip", "install.png");
 await pg2.click("#installBtn"); await sleep(400);
 const imgGuide = await shot2("#howOv .how", "guide.png");
+// the owner's screen: the Announce button and the scheduler, set for tomorrow at 5 PM Eastern
+const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+await ctx3.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
+await ctx3.addInitScript((sess) => { try { localStorage.setItem("sd.session.v1", JSON.stringify(sess)); localStorage.setItem("sd.installed", "1"); } catch (e) {} }, { ...mint("owner@demo.test"), role: "editor", owner: true });
+const pg3 = await ctx3.newPage(); await pg3.goto(BASE + "/"); await pg3.waitForSelector("#annBtn:not([hidden])", { timeout: 20000 }); await sleep(600);
+const f3 = join(dir, "pills.png"); await pg3.locator("#annBtn").locator("xpath=..").screenshot({ path: f3 }); const imgPills = "data:image/png;base64," + readFileSync(f3).toString("base64");
+await pg3.click("#annBtn"); await sleep(600);
+await pg3.fill("#annDate", new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(Date.now() + 86400000))); await pg3.fill("#annTime", "17:00"); await sleep(400);
+await pg3.click("#annGo"); await pg3.waitForFunction(() => (document.getElementById("annItems").innerText.match(/Waiting/g) || []).length === 3, null, { timeout: 10000 }); await sleep(300);
+const f4 = join(dir, "ann.png"); await pg3.locator("#annModal .card").screenshot({ path: f4 }); const imgAnn = "data:image/png;base64," + readFileSync(f4).toString("base64");
 const font = "data:font/woff2;base64," + readFileSync(join(ROOT, "public/fonts/lobster-two-700-italic.woff2")).toString("base64");
 
 const css = `@font-face{font-family:Lobster;src:url(${font}) format("woff2");font-weight:700;font-style:italic}
@@ -162,7 +172,16 @@ const faq = [["Is it free?", "Yes. Just sign in with Google."], ["Do I need Gmai
 const c6 = card(`<div class="brand">Kim's Speed Dating</div><h1>Good to know</h1><p class="sub">Quick answers before you ask.</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px 26px;align-content:start">${faq.map(([q, a]) => `<div style="border:2px solid rgba(255,77,109,.55);border-radius:20px;padding:18px 24px;background:rgba(255,255,255,.04)"><div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:4px">${q}</div><div style="font-size:24px;color:#ffd5dc;line-height:1.35">${a}</div></div>`).join("")}</div>
 <div class="note"><span class="pill">Free</span><span class="pill">18+ only</span><span class="pill">View only</span></div>`);
+const c7 = card(`<div class="brand">For Kim: owners only</div><h1>Schedule your live</h1><p class="sub">Set the time once. The app sends the 1 hour, 30 minute and "we are live" messages for you.</p>
+<div class="cols"><div class="steps">${steps([
+  "<b>Tap Announce</b> in the row of buttons at the top.<span>Only owners see it.</span>",
+  "<b>Pick the date and time.</b> It is Eastern time. Check the line under it.",
+  "<b>Tick phones and Discord.</b> Leave Ping @everyone off unless you want it.<span>Discord reaches everyone. Phones reach only people who turned them on.</span>",
+  "<b>Press Schedule it.</b> You will see three lines marked Waiting.",
+  "<b>Press Send me a test</b> to check your own phone. <b>Cancel schedule</b> if plans change."])}</div>
+<div class="shots"><img src="${imgAnn}"></div></div>
+<div class="note"><span class="pill">Schedule at least 1 hour ahead</span><span class="pill">Late messages are skipped</span></div>`);
 mkdirSync(join(ROOT, "docs", "discord"), { recursive: true });
 const art = await browser.newPage({ viewport: { width: 1080, height: 1350 } });
-for (const [html, name] of [[c1, "card-speed-dater.png"], [c2, "card-notifications.png"], [c3, "card-question-button.png"], [c4, "card-board.png"], [c5, "card-home-screen.png"], [c6, "card-good-to-know.png"]]) { await art.setContent(html, { waitUntil: "load" }); await sleep(300); await art.screenshot({ path: join(ROOT, "docs", "discord", name) }); console.log("wrote docs/discord/" + name); }
+for (const [html, name] of [[c1, "card-speed-dater.png"], [c2, "card-notifications.png"], [c3, "card-question-button.png"], [c4, "card-board.png"], [c5, "card-home-screen.png"], [c6, "card-good-to-know.png"], [c7, "card-kim-schedule-live.png"]]) { await art.setContent(html, { waitUntil: "load" }); await sleep(300); await art.screenshot({ path: join(ROOT, "docs", "discord", name) }); console.log("wrote docs/discord/" + name); }
 await browser.close(); stop(); rmSync(dir, { recursive: true, force: true }); process.exit(0);
