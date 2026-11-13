@@ -367,7 +367,38 @@
   PASS adding the dater links the sign-up: it leaves the pending list
   PASS ...and it is no longer pending on the admin page
   PASS Clear all on the admin page asks first and then empties the list
+  PASS a sign-up that looks like someone already on your list opens 'Is this person already on your list?' instead of adding a duplicate
+  PASS it shows exactly what would change before anything happens
+  PASS confirming merges them and seats them, without making a second dater
+  PASS ...keeping their history and filling in what they entered
+  PASS the old name stays searchable in the dater list
+  PASS Undo on the merge toast puts the dater back as it was
+  PASS 'Merge with existing...' lets you search your dater list for someone with a different name
+  PASS the admin page confirms the merge and offers Undo
+  PASS ...the merged sign-up leaves the pending list
+  PASS Undo on the admin page returns the sign-up to pending
   PASS the sign-up screens show no JavaScript errors
+  PASS previewing a merge lists exactly what would change, and the old name that stays searchable
+  PASS previewing changes nothing, and only hosts may (403 for a Contributor)
+  PASS merging into a dater that does not exist is a clean 404
+  PASS merging keeps the existing dater and all their history, and fills in what the person entered
+  PASS ...the old name is kept for searching and the dater carries an anonymous account id, never an email
+  PASS no second dater was created
+  PASS a dater already linked to one account cannot be merged into another (400)
+  PASS undoing a merge puts the dater back exactly as it was and returns the sign-up to pending
+  PASS there is nothing to undo twice (404)
+  PASS when the person changes their username, the linked dater's name follows and the old names stay searchable
+  PASS ...hosts' open pages see the new name at once
+  PASS the owner's search still finds them by the old username, and shows what it was
+  PASS changing only the capital letters is not counted as a change and renames nothing else
+  PASS a name the host set by hand is left alone when the username changes
+  PASS usernames can be changed 3 times a day, then it asks them to wait (429)
+  PASS a username someone released can be taken by another account right away
+  PASS a dater made from a sign-up is linked to the account too
+  PASS ...so it follows a username change as well
+  PASS linking a hand-made dater to a sign-up marks the account on the dater
+  PASS a dater that is already linked cannot be linked to a second account (400)
+  PASS a contributor cannot merge, unmerge or link (403)
 
 == Browser: three roles, live sync, reconnect
   PASS Editor page opens in Host view
@@ -586,4 +617,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-551 passed, 0 failed, 551 total
+582 passed, 0 failed, 582 total

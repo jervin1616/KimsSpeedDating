@@ -548,6 +548,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 
 <script src="/db-shim.js"></script>
 <script src="/match.js"></script>
+<script src="/mergeui.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -736,7 +737,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   function renderDaters() {
     var list = $("dList"); list.textContent = "";
     var q = $("search").value.trim().toLowerCase();
-    var items = state.daters.filter(function (d) { return !q || (d.name + " " + d.location).toLowerCase().indexOf(q) >= 0; });
+    var items = state.daters.filter(function (d) { return !q || (d.name + " " + d.location + " " + (d.aka || []).join(" ")).toLowerCase().indexOf(q) >= 0; });
     var srt = $("sort").value;
     items.sort(function (x, y) {
       var px = x.panelCount || 0, py = y.panelCount || 0;
@@ -1181,10 +1182,10 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   document.addEventListener("visibilitychange", function () { if (!document.hidden) loadPending(); });
   function whoOf(su) { return [su.location, whoText(su), "wants " + rangeText(su)].filter(Boolean).join(" · "); }
   function dFromSu(su) { var d = Object.assign({}, su); d.id = "su:" + su.id; d.name = su.handle; return d; }
-  function approvePending(su) {
-    return api("/api/signups", "POST", { action: "approve", id: su.id }).then(function (r) {
-      var d = Object.assign({ id: r.daterId }, r.dater);
-      if (!byId(d.id)) state.daters.push(d);
+  function approvePending(su, mergeInto) {
+    return api("/api/signups", "POST", { action: "approve", id: su.id, daterId: mergeInto || undefined }).then(function (r) {
+      var d = Object.assign({ id: r.daterId }, r.dater), ex = byId(d.id);
+      if (ex) Object.assign(ex, d); else state.daters.push(d);
       state.pending = state.pending.filter(function (x) { return x.id !== su.id; });
       renderAll();
       return d;
@@ -1192,8 +1193,18 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
   function pickPending(su) {
     var key = state.pickFor; closePicker();
-    approvePending(su).then(function (d) { state.selected = key === "hot" ? null : key; seatDater(d, key === "hot" ? "hot" : "panel"); })
-      .catch(function (e) { toast(e.message); loadPending(); });
+    var seat = function (d) { state.selected = key === "hot" ? null : key; seatDater(d, key === "hot" ? "hot" : "panel"); };
+    var fail = function (e) { toast(e.message); loadPending(); };
+    if (!window.MergeUI.candidates(su, state.daters).length) { approvePending(su).then(seat).catch(fail); return; } // nobody similar: approve and seat in one tap
+    window.MergeUI.open({ su: su, daters: state.daters, preview: function (daterId) { return api("/api/signups", "POST", { action: "preview", id: su.id, daterId: daterId }); } }).then(function (r) {
+      if (r.action === "new") return approvePending(su).then(seat);
+      if (r.action !== "merge") return;
+      var before = byId(r.daterId) && byId(r.daterId).name;
+      return approvePending(su, r.daterId).then(function (d) {
+        seat(d);
+        toastUndo("Merged @" + su.handle + " into " + before + ".", function () { api("/api/signups", "POST", { action: "unmerge", id: su.id }).then(function () { toast("Merge undone."); loadPending(); }).catch(function (e) { toast(e.message); }); });
+      });
+    }).catch(fail);
   }
   // when adding a dater by hand: does it look like someone who signed up?
   function renderMatch() {
@@ -1413,7 +1424,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     var key = state.pickFor; if (!key) return;
     var s = seatsNow(), hot = byId(s.hot), q = $("pickSearch").value.trim().toLowerCase();
     var useFit = key !== "hot" && !!hot, rank = { mutual: 0, close: 1, nofit: 2 };
-    var items = state.daters.filter(function (d) { return !q || (d.name + " " + d.location).toLowerCase().indexOf(q) >= 0; }).map(function (d) {
+    var items = state.daters.filter(function (d) { return !q || (d.name + " " + d.location + " " + (d.aka || []).join(" ")).toLowerCase().indexOf(q) >= 0; }).map(function (d) {
       return { d: d, f: useFit && hot.id !== d.id ? fit(hot, d) : null };
     });
     // people who signed up but are not approved yet turn up like anyone else, but only when you search for them

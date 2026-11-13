@@ -156,7 +156,7 @@ export default {
           r = path === "/api/profile" ? await database(env).setHandle(s.email, body && body.handle) : await database(env).submitSignup(s.email, body);
         }
         if (r.ok) return json(r);
-        return json({ error: r.code, message: r.message }, r.code === "taken" || r.code === "locked" ? 409 : 400);
+        return json({ error: r.code, message: r.message }, r.code === "taken" || r.code === "locked" ? 409 : r.code === "limited" ? 429 : 400);
       }
 
       if (path === "/api/signups" && (request.method === "GET" || request.method === "POST")) {
@@ -172,7 +172,7 @@ export default {
           try { b = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
           b = b && typeof b === "object" ? b : {};
           const d = database(env);
-          r = b.action === "approve" ? await d.approveSignup(s.email, b.id) : b.action === "decline" ? await d.declineSignup(s.email, b.id)
+          r = b.action === "approve" ? await d.approveSignup(s.email, b.id, b.daterId) : b.action === "preview" ? await d.previewMerge(s.email, b.id, b.daterId) : b.action === "unmerge" ? await d.unmergeSignup(s.email, b.id) : b.action === "decline" ? await d.declineSignup(s.email, b.id)
             : b.action === "clear" ? await d.clearSignups(s.email) : b.action === "link" ? await d.linkSignup(s.email, b.id, b.daterId) : { ok: false, code: "invalid", message: "Unknown action." };
         }
         if (r.ok) return json(r);

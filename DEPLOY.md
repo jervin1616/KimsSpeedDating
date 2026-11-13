@@ -518,3 +518,15 @@ On a phone browser the card shows every visit after sign-in. It stops when: the 
 Contributors cannot see or approve sign-ups. Hosts never see email addresses. Pending sign-ups stay until approved, declined, withdrawn or cleared. If the host later removes the dater, that person can sign up again.
 
 **After you deploy:** the Privacy and Terms pages already describe all of this. Any older Discord post that says "we only use your email to let you in" is no longer true, so reword it.
+
+## Merging sign-ups into daters you already have, and username changes
+
+**Who a dater is.** A dater made from a sign-up (or merged with one) carries an anonymous account id, never an email. That link is what keeps them the same person if their TikTok username changes.
+
+**Merging.** When you approve a sign-up (from the seat picker or the admin page) and an existing dater looks like the same person (same name ignoring `@`, capitals, dots and underscores, or a close one with the same state or an age within a year, also checking their old names), a dialog asks "Is @username already on your list?" It lists the likely daters, plus a search box for anyone else. Pick one and you see exactly what would change (for example `Age 30 → 31`). **Confirm merge** keeps the existing dater and all their history (panel and hot seat time, match log, seat history) and fills in what the person entered. Their old name stays searchable. An **Undo** button appears right after (the toast in the picker, a bar at the top of the admin page). Daters already linked to an account are never suggested, and one dater cannot be merged into two accounts.
+
+If nobody looks similar, approving works as before, with no extra tap. On the admin page, each pending row also has **Merge with existing...**, which opens the same dialog in search mode, for someone whose name looks nothing like their username.
+
+**Username changes.** People can change their TikTok username on their profile at any time, up to 3 times a day (case-only changes are free). If their linked dater's name is still their old username, it renames itself and keeps the old name for searching; a name you set by hand is left alone. Owners searching on the admin page also find people by their old usernames, shown as "was @oldname". A username someone gives up can be claimed by another account straight away.
+
+**Not solved:** the app cannot tell a real TikTok rename from someone typing a stranger's name, so check on camera if a name suddenly looks unrelated.

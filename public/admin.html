@@ -136,6 +136,8 @@
   </section>
 </main>
 <script src="/db-shim.js"></script>
+<script src="/match.js"></script>
+<script src="/mergeui.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -226,7 +228,7 @@
     $("blockedCard").hidden = !blocked.length; $("blockedCount").textContent = blocked.length;
     var bl = $("blockedList"); bl.textContent = ""; blocked.forEach(function (p) { bl.appendChild(personRow(p)); });
     renderLock(data);
-    loadCats(); loadPacks(); $("peopleCard").hidden = false; loadPend();
+    loadCats(); loadPacks(); $("peopleCard").hidden = false; loadPend(); watchDaters();
     $("eraseCard").hidden = false;
     if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
   }
@@ -284,6 +286,30 @@
       });
     }).catch(function () { $("packCard").hidden = true; });
   }
+  var adminDaters = [], daterSub = false;
+  function watchDaters() { // owners can read the dater list; it lets the page suggest "is this someone already on your list?"
+    if (daterSub) return; daterSub = true;
+    window.claude.use("db").then(function (db) { db.collection("daters").onSnapshot(function (snap) { adminDaters = snap.docs.map(function (d) { return Object.assign({}, d.data() || {}, { id: d.id }); }); }, function () {}); }).catch(function () { daterSub = false; });
+  }
+  function approveWithMerge(su, searchOnly) {
+    var go = function (daterId) {
+      var was = daterId && adminDaters.filter(function (d) { return d.id === daterId; })[0];
+      say("Saving..."); return post("/api/signups", { action: "approve", id: su.id, daterId: daterId || undefined }).then(function (r) {
+        say(r.merged ? "Merged @" + su.handle + " into " + (was ? was.name : "the dater") + "." : "Added @" + su.handle + " to the dater list.");
+        if (r.merged) showMergeUndo(su, was ? was.name : "the dater");
+        loadPend();
+      });
+    };
+    if (!searchOnly && !window.MergeUI.candidates(su, adminDaters).length) return go().catch(function (e) { say(e.message, true); loadPend(); });
+    return window.MergeUI.open({ su: su, daters: adminDaters, searchOnly: !!searchOnly, preview: function (daterId) { return post("/api/signups", { action: "preview", id: su.id, daterId: daterId }); } }).then(function (r) {
+      if (r.action === "new") return go(); if (r.action === "merge") return go(r.daterId);
+    }).catch(function (e) { say(e.message, true); loadPend(); });
+  }
+  function showMergeUndo(su, name) {
+    var b = $("undoBtn"); b.textContent = "Undo: unmerge @" + su.handle + " from " + name;
+    b.onclick = function () { hideUndo(); post("/api/signups", { action: "unmerge", id: su.id }).then(function () { say("Merge undone. @" + su.handle + " is pending again."); loadPend(); }).catch(function (e) { say(e.message, true); }); };
+    $("undoRow").hidden = false; clearTimeout(undoTimer); undoTimer = setTimeout(hideUndo, 20000);
+  }
   var pendAll = [], GL = { man: "Man", woman: "Woman", nonbinary: "Non-binary" }, SL = { straight: "Straight", gay: "Gay or lesbian", bi: "Bisexual", other: "Other" };
   function loadPend() {
     window.claude.authFetch("/api/signups").then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || "Could not load sign-ups."); return j; }); })
@@ -304,10 +330,11 @@
       who.appendChild(meta); row.appendChild(who);
       var right = document.createElement("div"); right.className = "form";
       var ok = document.createElement("button"); ok.type = "button"; ok.className = "primary"; ok.textContent = "Approve";
-      ok.onclick = function () { say("Saving..."); post("/api/signups", { action: "approve", id: su.id }).then(function () { say("Added @" + su.handle + " to the dater list."); loadPend(); }).catch(function (e) { say(e.message, true); loadPend(); }); };
+      ok.onclick = function () { approveWithMerge(su, false); };
+      var mg = document.createElement("button"); mg.type = "button"; mg.textContent = "Merge with existing..."; mg.onclick = function () { approveWithMerge(su, true); };
       var no = document.createElement("button"); no.type = "button"; no.className = "danger"; no.textContent = "Decline";
       no.onclick = function () { post("/api/signups", { action: "decline", id: su.id }).then(function () { say("Declined @" + su.handle + "."); loadPend(); }).catch(function (e) { say(e.message, true); }); };
-      right.appendChild(ok); right.appendChild(no); row.appendChild(right); box.appendChild(row);
+      right.appendChild(ok); right.appendChild(mg); right.appendChild(no); row.appendChild(right); box.appendChild(row);
     });
   }
   $("pendQ").oninput = renderPend;
@@ -327,7 +354,7 @@
         var row = document.createElement("div"); row.className = "row" + (p.role === "blocked" ? " blockedrow" : "");
         var who = document.createElement("div"); who.className = "who"; who.appendChild(document.createTextNode(p.email));
         var meta = document.createElement("div"); meta.className = "meta";
-        meta.textContent = [p.handle ? "TikTok @" + p.handle : "no username yet", (LABEL[p.role] || p.role) + (p.source === "default" ? " (default)" : ""), "signed in " + p.n + (p.n === 1 ? " time" : " times") + ", last " + ago(p.last), p.signup !== "none" ? "dater sign-up: " + p.signup : ""].filter(Boolean).join(" \u00b7 ");
+        meta.textContent = [p.handle ? "TikTok @" + p.handle + (p.was && p.was.length ? " (was @" + p.was.join(", @") + ")" : "") : "no username yet", (LABEL[p.role] || p.role) + (p.source === "default" ? " (default)" : ""), "signed in " + p.n + (p.n === 1 ? " time" : " times") + ", last " + ago(p.last), p.signup !== "none" ? "dater sign-up: " + p.signup : ""].filter(Boolean).join(" \u00b7 ");
         who.appendChild(meta); row.appendChild(who);
         var right = document.createElement("div"); right.className = "form";
         if (p.handle) { var rel = document.createElement("button"); rel.type = "button"; rel.textContent = "Release username"; rel.onclick = function () { if (!window.confirm("Free up @" + p.handle + "? Their pending sign-up is removed too.")) return; say("Saving..."); post("/api/people/release", { email: p.email }).then(function () { say("Released @" + p.handle + "."); searchPeople(); }).catch(function (e) { say(e.message, true); }); }; right.appendChild(rel); }

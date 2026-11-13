@@ -35,9 +35,12 @@ export class Database extends DurableObject {
     this.sql.exec("CREATE TABLE IF NOT EXISTS roles (email TEXT PRIMARY KEY, role TEXT NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS seen (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS role_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, actor TEXT NOT NULL, email TEXT NOT NULL, from_role TEXT NOT NULL, to_role TEXT NOT NULL)");
-    this.sql.exec("CREATE TABLE IF NOT EXISTS members (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL, handle TEXT, hkey TEXT) WITHOUT ROWID");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS members (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL, handle TEXT, hkey TEXT, mid TEXT, prev TEXT, hday INTEGER, hcount INTEGER, did TEXT) WITHOUT ROWID");
     this.sql.exec("CREATE UNIQUE INDEX IF NOT EXISTS members_hkey ON members (hkey) WHERE hkey IS NOT NULL");
-    this.sql.exec("CREATE TABLE IF NOT EXISTS signups (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, handle TEXT NOT NULL, doc TEXT NOT NULL, status TEXT NOT NULL, dater_id TEXT, ts INTEGER NOT NULL)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS signups (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, handle TEXT NOT NULL, doc TEXT NOT NULL, status TEXT NOT NULL, dater_id TEXT, ts INTEGER NOT NULL, merged TEXT)");
+    for (const [t, c, d] of [["members", "mid", "TEXT"], ["members", "prev", "TEXT"], ["members", "hday", "INTEGER"], ["members", "hcount", "INTEGER"], ["members", "did", "TEXT"], ["signups", "merged", "TEXT"]]) { // copies made before these columns existed
+      if (!this.sql.exec("PRAGMA table_info(" + t + ")").toArray().some((r) => r.name === c)) this.sql.exec("ALTER TABLE " + t + " ADD COLUMN " + c + " " + d);
+    }
     this.sql.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS revoked (email TEXT PRIMARY KEY, after INTEGER NOT NULL) WITHOUT ROWID");
     // the old "recently signed in" list becomes the permanent member list (once)
@@ -609,14 +612,44 @@ export class Database extends DurableObject {
 
   isEditor(email) { return this.resolve(email).role === "editor"; } // owners resolve to editor level
 
+  ensureMid(e) { // an anonymous id for this account, safe to put on dater records (never the email)
+    const r = this.sql.exec("SELECT mid FROM members WHERE email = ?", e).toArray()[0];
+    if (r && r.mid) return r.mid;
+    const mid = newId();
+    this.sql.exec("UPDATE members SET mid = ? WHERE email = ?", mid, e);
+    return mid;
+  }
+
   claimHandle(e, handle) { // sets this person's TikTok username; one account per username
     const key = handleKey(handle);
     const taken = this.sql.exec("SELECT email FROM members WHERE hkey = ? AND email <> ?", key, e).toArray();
     if (taken.length) return { ok: false, code: "taken", message: "That TikTok username is already claimed by another account. If it is yours, ask the host to free it up." };
     if (!this.sql.exec("SELECT 1 AS x FROM members WHERE email = ?", e).toArray().length && !this.recordMember(e)) return { ok: false, code: "full", message: "The member list is full right now." };
-    this.sql.exec("UPDATE members SET handle = ?, hkey = ? WHERE email = ?", handle, key, e);
+    const cur = this.sql.exec("SELECT handle, hkey, prev, hday, hcount, did FROM members WHERE email = ?", e).one();
+    if (cur.handle && cur.hkey !== key) { // a real change of username: limited per day, and the old one stays searchable
+      const today = Math.floor(Date.now() / 86400000), used = cur.hday === today ? (cur.hcount || 0) : 0;
+      if (used >= 3) return { ok: false, code: "limited", message: "You can change your username 3 times a day. Try again tomorrow." };
+      let prev = []; try { prev = JSON.parse(cur.prev || "[]"); } catch (x) { prev = []; }
+      prev = [cur.handle, ...prev.filter((h) => handleKey(h) !== handleKey(cur.handle))].slice(0, 5);
+      this.sql.exec("UPDATE members SET handle = ?, hkey = ?, prev = ?, hday = ?, hcount = ? WHERE email = ?", handle, key, JSON.stringify(prev), today, used + 1, e);
+      if (cur.did) this.renameLinkedDater(cur.did, cur.handle, handle);
+    } else {
+      this.sql.exec("UPDATE members SET handle = ?, hkey = ? WHERE email = ?", handle, key, e);
+    }
     this.sql.exec("UPDATE signups SET handle = ?, doc = json_set(doc, '$.name', ?) WHERE email = ? AND status = 'pending'", handle, handle, e);
     return { ok: true, handle };
+  }
+
+  // A linked dater whose name is still the person's old username follows the change. A name the host set by hand is left alone.
+  renameLinkedDater(did, oldHandle, newHandle) {
+    const row = this.getRow("daters", did); if (row === null) return;
+    const d = JSON.parse(row);
+    if (String(d.name || "").toLowerCase() !== String(oldHandle).toLowerCase()) return;
+    d.aka = [d.name, ...(Array.isArray(d.aka) ? d.aka : [])].filter((n, i, a) => a.findIndex((m) => String(m).toLowerCase() === String(n).toLowerCase()) === i && String(n).toLowerCase() !== String(newHandle).toLowerCase()).slice(0, 5);
+    d.name = newHandle;
+    const text = validateDoc(d);
+    this.upsert("daters", did, text);
+    this.broadcast("daters", did, text);
   }
 
   // The person's own profile and sign-up status.
@@ -670,26 +703,83 @@ export class Database extends DurableObject {
     return { ok: true, pending: rows.map((r) => ({ id: r.id, handle: r.handle, ts: r.ts, ...JSON.parse(r.doc), ...(owner ? { email: r.email } : {}) })) };
   }
 
-  approveSignup(actorEmail, id) {
+  // The fields of a dater that a sign-up fills in (the person entered them themselves, so they win on a merge).
+  static MERGE_FIELDS = [["name", "Name"], ["age", "Age"], ["location", "State"], ["gender", "Gender"], ["sexuality", "Sexuality"], ["min", "Wants from"], ["max", "Wants to"], ["minM", "Men from"], ["maxM", "Men to"], ["minW", "Women from"], ["maxW", "Women to"]];
+
+  mergeTarget(su, daterId) { // returns { d } or { error }
+    const row = typeof daterId === "string" ? this.getRow("daters", daterId) : null;
+    if (row === null) return { error: { ok: false, code: "not_found", message: "That dater does not exist." } };
+    const d = JSON.parse(row), mid = this.sql.exec("SELECT mid FROM members WHERE email = (SELECT email FROM signups WHERE id = ?)", su.id).toArray()[0];
+    if (d.acct && (!mid || d.acct !== mid.mid)) return { error: { ok: false, code: "invalid", message: "That dater is already linked to another account." } };
+    return { d };
+  }
+
+  mergedDoc(d, signupDoc, mid) { // the dater as it would look after a merge, keeping stats, history and anything else on the record
+    const next = { ...d };
+    for (const [k] of Database.MERGE_FIELDS) { if (k in signupDoc) next[k] = signupDoc[k]; else delete next[k]; }
+    if (String(d.name || "").toLowerCase() !== String(signupDoc.name).toLowerCase()) next.aka = [d.name, ...(Array.isArray(d.aka) ? d.aka : [])].filter((n, i, a) => n && a.findIndex((m) => String(m).toLowerCase() === String(n).toLowerCase()) === i && String(n).toLowerCase() !== String(signupDoc.name).toLowerCase()).slice(0, 5);
+    next.acct = mid;
+    return next;
+  }
+
+  previewMerge(actorEmail, id, daterId) {
+    if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can do that." };
+    const su = this.sql.exec("SELECT id, email, doc, status FROM signups WHERE id = ?", String(id || "")).toArray()[0];
+    if (!su || su.status !== "pending") return { ok: false, code: "not_found", message: "That sign-up is gone (declined or withdrawn)." };
+    const t = this.mergeTarget(su, daterId); if (t.error) return t.error;
+    const doc = JSON.parse(su.doc), next = this.mergedDoc(t.d, doc, "x");
+    const changes = Database.MERGE_FIELDS.filter(([k]) => t.d[k] !== next[k]).map(([k, label]) => ({ field: k, label, from: t.d[k] === undefined ? null : t.d[k], to: next[k] === undefined ? null : next[k] }));
+    return { ok: true, dater: { id: daterId, name: t.d.name, age: t.d.age, location: t.d.location }, changes, keepsName: next.aka ? next.aka[0] : null };
+  }
+
+  // daterId given: merge the sign-up into that existing dater (keeps its stats, match log and history). Otherwise make a new dater.
+  approveSignup(actorEmail, id, daterId) {
     if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can approve sign-ups." };
-    const su = this.sql.exec("SELECT id, handle, doc, status, dater_id FROM signups WHERE id = ?", String(id || "")).toArray()[0];
+    const su = this.sql.exec("SELECT id, email, handle, doc, status, dater_id FROM signups WHERE id = ?", String(id || "")).toArray()[0];
     if (!su) return { ok: false, code: "not_found", message: "That sign-up is gone (declined or withdrawn)." };
     if (su.status === "approved" && su.dater_id) {
       const row = this.getRow("daters", su.dater_id);
       if (row !== null) return { ok: true, daterId: su.dater_id, dater: JSON.parse(row), already: true };
     }
+    if (daterId) { const t0 = this.mergeTarget(su, daterId); if (t0.error) return t0.error; }
+    const mid = this.ensureMid(su.email);
     let out;
-    this.ctx.storage.transactionSync(() => {
-      this.ensureRoom("daters");
-      const data = { ...JSON.parse(su.doc), ts: Date.now(), src: "signup" };
-      const daterId = newId();
+    try { this.ctx.storage.transactionSync(() => {
+      let data, target, merged = null;
+      if (daterId) {
+        const t = this.mergeTarget(su, daterId); if (t.error) throw new RuleError("invalid-argument", t.error.message);
+        target = daterId; data = this.mergedDoc(t.d, JSON.parse(su.doc), mid);
+        merged = {}; for (const k of [...Database.MERGE_FIELDS.map((f) => f[0]), "aka", "acct"]) merged[k] = t.d[k] === undefined ? null : t.d[k]; // what to put back on Undo
+      } else {
+        this.ensureRoom("daters");
+        target = newId(); data = { ...JSON.parse(su.doc), acct: mid, ts: Date.now(), src: "signup" };
+      }
       const text = validateDoc(data);
-      this.upsert("daters", daterId, text);
-      this.sql.exec("UPDATE signups SET status = 'approved', dater_id = ? WHERE id = ?", daterId, su.id);
-      out = { daterId, data, text };
-    });
+      this.upsert("daters", target, text);
+      this.sql.exec("UPDATE signups SET status = 'approved', dater_id = ?, merged = ? WHERE id = ?", target, merged ? JSON.stringify(merged) : null, su.id);
+      this.sql.exec("UPDATE members SET did = ? WHERE email = ?", target, su.email);
+      out = { daterId: target, data, text, merged: !!merged };
+    }); } catch (e) { if (e instanceof RuleError) return { ok: false, code: "invalid", message: e.message }; throw e; }
     this.broadcast("daters", out.daterId, out.text);
-    return { ok: true, daterId: out.daterId, dater: out.data };
+    return { ok: true, daterId: out.daterId, dater: out.data, merged: out.merged };
+  }
+
+  // Undo a merge: put the dater back the way it was and return the sign-up to pending.
+  unmergeSignup(actorEmail, id) {
+    if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can do that." };
+    const su = this.sql.exec("SELECT id, email, status, dater_id, merged FROM signups WHERE id = ?", String(id || "")).toArray()[0];
+    if (!su || su.status !== "approved" || !su.merged) return { ok: false, code: "not_found", message: "There is no merge to undo." };
+    const row = this.getRow("daters", su.dater_id);
+    let text = null;
+    if (row !== null) {
+      const d = JSON.parse(row), old = JSON.parse(su.merged);
+      for (const [k, v] of Object.entries(old)) { if (v === null) delete d[k]; else d[k] = v; }
+      text = validateDoc(d); this.upsert("daters", su.dater_id, text);
+    }
+    this.sql.exec("UPDATE signups SET status = 'pending', dater_id = NULL, merged = NULL WHERE id = ?", su.id);
+    this.sql.exec("UPDATE members SET did = NULL WHERE email = ?", su.email);
+    if (text !== null) this.broadcast("daters", su.dater_id, text);
+    return { ok: true };
   }
 
   declineSignup(actorEmail, id) {
@@ -708,8 +798,16 @@ export class Database extends DurableObject {
   // The host added the dater by hand and confirmed it is the same person as this sign-up.
   linkSignup(actorEmail, id, daterId) {
     if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can do that." };
-    if (typeof daterId !== "string" || this.getRow("daters", daterId) === null) return { ok: false, code: "not_found", message: "That dater does not exist." };
-    this.sql.exec("UPDATE signups SET status = 'approved', dater_id = ? WHERE id = ? AND status = 'pending'", daterId, String(id || ""));
+    const row = typeof daterId === "string" ? this.getRow("daters", daterId) : null;
+    if (row === null) return { ok: false, code: "not_found", message: "That dater does not exist." };
+    const su = this.sql.exec("SELECT id, email FROM signups WHERE id = ? AND status = 'pending'", String(id || "")).toArray()[0];
+    if (!su) return { ok: true };
+    const d = JSON.parse(row), mid = this.ensureMid(su.email);
+    if (d.acct && d.acct !== mid) return { ok: false, code: "invalid", message: "That dater is already linked to another account." };
+    d.acct = mid; const text = validateDoc(d); this.upsert("daters", daterId, text);
+    this.sql.exec("UPDATE signups SET status = 'approved', dater_id = ? WHERE id = ?", daterId, su.id);
+    this.sql.exec("UPDATE members SET did = ? WHERE email = ?", daterId, su.email);
+    this.broadcast("daters", daterId, text);
     return { ok: true };
   }
 
@@ -719,10 +817,12 @@ export class Database extends DurableObject {
     const t = String(q || "").trim().toLowerCase().replace(/^@+/, "");
     if (t.length < 2 || t.length > 60) return { ok: false, code: "invalid", message: "Type at least 2 characters." };
     const like = "%" + t.replace(/[\\%_]/g, (c) => "\\" + c) + "%";
-    const rows = this.sql.exec("SELECT email, first, last, n, handle FROM members WHERE lower(email) LIKE ? ESCAPE '\\' OR hkey LIKE ? ESCAPE '\\' ORDER BY last DESC LIMIT 50", like, like).toArray();
+    const rows = this.sql.exec("SELECT email, first, last, n, handle, prev FROM members WHERE lower(email) LIKE ? ESCAPE '\\' OR hkey LIKE ? ESCAPE '\\' OR lower(prev) LIKE ? ESCAPE '\\' ORDER BY last DESC LIMIT 50", like, like, like).toArray();
     const people = rows.map((r) => {
       const me = this.resolve(r.email), su = this.sql.exec("SELECT status FROM signups WHERE email = ?", r.email).toArray()[0];
-      return { ...r, role: me.source === "secret" ? (me.owner ? "owner" : me.role) : me.blocked ? "blocked" : me.role, source: me.source, signup: su ? su.status : "none" };
+      let was = []; try { was = JSON.parse(r.prev || "[]"); } catch (x) { was = []; }
+      delete r.prev;
+      return { ...r, was, role: me.source === "secret" ? (me.owner ? "owner" : me.role) : me.blocked ? "blocked" : me.role, source: me.source, signup: su ? su.status : "none" };
     });
     return { ok: true, people, total: this.sql.exec("SELECT COUNT(*) AS n FROM members").one().n };
   }

@@ -937,7 +937,112 @@ try {
       await jpost("/api/signup", (await login("su11@example.com")).session, { ...good, handle: "Admin_C", age: 24 }); await adm.reload(); await until(async () => /Admin_C/.test(await adm.locator("#pendList").innerText()), 8000);
       adm.once("dialog", (d) => d.accept()); await adm.click("#pendClear");
       check("Clear all on the admin page asks first and then empties the list", await until(async () => /Nobody is waiting/.test(await adm.locator("#pendList").innerText()), 6000));
+      // merging a sign-up into someone already on the dater list
+      {
+        const edc = await connect(ED); await edc.wait((m) => m.t === "hello");
+        const mia = await edc.w("add", "daters", null, { name: "Mia Quinn", age: 30, location: "NC", gender: "woman", sexuality: "straight", min: 26, max: 38, ts: 7, panelMs: 9000, panelCount: 3 });
+        const kay = await edc.w("add", "daters", null, { name: "Kay Different", age: 40, location: "TX", gender: "man", sexuality: "straight", min: 30, max: 50, ts: 8 });
+        await jpost("/api/signup", (await login("mrg1@example.com")).session, { ...good, handle: "mia_quinn", age: 31, location: "NC", min: 27, max: 39 });
+        await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange"))); await sleep(900);
+        await catE.locator('button.heart[aria-label="Seat 3: empty"]').scrollIntoViewIfNeeded();
+        await catE.locator('button.heart[aria-label="Seat 3: empty"]').dispatchEvent("click"); await sleep(700); // Seat 3: it is not the selected seat, so one tap opens the picker
+        await until(async () => await catE.locator("#pickModal").isVisible(), 6000); await sleep(600);
+        await catE.fill("#pickSearch", "mia_");
+        await until(async () => /mia_quinn/.test(await catE.locator("#pickList").innerText()), 5000);
+        await catE.locator("#pickList .pickrow", { hasText: "mia_quinn" }).click();
+        check("a sign-up that looks like someone already on your list opens 'Is this person already on your list?' instead of adding a duplicate", await until(async () => await catE.locator(".mu-card").isVisible() && /already on your list/.test(await catE.locator(".mu-card").innerText()) && /Mia Quinn/.test(await catE.locator(".mu-card").innerText()), 6000));
+        await catE.locator(".mu-row", { hasText: "Mia Quinn" }).getByRole("button", { name: "Merge into this one" }).click();
+        check("it shows exactly what would change before anything happens", await until(async () => { const t = await catE.locator(".mu-card").innerText(); return /Name/.test(t) && /Mia Quinn\s+→\s+mia_quinn/.test(t) && /Age/.test(t) && /30\s+→\s+31/.test(t); }, 6000), await catE.locator(".mu-card").innerText());
+        await catE.locator(".mu-card").screenshot({ path: "/tmp/cat-shots/new-merge.png" }).catch(() => {});
+        const nBefore = (await (await connect(O)).sub("daters")).docs.length;
+        await catE.getByRole("button", { name: "Confirm merge" }).click();
+        check("confirming merges them and seats them, without making a second dater", await until(async () => (await catE.locator('button.heart[aria-label*="mia_quinn"]').count()) === 1, 6000) && (await (await connect(O)).sub("daters")).docs.length === nBefore);
+        const miaDoc = (await (await connect(O)).sub("daters/" + mia.id)).docs[0].data;
+        check("...keeping their history and filling in what they entered", miaDoc.name === "mia_quinn" && miaDoc.age === 31 && miaDoc.min === 27 && miaDoc.panelMs === 9000 && miaDoc.panelCount === 3 && miaDoc.ts === 7 && miaDoc.aka.includes("Mia Quinn") && typeof miaDoc.acct === "string" && !JSON.stringify(miaDoc).includes("@example.com"), miaDoc);
+        check("the old name stays searchable in the dater list", await (async () => { await catE.click("#tabD"); await catE.fill("#search", "mia quinn"); return until(async () => /mia_quinn/.test(await catE.locator("#dList").innerText()), 4000); })());
+        await catE.fill("#search", "");
+        await catE.locator("#toast .undo").click().catch(() => {});
+        check("Undo on the merge toast puts the dater back as it was", await until(async () => { const d = (await (await connect(O)).sub("daters/" + mia.id)).docs[0].data; return d.name === "Mia Quinn" && d.age === 30 && !d.acct && !d.aka; }, 6000));
+        // admin page: merge with an existing dater whose name looks nothing like the username
+        await jpost("/api/signup", (await login("mrg2@example.com")).session, { ...good, handle: "kay_dee", age: 41, location: "TX" });
+        await adm.reload(); await sleep(1500);
+        await until(async () => /kay_dee/.test(await adm.locator("#pendList").innerText()), 8000);
+        await adm.locator("#pendList .row", { hasText: "kay_dee" }).getByRole("button", { name: "Merge with existing..." }).click();
+        await adm.locator(".mu-card input").fill("kay");
+        check("'Merge with existing...' lets you search your dater list for someone with a different name", await until(async () => /Kay Different/.test(await adm.locator(".mu-card").innerText()), 5000));
+        await adm.locator(".mu-row", { hasText: "Kay Different" }).getByRole("button", { name: "Merge into this one" }).click();
+        await until(async () => /Confirm merge/.test(await adm.locator(".mu-card").innerText()), 5000);
+        await adm.getByRole("button", { name: "Confirm merge" }).click();
+        check("the admin page confirms the merge and offers Undo", await until(async () => /Merged @kay_dee into Kay Different/.test(await adm.locator("#msg").innerText()) && await adm.locator("#undoBtn").isVisible(), 6000));
+        check("...the merged sign-up leaves the pending list", !/kay_dee/.test(await adm.locator("#pendList").innerText()));
+        await adm.click("#undoBtn");
+        check("Undo on the admin page returns the sign-up to pending", await until(async () => /kay_dee/.test(await adm.locator("#pendList").innerText()), 6000) && (await (await connect(O)).sub("daters/" + kay.id)).docs[0].data.name === "Kay Different");
+        edc.close();
+      }
       check("the sign-up screens show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0 && adm.errors.length === 0, [...catV.errors, ...catE.errors, ...adm.errors]);
+    }
+
+    // ---- merging into existing daters, and people who change their TikTok username
+    {
+      const jget = (path, session) => fetch(API_BASE + path, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+      const CT = (await login(EMAILS.contributor)).session;
+      const mk = async (n) => (await login("mg" + n + "@example.com")).session;
+      const A = await mk("a"), B = await mk("b"), C3 = await mk("c"), D4 = await mk("d");
+      const base = { age: 28, location: "NC", gender: "woman", sexuality: "straight", min: 26, max: 36, adult: true };
+      const edw = await connect(ED); await edw.wait((m) => m.t === "hello"); await edw.sub("daters");
+      const old = await edw.w("add", "daters", null, { name: "Jessica", age: 27, location: "NC", gender: "woman", sexuality: "straight", min: 25, max: 35, ts: 1, panelMs: 5000, panelCount: 2, hotMs: 3000, hotCount: 1 });
+      const dd = async (id) => (await (await connect(O)).sub("daters/" + id)).docs[0].data;
+      await api("/api/signup", A, { ...base, handle: "jessica_nc" });
+      const sidA = (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "jessica_nc").id;
+      const pv = await api("/api/signups", ED, { action: "preview", id: sidA, daterId: old.id });
+      check("previewing a merge lists exactly what would change, and the old name that stays searchable", pv.status === 200 && pv.body.changes.some((c) => c.field === "name" && c.from === "Jessica" && c.to === "jessica_nc") && pv.body.changes.some((c) => c.field === "age" && c.from === 27 && c.to === 28) && pv.body.changes.some((c) => c.field === "min" && c.from === 25 && c.to === 26) && pv.body.keepsName === "Jessica", pv.body);
+      check("previewing changes nothing, and only hosts may (403 for a Contributor)", (await dd(old.id)).age === 27 && (await api("/api/signups", CT, { action: "preview", id: sidA, daterId: old.id })).status === 403);
+      check("merging into a dater that does not exist is a clean 404", (await api("/api/signups", ED, { action: "approve", id: sidA, daterId: "nope" })).status === 404);
+      const mg = await api("/api/signups", ED, { action: "approve", id: sidA, daterId: old.id });
+      const m1 = await dd(old.id);
+      check("merging keeps the existing dater and all their history, and fills in what the person entered", mg.status === 200 && mg.body.merged === true && mg.body.daterId === old.id && m1.name === "jessica_nc" && m1.age === 28 && m1.min === 26 && m1.max === 36 && m1.panelMs === 5000 && m1.panelCount === 2 && m1.hotMs === 3000 && m1.hotCount === 1 && m1.ts === 1, m1);
+      check("...the old name is kept for searching and the dater carries an anonymous account id, never an email", m1.aka.includes("Jessica") && typeof m1.acct === "string" && m1.acct.length >= 10 && !JSON.stringify(m1).includes("@"), m1);
+      check("no second dater was created", (await (await connect(O)).sub("daters")).docs.filter((d) => /jess/i.test(d.data.name)).length === 1);
+      await api("/api/signup", B, { ...base, handle: "someone_else" });
+      const sidB = (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "someone_else").id;
+      check("a dater already linked to one account cannot be merged into another (400)", (await api("/api/signups", ED, { action: "approve", id: sidB, daterId: old.id })).status === 400 && (await api("/api/signups", ED, { action: "preview", id: sidB, daterId: old.id })).status === 400);
+      // undo
+      const um = await api("/api/signups", ED, { action: "unmerge", id: sidA });
+      const m2 = await dd(old.id);
+      check("undoing a merge puts the dater back exactly as it was and returns the sign-up to pending", um.status === 200 && m2.name === "Jessica" && m2.age === 27 && m2.min === 25 && !("acct" in m2) && !("aka" in m2) && m2.panelMs === 5000 && (await jget("/api/signups", ED)).body.pending.some((x) => x.id === sidA));
+      check("there is nothing to undo twice (404)", (await api("/api/signups", ED, { action: "unmerge", id: sidA })).status === 404);
+      // merge again, then the username changes
+      await api("/api/signups", ED, { action: "approve", id: sidA, daterId: old.id });
+      const ch1 = await api("/api/profile", A, { handle: "jessica_new" });
+      const m3 = await dd(old.id);
+      check("when the person changes their username, the linked dater's name follows and the old names stay searchable", ch1.status === 200 && m3.name === "jessica_new" && m3.aka.includes("jessica_nc") && m3.aka.includes("Jessica"), m3);
+      check("...hosts' open pages see the new name at once", !!(await edw.wait((m) => m.t === "chg" && m.coll === "daters" && m.id === old.id && m.data && m.data.name === "jessica_new", 3000)));
+      const pf = await jget("/api/people?q=jessica_nc", O);
+      check("the owner's search still finds them by the old username, and shows what it was", pf.body.people.some((p) => p.email === "mga@example.com" && p.handle === "jessica_new" && p.was.includes("jessica_nc")), pf.body.people);
+      check("changing only the capital letters is not counted as a change and renames nothing else", (await api("/api/profile", A, { handle: "Jessica_New" })).status === 200);
+      await edw.w("update", "daters", old.id, { name: "Custom Name" });
+      await api("/api/profile", A, { handle: "jessica_new2" });
+      check("a name the host set by hand is left alone when the username changes", (await dd(old.id)).name === "Custom Name");
+      const ch3 = await api("/api/profile", A, { handle: "jessica_new3" });
+      const ch4 = await api("/api/profile", A, { handle: "jessica_new4" });
+      check("usernames can be changed 3 times a day, then it asks them to wait (429)", ch3.status === 200 && ch4.status === 429 && /3 times a day/.test(ch4.body.message), ch4.body);
+      check("a username someone released can be taken by another account right away", (await api("/api/profile", B, { handle: "jessica_nc" })).status === 200);
+      // new dater from a sign-up carries the link; manual link
+      await api("/api/signup", C3, { ...base, handle: "fresh_face" });
+      const sidC = (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "fresh_face").id;
+      const ap = await api("/api/signups", ED, { action: "approve", id: sidC });
+      check("a dater made from a sign-up is linked to the account too", ap.status === 200 && !ap.body.merged && typeof ap.body.dater.acct === "string");
+      await api("/api/profile", C3, { handle: "fresh_face2" });
+      check("...so it follows a username change as well", (await dd(ap.body.daterId)).name === "fresh_face2");
+      const handDater = await edw.w("add", "daters", null, { name: "By Hand", age: 29, location: "NC", gender: "woman", sexuality: "straight", min: 25, max: 35, ts: 9 });
+      await api("/api/signup", D4, { ...base, handle: "by_hand" });
+      const sidD = (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "by_hand").id;
+      check("linking a hand-made dater to a sign-up marks the account on the dater", (await api("/api/signups", ED, { action: "link", id: sidD, daterId: handDater.id })).status === 200 && typeof (await dd(handDater.id)).acct === "string");
+      await api("/api/signup", await mk("e"), { ...base, handle: "late_one" });
+      const sidE = (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "late_one").id;
+      check("a dater that is already linked cannot be linked to a second account (400)", (await api("/api/signups", ED, { action: "link", id: sidE, daterId: handDater.id })).status === 400);
+      check("a contributor cannot merge, unmerge or link (403)", (await api("/api/signups", CT, { action: "approve", id: sidE, daterId: handDater.id })).status === 403 && (await api("/api/signups", CT, { action: "unmerge", id: sidA })).status === 403 && (await api("/api/signups", CT, { action: "link", id: sidE, daterId: handDater.id })).status === 403);
+      edw.close();
     }
     await catPages.close(); cz.close();
   }
