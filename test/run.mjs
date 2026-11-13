@@ -808,6 +808,39 @@ try {
     const dilTexts = new Set(pack.questions.filter((q) => q.cat === "dilemma").map((q) => q.text));
     const dseen = []; for (let i = 0; i < 8; i++) { await catV.click("#myQBtn"); dseen.push(await catV.locator("#myQText").innerText()); }
     check("a viewer picking 'What would you do?' gets only those new questions", dseen.every((t) => dilTexts.has(t)), dseen);
+    // ---- pack categories and removing a pack
+    {
+      const st = (await packReq(O, "hot-seat")).body;
+      const wantCats = {}; for (const q of pack.questions) wantCats[q.cat] = (wantCats[q.cat] || 0) + 1;
+      check("the pack status lists every category with how many questions it has and how many are in the bank", Object.keys(wantCats).every((k) => st.cats[k] && st.cats[k].total === wantCats[k] && st.cats[k].present === wantCats[k]) && Object.keys(st.cats).length === Object.keys(wantCats).length, st.cats);
+      const adm = await pageFor(O, "/admin.html#questions");
+      await until(async () => /Categories:/.test(await adm.locator("#packList").innerText()), 8000);
+      const ptxt = await adm.locator("#packList").innerText();
+      check("the Questions tab shows the pack's categories in plain words, with counts", /Categories: .*What would you do\? \d+/.test(ptxt) && /Confessions & icks \d+/.test(ptxt) && !/\bdilemma\b/.test(ptxt), ptxt);
+      await cz.w("set", "questions", "keepme_q1", { text: "My own question stays", handle: "", status: "ready", cat: "chat", ts: 2, askCount: 3 });
+      check("removing a pack is refused for non-owners (403 for an Editor) and for a wrong origin", (await api("/api/pack", ED, { name: "hot-seat", action: "remove" })).status === 403 && (await api("/api/pack", O, { name: "hot-seat", action: "remove" }, { Origin: "https://evil.example" })).status === 403);
+      const before = (await (await connect(O)).sub("questions")).docs.length;
+      adm.once("dialog", (d) => d.dismiss());
+      await adm.getByRole("button", { name: /Remove the .* pack from the question bank/ }).click(); await sleep(600);
+      check("cancelling the confirmation removes nothing", (await (await connect(O)).sub("questions")).docs.length === before);
+      adm.once("dialog", (d) => d.accept());
+      await adm.getByRole("button", { name: /Remove the .* pack from the question bank/ }).click();
+      check("removing the pack takes out exactly its questions", await until(async () => (await (await connect(O)).sub("questions")).docs.length === before - pack.questions.length, 8000), before);
+      const left = new Map((await (await connect(O)).sub("questions")).docs.map((d) => [d.id, d.data]));
+      check("...and leaves other questions alone, with their counts", left.has("keepme_q1") && left.get("keepme_q1").askCount === 3 && !pack.questions.some((q) => left.has(q.id)));
+      check("the page says what happened and the pack can be added back", await until(async () => /Removed \d+ questions/.test(await adm.locator("#msg").innerText().catch(() => "")) || /0 of \d+ already added/.test(await adm.locator("#packList").innerText()), 8000));
+      check("a viewer's open page drops the removed categories at once", await until(async () => !(await catV.locator("#myCat option").allTextContents()).some((o) => /^What would you do\?/.test(o)), 8000));
+      const again = await packReq(O, "hot-seat", "POST");
+      check("adding the pack back restores every question", again.status === 200 && again.body.added === pack.questions.length, again.body);
+      const rm2 = await api("/api/pack", O, { name: "hot-seat", action: "remove" });
+      const rm3 = await api("/api/pack", O, { name: "hot-seat", action: "remove" });
+      check("removing twice is harmless (the second time removes 0)", rm2.status === 200 && rm2.body.removed === pack.questions.length && rm3.body.removed === 0, [rm2.body, rm3.body]);
+      await packReq(O, "hot-seat", "POST");
+      await cz.w("set", "questions", pack.questions[0].id, { text: "Mine stays", handle: "@mine", status: "ready", cat: "chat", ts: 1, askCount: 5 });
+      await cz.w("delete", "questions", "keepme_q1");
+      check("the pack tools show no JavaScript errors", adm.errors.length === 0, adm.errors);
+      await adm.context().close();
+    }
     // ---- member list, TikTok usernames, dater sign-ups and pending daters
     {
       const jget = (path, session) => fetch(API_BASE + path, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));

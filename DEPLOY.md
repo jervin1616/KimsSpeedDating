@@ -575,3 +575,9 @@ The admin page (`/admin.html`) has six tabs. Owners and hosts see the same six.
 - `/#announce` opens the announcer on the main screen for an owner. The Today tab's Going live card uses it.
 - The Help tab replaces the Word and HTML guides for day to day use. Those files stay in `docs/`.
 - Nothing to configure and no new secrets. Deploy as usual.
+
+## Packs: categories and removal
+
+On the Questions tab, each pack now lists its categories in plain words with counts, for example `What would you do? 31, Deep & personal 28`. If only some of a category is in the bank it shows `12/31`.
+
+Each pack also has a **Remove from the bank** button (owners only). It asks first, then deletes only the questions that came from that pack, matched by id. Your own questions and questions from chat are never touched. How often a removed question was asked is lost. Adding the pack back restores the questions, with fresh counts. Open pages drop the removed questions at once. No new secrets or settings.

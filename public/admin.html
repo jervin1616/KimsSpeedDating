@@ -175,7 +175,7 @@
   </section>
   <section class="card" id="packCard" hidden>
     <h2>Question packs</h2>
-    <p>Add a ready-made set of questions to the bank. It only adds new ones and never changes questions you already have.</p>
+    <p>Add a ready-made set of questions to the bank, or take one back out. Adding only adds new ones and never changes questions you already have. Removing only removes questions that came from that pack.</p>
     <div id="packList"></div>
   </section>
   </div>
@@ -418,6 +418,7 @@
       };
     }).catch(function () { /* leave the card as is */ });
   }
+  var CAT_NAMES = { first: "First dates", date: "About your date", flirty: "Flirty", love: "Love & relationships", wyr: "Would you rather", tot: "This or that", funny: "Funny & hypothetical", food: "Food & drink", media: "Music, movies & games", travel: "Travel & adventure", memories: "Childhood & memories", deep: "Deep & personal", life: "Everyday life", hot: "Hot takes & debates", dilemma: "What would you do?", confess: "Confessions & icks", chat: "From chat", other: "Other" };
   function loadPacks() {
     fetch("/packs/index.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (packs) {
       var box = $("packList"); box.textContent = "";
@@ -428,7 +429,14 @@
           var row = document.createElement("div"); row.className = "row";
           var who = document.createElement("div"); who.className = "who"; who.appendChild(document.createTextNode(p.title));
           var meta = document.createElement("div"); meta.className = "meta"; meta.textContent = st.present + " of " + st.total + " already added";
-          who.appendChild(meta); row.appendChild(who);
+          who.appendChild(meta);
+          var keys = Object.keys(st.cats || {}).sort(function (x, y) { return st.cats[y].total - st.cats[x].total; });
+          if (keys.length) {
+            var cl = document.createElement("div"); cl.className = "meta"; cl.setAttribute("aria-label", "Categories in this pack");
+            cl.textContent = "Categories: " + keys.map(function (k) { var c = st.cats[k]; return (CAT_NAMES[k] || k) + " " + (c.present === c.total ? c.total : c.present + "/" + c.total); }).join(", ");
+            who.appendChild(cl);
+          }
+          row.appendChild(who);
           var right = document.createElement("div"); right.className = "form";
           var b = document.createElement("button"); b.type = "button"; b.className = "primary";
           b.textContent = st.missing ? "Add " + st.missing + " questions" : "All added"; b.disabled = !st.missing;
@@ -436,7 +444,15 @@
             say("Adding..."); b.disabled = true;
             post("/api/pack", { name: p.name }).then(function (r) { say("Added " + r.added + " questions" + (r.skipped ? " (" + r.skipped + " were already there)" : "") + "."); loadPacks(); }).catch(function (e) { say(e.message, true); loadPacks(); });
           };
-          right.appendChild(b); row.appendChild(right); box.appendChild(row);
+          right.appendChild(b);
+          var rm = document.createElement("button"); rm.type = "button"; rm.textContent = "Remove from the bank"; rm.disabled = !st.present;
+          rm.setAttribute("aria-label", "Remove the " + p.title + " pack from the question bank");
+          rm.onclick = function () {
+            if (!window.confirm("Remove " + st.present + " questions of this pack from the bank?\n\nOnly questions that came from this pack are removed. Your own questions, and questions from chat, are not touched. How often each was asked is lost for the removed ones. You can add the pack back at any time.")) return;
+            say("Removing..."); rm.disabled = true;
+            post("/api/pack", { name: p.name, action: "remove" }).then(function (r) { say("Removed " + r.removed + " questions. You can add the pack back with the button."); loadPacks(); loadCats(); }).catch(function (e) { say(e.message, true); loadPacks(); });
+          };
+          right.appendChild(rm); row.appendChild(right); box.appendChild(row);
         }).catch(function () { /* skip this pack */ });
       });
     }).catch(function () { $("packCard").hidden = true; });

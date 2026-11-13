@@ -1009,9 +1009,37 @@ export class Database extends DurableObject {
   }
 
   packStatus(ids) {
-    let present = 0;
-    for (const id of ids) if (this.getRow("questions", id) !== null) present++;
-    return { total: ids.length, present, missing: ids.length - present };
+    const have = [];
+    for (const id of ids) if (this.getRow("questions", id) !== null) have.push(id);
+    return { total: ids.length, present: have.length, missing: ids.length - have.length, have };
+  }
+
+  // Removes the questions of a pack (matched by id) from the bank. Only those ids are touched. Owners only.
+  removePack(actorEmail, ids) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const gone = [];
+    this.ctx.storage.transactionSync(() => {
+      for (const id of ids) {
+        if (typeof id !== "string" || !validDocId("questions", id)) continue;
+        if (this.getRow("questions", id) === null) continue;
+        this.sql.exec("DELETE FROM docs WHERE coll = 'questions' AND id = ?", id);
+        gone.push(id);
+      }
+    });
+    if (gone.length) this.broadcastDel("questions", gone);
+    return { ok: true, removed: gone.length };
+  }
+
+  broadcastDel(coll, ids) {
+    this.snap.delete(coll);
+    const out = '{"t":"bulk","coll":' + JSON.stringify(coll) + ',"del":' + JSON.stringify(ids) + "}";
+    const now = Math.floor(Date.now() / 1000);
+    for (const [ws, att] of this.loadMeta()) {
+      if (!att.colls.includes(coll) || att.exp <= now) continue;
+      const role = this.resolve(att.email, att.iat).role;
+      if (role === "none" || !canRead(role, coll)) continue;
+      this.send(ws, out);
+    }
   }
 
   // Adds the questions of a pack that are not there yet (matched by id). Existing questions are never touched.

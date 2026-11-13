@@ -382,6 +382,7 @@
         if (sub.coll !== m.coll || sub.docId || !sub.mirror) return;
         if (Array.isArray(m.patch)) m.patch.forEach(function (p) { var cur = sub.mirror.get(p[0]); if (cur) sub.mirror.set(p[0], Object.assign({}, cur, p[1])); });
         if (Array.isArray(m.add)) m.add.forEach(function (p) { sub.mirror.set(p[0], p[1]); });
+        if (Array.isArray(m.del)) m.del.forEach(function (id) { sub.mirror.delete(id); });
         if (sub.ready) dispatch(sub);
       });
     } else if (m.t === "ack") {

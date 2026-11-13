@@ -306,6 +306,17 @@
   PASS adding it again changes nothing
   PASS pages already open pick up the new categories at once (viewer picker and host filter)
   PASS a viewer picking 'What would you do?' gets only those new questions
+  PASS the pack status lists every category with how many questions it has and how many are in the bank
+  PASS the Questions tab shows the pack's categories in plain words, with counts
+  PASS removing a pack is refused for non-owners (403 for an Editor) and for a wrong origin
+  PASS cancelling the confirmation removes nothing
+  PASS removing the pack takes out exactly its questions
+  PASS ...and leaves other questions alone, with their counts
+  PASS the page says what happened and the pack can be added back
+  PASS a viewer's open page drops the removed categories at once
+  PASS adding the pack back restores every question
+  PASS removing twice is harmless (the second time removes 0)
+  PASS the pack tools show no JavaScript errors
   PASS everyone who signs in lands on the member list automatically (owners can search it by email)
   PASS only owners can search people (403 for an Editor and a Contributor, 401 with no login, 400 for a one-letter search)
   PASS a new viewer has no username and no sign-up yet
@@ -705,4 +716,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-670 passed, 0 failed, 670 total
+681 passed, 0 failed, 681 total

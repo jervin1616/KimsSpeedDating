@@ -245,12 +245,23 @@ export default {
         if (!s) return json({ error: "unauthorized" }, 401);
         if (!s.owner) return json({ error: "forbidden", message: "Only owners can do that." }, 403);
         let name = url.searchParams.get("name") || "";
-        if (request.method === "POST") { try { name = String((await request.json()).name || ""); } catch (e) { return json({ error: "bad_request" }, 400); } }
+        let remove = false;
+        if (request.method === "POST") { try { const body = await request.json(); name = String(body.name || ""); remove = body.action === "remove"; } catch (e) { return json({ error: "bad_request" }, 400); } }
         if (!/^[a-z0-9-]{1,40}$/.test(name)) return json({ error: "bad_request", message: "Unknown pack." }, 400);
         let pack;
         try { pack = await (await env.ASSETS.fetch(new Request(url.origin + "/packs/" + name + ".json"))).json(); } catch (e) { return json({ error: "no_file", message: "That pack was not found on the site." }, 404); }
         if (!pack || !Array.isArray(pack.questions) || pack.questions.length > 500) return json({ error: "no_file", message: "That pack is not valid." }, 500);
-        if (request.method === "GET") return json({ ok: true, name, ...(await database(env).packStatus(pack.questions.map((q) => String(q && q.id)))) });
+        if (request.method === "GET") {
+          const st = await database(env).packStatus(pack.questions.map((q) => String(q && q.id)));
+          const have = new Set(st.have), cats = {};
+          for (const q of pack.questions) { const c = q && typeof q.cat === "string" ? q.cat : "other"; (cats[c] = cats[c] || { total: 0, present: 0 }).total++; if (have.has(String(q && q.id))) cats[c].present++; }
+          return json({ ok: true, name, total: st.total, present: st.present, missing: st.missing, cats });
+        }
+        if (remove) {
+          const r = await database(env).removePack(s.email, pack.questions.map((q) => String(q && q.id)));
+          if (r.ok) return json(r);
+          return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
+        }
         const r = await database(env).addPack(s.email, pack.questions, CATEGORY_KEYS);
         if (r.ok) return json(r);
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
