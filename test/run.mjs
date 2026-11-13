@@ -133,7 +133,7 @@ async function startWrangler(jwksPort, o = {}) {
     DEFAULT_ROLE: o.defaultRole || "none", MAX_VIEWERS: o.maxViewers || "6", ALLOWED_ORIGINS: `${PROXY_BASE},http://localhost:${PROXY_PORT}`,
   };
   const args = ["wrangler", "dev", "--port", String(port), "--ip", "127.0.0.1", "--inspector-port", o.inspector || "9239", "--persist-to", join(logDir, o.state || "state"), "--local"];
-  for (const [k, v] of Object.entries(vars)) args.push("--var", `${k}:${v}`);
+  for (const [k, v] of Object.entries({ ...vars, ...(o.vars || {}) })) args.push("--var", `${k}:${v}`);
   const proc = spawn("npx", args, { cwd: ROOT, env: { ...process.env, NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost", WRANGLER_SEND_METRICS: "false", CI: "1" }, detached: true });
   const out = [];
   proc.stdout.on("data", (d) => out.push(d.toString()));
@@ -513,6 +513,21 @@ try {
   check("a blocked person gets no access even though the default is Viewer", resolveRole(lockEnv, "bad@x.com", "blocked").role === "none" && resolveRole(lockEnv, "bad@x.com", "blocked").blocked === true);
   check("a block can never apply to someone in the ROLES secret", resolveRole(lockEnv, "boss@x.com", "blocked").role === "editor");
   check("a locked door turns away new sign-ins from unlisted people but not older sessions, added people or owners", resolveRole(lockEnv, "n@x.com", undefined, { iat: 200, lockTs: 100 }).role === "none" && resolveRole(lockEnv, "n@x.com", undefined, { iat: 50, lockTs: 100 }).role === "viewer" && resolveRole(lockEnv, "n@x.com", "viewer", { iat: 200, lockTs: 100 }).role === "viewer" && resolveRole(lockEnv, "boss@x.com", undefined, { iat: 200, lockTs: 100 }).role === "editor" && resolveRole(lockEnv, "n@x.com", undefined, { iat: undefined, lockTs: 100 }).role === "viewer");
+  const wp = await import("../src/webpush.js"); const an = await import("../src/announce.js");
+  check("push services are allowed only on their real hosts (lookalikes and plain http are refused)", wp.okEndpoint({}, "https://fcm.googleapis.com/fcm/send/abc") && wp.okEndpoint({}, "https://updates.push.services.mozilla.com/wpush/v2/abc") && wp.okEndpoint({}, "https://web.push.apple.com/abc") && wp.okEndpoint({}, "https://wns2-par02p.notify.windows.com/w/?token=x") && !wp.okEndpoint({}, "https://fcm.googleapis.com.evil.com/x") && !wp.okEndpoint({}, "https://evilgoogleapis.com/x") && !wp.okEndpoint({}, "http://fcm.googleapis.com/x") && !wp.okEndpoint({}, "https://user:pw@fcm.googleapis.com/x") && !wp.okEndpoint({}, "http://127.0.0.1:9/x") && wp.okEndpoint({ ALLOW_INSECURE_PUSH: "1" }, "http://127.0.0.1:9/x") && !wp.okEndpoint({ ALLOW_INSECURE_PUSH: "1" }, "http://evil.example.com/x"));
+  check("Discord webhooks are only accepted on discord.com with a real webhook path", an.okWebhook({}, "https://discord.com/api/webhooks/123456789/abc-DEF_1") && an.okWebhook({}, "https://discordapp.com/api/webhooks/1/x") && !an.okWebhook({}, "https://discord.com.evil.com/api/webhooks/1/x") && !an.okWebhook({}, "https://discord.com/other") && !an.okWebhook({}, "http://discord.com/api/webhooks/1/x") && !an.okWebhook({}, ""));
+  check("the encryption for a phone is the standard one: a phone's own key decrypts it, nobody else's does", await (async () => {
+    const e = crypto.createECDH("prime256v1"); e.generateKeys(); const auth = crypto.randomBytes(16), pub = e.getPublicKey();
+    const body = Buffer.from(await wp.encryptPayload({ p256dh: pub.toString("base64url"), auth: auth.toString("base64url") }, new TextEncoder().encode(JSON.stringify({ hi: "there" }))));
+    const hk = (ikm, salt, info, n) => Buffer.from(crypto.hkdfSync("sha256", ikm, salt, info, n));
+    const open = (ecdh, au) => { const salt = body.subarray(0, 16), idlen = body[20], asPub = body.subarray(21, 21 + idlen), ct = body.subarray(21 + idlen); const ikm = hk(ecdh.computeSecret(asPub), au, Buffer.concat([Buffer.from("WebPush: info\0"), pub, asPub]), 32); const d = crypto.createDecipheriv("aes-128-gcm", hk(ikm, salt, Buffer.from("Content-Encoding: aes128gcm\0"), 16), hk(ikm, salt, Buffer.from("Content-Encoding: nonce\0"), 12)); d.setAuthTag(ct.subarray(ct.length - 16)); return Buffer.concat([d.update(ct.subarray(0, ct.length - 16)), d.final()]); };
+    const plain = open(e, auth); const other = crypto.createECDH("prime256v1"); other.generateKeys();
+    let blocked = false; try { open(other, auth); } catch (x) { blocked = true; }
+    return plain.subarray(0, plain.length - 1).toString() === '{"hi":"there"}' && plain[plain.length - 1] === 2 && body[20] === 65 && body.readUInt32BE(16) === 4096 && blocked;
+  })());
+  const et = {}; new Function("window", readFileSync(join(ROOT, "public", "ettime.js"), "utf8"))(et);
+  check("Eastern time: 5 PM in winter is 22:00 UTC and in summer 21:00 UTC, including around the clock changes", new Date(et.EtTime.etToUtcMs("2026-12-15", "17:00")).toISOString() === "2026-12-15T22:00:00.000Z" && new Date(et.EtTime.etToUtcMs("2027-07-15", "17:00")).toISOString() === "2027-07-15T21:00:00.000Z" && new Date(et.EtTime.etToUtcMs("2027-03-14", "03:30")).toISOString() === "2027-03-14T07:30:00.000Z" && new Date(et.EtTime.etToUtcMs("2026-11-01", "00:30")).toISOString() === "2026-11-01T04:30:00.000Z" && Number.isNaN(et.EtTime.etToUtcMs("", "17:00")));
+  check("the time is written the same way on the page and in the messages", et.EtTime.fmtEt(Date.UTC(2026, 11, 15, 22, 0)) === "5:00 PM" && an.fmtEt(Date.UTC(2026, 11, 15, 22, 0)) === "5:00 PM" && et.EtTime.fmtEt(Date.UTC(2027, 6, 15, 21, 30), true) === an.fmtEt(Date.UTC(2027, 6, 15, 21, 30), true) && an.messageFor("1h", Date.UTC(2026, 11, 15, 22, 0), "https://x.test").body === "We go live in 1 hour (5:00 PM ET).");
   const sm = {}; new Function("window", readFileSync(join(ROOT, "public", "match.js"), "utf8"))(sm); const SM = sm.SignupMatch;
   check("usernames: @ is optional, 2 to 24 letters, numbers, dots and underscores, capitals kept", normHandle("@Jess_NC") === "Jess_NC" && normHandle("ab") === "ab" && normHandle("a") === null && normHandle("x".repeat(25)) === null && normHandle("has space") === null && normHandle(".dot") === null && normHandle("emoji\u{1F600}") === null && normHandle("") === null && normHandle(null) === null);
   check("sign-up checks mirror the host's dater form (18+, ranges, state only, confirmation)", cleanSignup({ handle: "a_b", age: 20, location: "NC", gender: "man", sexuality: "straight", min: 20, max: 30, adult: true }).ok && !cleanSignup({ handle: "a_b", age: "17", location: "NC", gender: "man", sexuality: "straight", min: 20, max: 30, adult: true }).ok && !cleanSignup({ handle: "a_b", age: 20, location: "NC", gender: "man", sexuality: "straight", min: 20, max: 30, adult: "yes" }).ok && cleanSignup({ handle: "a_b", age: "20", location: "NC", gender: "man", sexuality: "straight", min: "20", max: "30", adult: true }).doc.min === 20);
@@ -538,7 +553,22 @@ try {
 
   /* ===== browser ===== */
   group("Block, lock the door, sign out, erase a person (second server, default role Viewer)");
-  wrangler2 = await startWrangler(jwksPort, { port: PORT2, inspector: "9240", defaultRole: "viewer", maxViewers: "50", state: "state2", log: "wrangler2.log" });
+  // a fake push service and a fake Discord: they record what the server sends, and answer 410 for "gone" devices
+  const pushHits = [], hookHits = [];
+  const mockSrv = createServer((req, res) => {
+    const chunks = []; req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      const body = Buffer.concat(chunks);
+      if (req.url === "/hook") { hookHits.push(JSON.parse(body.toString())); res.writeHead(204); res.end(); return; }
+      pushHits.push({ url: req.url, headers: req.headers, body, at: Date.now() });
+      res.writeHead(req.url.startsWith("/push/gone") ? 410 : 201); res.end();
+    });
+  }).listen(0, "127.0.0.1");
+  await new Promise((r) => mockSrv.once("listening", r));
+  const MOCK = `http://127.0.0.1:${mockSrv.address().port}`;
+  const vk = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey.export({ format: "jwk" });
+  wrangler2 = await startWrangler(jwksPort, { port: PORT2, inspector: "9240", defaultRole: "viewer", maxViewers: "50", state: "state2", log: "wrangler2.log",
+    vars: { VAPID_KEYS: [vk.x, vk.y, vk.d].join("."), DISCORD_WEBHOOK: MOCK + "/hook", ALLOW_INSECURE_PUSH: "1", ANNOUNCE_SCALE: "0.001", PUSH_BATCH: "5" } });
   API_BASE = BASE2;
   {
     const O = (await login(EMAILS.editorA)).session, ED = (await login(EMAILS.editorB)).session;
@@ -983,6 +1013,62 @@ try {
         check("Undo on the admin page returns the sign-up to pending", await until(async () => /kay_dee/.test(await adm.locator("#pendList").innerText()), 6000) && (await (await connect(O)).sub("daters/" + kay.id)).docs[0].data.name === "Kay Different");
         edc.close();
       }
+      // notifications on the page: the viewer's switch, and the owner's announcer
+      {
+        const e2 = crypto.createECDH("prime256v1"); e2.generateKeys();
+        const fake = { endpoint: MOCK + "/push/ui1", keys: { p256dh: Buffer.from(e2.getPublicKey()).toString("base64url"), auth: crypto.randomBytes(16).toString("base64url") } };
+        const phone = async (session, { ua, supported = true, standalone = false } = {}) => {
+          const ctx = await catPages.newContext({ viewport: { width: 390, height: 844 }, ...(ua ? { userAgent: ua } : {}) });
+          await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
+          await ctx.addInitScript(([k, v, f, sup, sa]) => {
+            try { localStorage.setItem(k, v); } catch (e) { /* ignore */ }
+            if (sa) Object.defineProperty(navigator, "standalone", { value: true });
+            if (!sup) { try { delete window.PushManager; } catch (e) { /* ignore */ } return; }
+            window.PushManager = function () {}; window.__sub = null;
+            window.Notification = { permission: "default", requestPermission: () => Promise.resolve("granted") };
+            const sub = { endpoint: f.endpoint, toJSON() { return { endpoint: f.endpoint, keys: f.keys }; }, unsubscribe() { window.__sub = null; return Promise.resolve(true); } };
+            const reg = { pushManager: { getSubscription: () => Promise.resolve(window.__sub), subscribe: () => { window.__sub = sub; window.Notification.permission = "granted"; return Promise.resolve(sub); } } };
+            Object.defineProperty(navigator, "serviceWorker", { value: { register: () => Promise.resolve(reg), ready: Promise.resolve(reg) }, configurable: true });
+          }, ["sd.session.v1", JSON.stringify(session), fake, supported, standalone]);
+          const pg = await ctx.newPage(); pg.errors = []; pg.on("pageerror", (e) => pg.errors.push(e.message)); await pg.goto(API_BASE + "/"); return pg;
+        };
+        const devicesNow = async () => (await (await fetch(API_BASE + "/api/announce", { headers: { Authorization: "Bearer " + O.token } })).json()).devices;
+        const nv = (await login("notifyviewer@example.com")).session;
+        const ph = await phone(nv);
+        check("a phone that can do notifications offers a 'Notify me when we go live' button", await until(async () => await ph.locator("#notifyBox").isVisible() && await ph.locator("#nbOn").isVisible(), 8000));
+        const d0 = await devicesNow();
+        await ph.click("#nbOn");
+        check("tapping it turns them on, says so, and signs that phone up on the server", await until(async () => await ph.locator("#nbOff").isVisible() && /Live notifications are on/.test(await ph.locator("#nbText").innerText()), 6000) && (await devicesNow()) === d0 + 1);
+        await ph.locator("#notifyBox").screenshot({ path: "/tmp/cat-shots/new-notify.png" }).catch(() => {});
+        await ph.click("#nbOff");
+        check("'Turn off' removes that phone and offers the button again", await until(async () => await ph.locator("#nbOn").isVisible() && (await devicesNow()) === d0, 6000));
+        const ios = await phone(nv, { ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", supported: false });
+        check("on an iPhone in the browser (where notifications are not available) it explains to add the app to the home screen first", await until(async () => await ios.locator("#notifyBox").isVisible() && /home screen first/.test(await ios.locator("#nbText").innerText()) && await ios.locator("#nbOn").isHidden(), 8000));
+        const iosApp = await phone(nv, { ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", supported: false, standalone: true });
+        await sleep(1500);
+        check("a browser that cannot do notifications at all shows nothing", await iosApp.locator("#notifyBox").isHidden());
+        for (const pg of [ph, ios, iosApp]) await pg.context().close();
+
+        // the owner's announcer
+        check("only owners see the Announce button", await catE.locator("#annBtn").isVisible() && await catV.locator("#annBtn").isHidden());
+        await catE.click("#annBtn");
+        check("it opens with today's date, a 5:00 PM time, and says it is Eastern time", await catE.locator("#annModal").isVisible() && /^\d{4}-\d{2}-\d{2}$/.test(await catE.locator("#annDate").inputValue()) && (await catE.locator("#annTime").inputValue()) === "17:00" && /Eastern/.test(await catE.locator("#annModal").innerText()));
+        const tomorrow = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(Date.now() + 86400000));
+        await catE.fill("#annDate", tomorrow); await catE.fill("#annTime", "17:00");
+        check("it spells out when the three messages will go out", await until(async () => { const t = await catE.locator("#annSum").innerText(); return /5:00 PM ET/.test(t) && /4:00 PM/.test(t) && /4:30 PM/.test(t); }, 4000), await catE.locator("#annSum").innerText());
+        await catE.fill("#annDate", "2020-01-01");
+        check("a time that has passed is called out", /already passed/.test(await catE.locator("#annSum").innerText()));
+        await catE.fill("#annDate", tomorrow);
+        check("phones and Discord are both switched on, with the number of phones signed up", await until(async () => await catE.locator("#annPush").isChecked() && await catE.locator("#annDiscord").isChecked() && !(await catE.locator("#annPing").isChecked()) && /Phone notifications \(\d+ phones? signed up\)/.test(await catE.locator("#annPushLbl").innerText()), 5000), { probe: await catE.evaluate(async () => { try { const r = await window.claude.authFetch("/api/announce"); return [r.status, (await r.text()).slice(0, 200)]; } catch (e) { return "threw " + e.message; } }), msg: await catE.locator("#annMsg").innerText(), push: await catE.locator("#annPush").isChecked(), pushDis: await catE.locator("#annPush").isDisabled(), disc: await catE.locator("#annDiscord").isChecked(), discDis: await catE.locator("#annDiscord").isDisabled(), text: (await catE.locator("#annModal").innerText()).slice(0, 300) });
+        await catE.locator("#annModal .card").screenshot({ path: "/tmp/cat-shots/new-announce.png" }).catch(() => {});
+        await catE.click("#annGo");
+        check("scheduling lists the three messages as waiting", await until(async () => { const t = await catE.locator("#annItems").innerText(); return /1 hour before/.test(t) && /30 minutes before/.test(t) && /We are live/.test(t) && (t.match(/Waiting/g) || []).length === 3; }, 6000) && /Scheduled for/.test(await catE.locator("#annMsg").innerText()));
+        check("it can be cancelled", await catE.locator("#annCancel").isVisible() && await (async () => { await catE.click("#annCancel"); return until(async () => (await catE.locator("#annItems .pendrow").count()) === 0 && await catE.locator("#annCancel").isHidden(), 6000); })());
+        await catE.click("#annTest");
+        check("'Send me a test' tells you to turn notifications on first when none of your phones are signed up", await until(async () => /not turned notifications on/.test(await catE.locator("#annMsg").innerText()), 6000));
+        await catE.keyboard.press("Escape");
+        check("Escape closes it", await catE.locator("#annModal").isHidden());
+      }
       check("the sign-up screens show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0 && adm.errors.length === 0, [...catV.errors, ...catE.errors, ...adm.errors]);
     }
 
@@ -1047,6 +1133,94 @@ try {
       check("a dater that is already linked cannot be linked to a second account (400)", (await api("/api/signups", ED, { action: "link", id: sidE, daterId: handDater.id })).status === 400);
       check("a contributor cannot merge, unmerge or link (403)", (await api("/api/signups", CT, { action: "approve", id: sidE, daterId: handDater.id })).status === 403 && (await api("/api/signups", CT, { action: "unmerge", id: sidA })).status === 403 && (await api("/api/signups", CT, { action: "link", id: sidE, daterId: handDater.id })).status === 403);
       edw.close();
+    }
+
+    // ---- "we are going live": phone notifications and the Discord post (owners schedule them)
+    {
+      const jget = (path, session) => fetch(API_BASE + path, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+      const CT = (await login(EMAILS.contributor)).session;
+      const u64 = (b) => Buffer.from(b).toString("base64url");
+      const newDevice = (path) => { const e = crypto.createECDH("prime256v1"); e.generateKeys(); const auth = crypto.randomBytes(16); return { ecdh: e, pub: e.getPublicKey(), auth, path, sub: { endpoint: MOCK + path, keys: { p256dh: u64(e.getPublicKey()), auth: u64(auth) } } }; };
+      const hk = (ikm, salt, info, n) => Buffer.from(crypto.hkdfSync("sha256", ikm, salt, info, n));
+      const decryptFor = (dev, body) => { // what a phone does with what it receives (RFC 8291)
+        const salt = body.subarray(0, 16), idlen = body[20], asPub = body.subarray(21, 21 + idlen), ct = body.subarray(21 + idlen);
+        const secret = dev.ecdh.computeSecret(asPub), ikm = hk(secret, dev.auth, Buffer.concat([Buffer.from("WebPush: info\0"), dev.pub, asPub]), 32);
+        const d = crypto.createDecipheriv("aes-128-gcm", hk(ikm, salt, Buffer.from("Content-Encoding: aes128gcm\0"), 16), hk(ikm, salt, Buffer.from("Content-Encoding: nonce\0"), 12));
+        d.setAuthTag(ct.subarray(ct.length - 16)); let plain = Buffer.concat([d.update(ct.subarray(0, ct.length - 16)), d.final()]);
+        let end = plain.length; while (end > 0 && plain[end - 1] === 0) end--; return JSON.parse(plain.subarray(0, end - 1).toString()); // drop the 0x02 end marker
+      };
+      const vapidOk = (auth, pubKey) => {
+        const m = /^vapid t=([\w-]+)\.([\w-]+)\.([\w-]+), k=([\w-]+)$/.exec(auth || ""); if (!m || m[4] !== pubKey) return false;
+        const pub = Buffer.from(pubKey, "base64url"), key = crypto.createPublicKey({ key: { kty: "EC", crv: "P-256", x: u64(pub.subarray(1, 33)), y: u64(pub.subarray(33, 65)) }, format: "jwk" });
+        const claims = JSON.parse(Buffer.from(m[2], "base64url")), head = JSON.parse(Buffer.from(m[1], "base64url"));
+        return head.alg === "ES256" && claims.aud === MOCK && claims.exp > Date.now() / 1000 && /^https?:\/\//.test(claims.sub) && crypto.verify("sha256", Buffer.from(m[1] + "." + m[2]), { key, dsaEncoding: "ieee-p1363" }, Buffer.from(m[3], "base64url"));
+      };
+      const cfg = (await (await fetch(API_BASE + "/api/config")).json()).push;
+      check("the page is told the public notification key (65 bytes), never the private one", Buffer.from(cfg || "", "base64url").length === 65 && Buffer.from(cfg, "base64url")[0] === 4 && !JSON.stringify(await (await fetch(API_BASE + "/api/config")).json()).includes(vk.d));
+      const subscribe = (session, dev) => api("/api/push", session, { action: "subscribe", subscription: dev.sub });
+      const probe = newDevice("/push/probe");
+      check("a device that is not a real push service is refused (400): other hosts, bad keys, plain http elsewhere", (await Promise.all([{ endpoint: "https://evil.example.com/x", keys: probe.sub.keys }, { endpoint: MOCK + "/push/k", keys: { p256dh: "AAAA", auth: probe.sub.keys.auth } }, { endpoint: "http://example.com/x", keys: probe.sub.keys }, { endpoint: "https://fcm.googleapis.com.evil.com/x", keys: probe.sub.keys }, null, {}].map((sub) => api("/api/push", CT, { action: "subscribe", subscription: sub })))).every((r) => r.status === 400));
+      check("signing up for notifications needs a login, and works for any role (viewer, Contributor)", (await api("/api/push", null, { action: "subscribe", subscription: probe.sub })).status === 401 && (await subscribe(CT, probe)).status === 200);
+      check("subscribing the same phone twice does not make a second entry", (await subscribe(CT, probe)).status === 200 && (await jget("/api/announce", O)).body.devices === 1);
+
+      const devs = [];
+      for (let i = 1; i <= 12; i++) { const d = newDevice("/push/d" + i); d.email = "push" + String(i).padStart(2, "0") + "@example.com"; d.session = (await login(d.email)).session; await subscribe(d.session, d); devs.push(d); }
+      const gone = newDevice("/push/gone1"); gone.session = (await login("pushgone@example.com")).session; await subscribe(gone.session, gone);
+      const blocked = newDevice("/push/blocked"); blocked.session = (await login("pushblocked@example.com")).session; await subscribe(blocked.session, blocked); await roles(O, "POST", { email: "pushblocked@example.com", role: "blocked" });
+      check("a blocked person cannot turn notifications on or off (403)", (await subscribe(blocked.session, newDevice("/push/b2"))).status === 403);
+      const st = await jget("/api/announce", O);
+      check("owners see how many phones are signed up, and whether phones and Discord are set up", st.status === 200 && st.body.devices === 1 + 12 + 1 + 1 && st.body.pushOn === true && st.body.discordOn === true && st.body.items.length === 0, st.body);
+      check("only owners can see or schedule it (403 for an Editor, a Contributor and a viewer, 401 with no login, 403 from a wrong origin)", (await jget("/api/announce", ED)).status === 403 && (await jget("/api/announce", CT)).status === 403 && (await jget("/api/announce", devs[0].session)).status === 403 && (await jget("/api/announce", null)).status === 401 && (await api("/api/announce", ED, { action: "schedule", liveAt: Date.now() + 9000, push: true })).status === 403 && (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 9000, push: true }, { Origin: "https://evil.example.com" })).status === 403);
+      check("a time in the past, more than 7 days away, or with nothing switched on is refused (400)", (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() - 600000, push: true })).status === 400 && (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 8 * 86400000, push: true })).status === 400 && (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 9000, push: false, discord: false })).status === 400 && (await api("/api/announce", O, { action: "bogus" })).status === 400);
+
+      // schedule: the hour is squeezed into seconds on this test server
+      pushHits.length = 0; hookHits.length = 0;
+      const liveAt = Date.now() + 9000;
+      const sch = await api("/api/announce", O, { action: "schedule", liveAt, push: true, discord: true, ping: false });
+      check("an owner schedules it: three messages, 1 hour, 30 minutes and live, all waiting", sch.status === 200 && sch.body.items.map((i) => i.kind).join() === "1h,30m,live" && sch.body.items.every((i) => i.status === "pending") && Math.abs(sch.body.items[2].at - liveAt) < 50 && sch.body.items[0].at < sch.body.items[1].at && sch.body.items[1].at < sch.body.items[2].at, sch.body);
+      const finished = await until(async () => (await jget("/api/announce", O)).body.items.every((i) => i.status === "done"), 45000, 500);
+      const after = await jget("/api/announce", O);
+      check("every message is sent when its time comes, in batches, and the whole schedule finishes (13 phones can receive: 12 plus one Contributor's)", !!finished && after.body.items.map((i) => i.sent).join() === "13,13,13" && after.body.items[0].failed === 1, after.body.items);
+      const fine = (d) => pushHits.filter((h) => h.url === d.path);
+      const kinds = ["We go live in 1 hour", "30 minutes until we go live", "We are live now!"];
+      const plain = devs.map((d) => fine(d).map((h) => decryptFor(d, h.body)));
+      check("each of the 12 phones got all three notifications, in order, readable only by that phone", plain.every((list) => list.length === 3 && list.every((m, i) => m.title === "Kim's Speed Dating" && m.body.startsWith(kinds[i]) && m.url === "/")), plain[0]);
+      check("the times in the messages are written in Eastern time", /\(\d{1,2}:\d{2} [AP]M ET\)/.test(plain[0][0].body) && /\(\d{1,2}:\d{2} [AP]M ET\)/.test(plain[0][1].body));
+      check("the notifications carry no email addresses or names", !JSON.stringify(plain).includes("@example.com"));
+      const h0 = fine(devs[0])[0].headers;
+      check("each push is properly signed by the site (VAPID) and set to expire in an hour", fine(devs[0]).every((h) => vapidOk(h.headers.authorization, cfg)) && h0["content-encoding"] === "aes128gcm" && h0.ttl === "3600" && h0.urgency === "high");
+      check("a phone the push service reports as gone is dropped from the list", fine(gone).length >= 1 && (await jget("/api/announce", O)).body.devices === 1 + 12 + 1, (await jget("/api/announce", O)).body.devices);
+      check("a blocked person's phone gets nothing", fine(blocked).length === 0);
+      check("no phone is ever sent the same message twice", devs.every((d) => fine(d).length === 3) && fine(probe).length === 3);
+      check("the Discord post goes out for each message, without pinging everyone", hookHits.length === 3 && hookHits.every((h, i) => h.content.includes(kinds[i].replace("!", "")) && h.content.includes("/") && !h.content.includes("@everyone") && Array.isArray(h.allowed_mentions.parse) && h.allowed_mentions.parse.length === 0), hookHits);
+
+      // ping, skipping the ones already past, cancelling
+      hookHits.length = 0;
+      await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 1500, push: false, discord: true, ping: true });
+      await until(async () => (await jget("/api/announce", O)).body.items.every((i) => i.status === "done" || i.status === "skipped"), 20000, 400);
+      const sk = (await jget("/api/announce", O)).body.items;
+      check("a message whose time has already passed is skipped, not sent late, and says so", sk.find((i) => i.kind === "1h").status === "skipped" && sk.find((i) => i.kind === "30m").status === "skipped" && sk.find((i) => i.kind === "live").status === "done" && /already passed/.test(sk.find((i) => i.kind === "1h").note), sk);
+      check("with 'ping everyone' on, the Discord post pings @everyone (and only then)", hookHits.length === 1 && hookHits[0].content.startsWith("@everyone ") && hookHits[0].allowed_mentions.parse.join() === "everyone", hookHits);
+      pushHits.length = 0; hookHits.length = 0;
+      await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 3 * 3600000, push: true, discord: true });
+      const cx = await api("/api/announce", O, { action: "cancel" });
+      await sleep(1500);
+      check("cancelling removes what has not been sent, and nothing goes out afterwards", cx.status === 200 && cx.body.items.length === 0 && pushHits.length === 0 && hookHits.length === 0, cx.body);
+      check("only owners can cancel (403 for an Editor)", (await api("/api/announce", ED, { action: "cancel" })).status === 403);
+
+      // test notification goes to the owner's own phones only
+      const mine = newDevice("/push/owner1"); await subscribe(O, mine);
+      pushHits.length = 0;
+      const tp = await api("/api/announce", O, { action: "test" });
+      check("'Send me a test' goes to the owner's own phone and nobody else's", tp.status === 200 && tp.body.sent === 1 && tp.body.devices === 1 && pushHits.length === 1 && pushHits[0].url === "/push/owner1" && /Test/.test(decryptFor(mine, pushHits[0].body).body), tp.body);
+      check("only owners can send a test (403)", (await api("/api/announce", ED, { action: "test" })).status === 403);
+      // turning it off
+      const n0 = (await jget("/api/announce", O)).body.devices;
+      await api("/api/push", devs[0].session, { action: "unsubscribe", endpoint: devs[0].sub.endpoint });
+      check("turning notifications off removes that phone", (await jget("/api/announce", O)).body.devices === n0 - 1);
+      const beforeN = (await jget("/api/announce", O)).body.devices;
+      await api("/api/push", devs[1].session, { action: "unsubscribe", endpoint: probe.sub.endpoint });
+      check("...somebody else cannot remove your phone", (await jget("/api/announce", O)).body.devices === beforeN);
     }
     await catPages.close(); cz.close();
   }

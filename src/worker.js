@@ -1,6 +1,7 @@
 // Worker: serves the API. Static files (the page) are served by Cloudflare assets and are free.
 import { verifyGoogleToken, mintSession, verifySession, canRefresh, safeEqual } from "./auth.js";
 import { LEVEL, CATEGORY_KEYS } from "./rules.js";
+import { vapidPublicKey } from "./webpush.js";
 
 export { Database } from "./database.js";
 
@@ -47,7 +48,7 @@ export default {
 
     try {
       if (path === "/api/config") {
-        return json({ clientId: env.GOOGLE_CLIENT_ID || "", configured: !!(env.GOOGLE_CLIENT_ID && env.SESSION_SECRET) });
+        return json({ clientId: env.GOOGLE_CLIENT_ID || "", configured: !!(env.GOOGLE_CLIENT_ID && env.SESSION_SECRET), push: vapidPublicKey(env) });
       }
 
       if (path === "/api/login" && request.method === "POST") {
@@ -190,6 +191,33 @@ export default {
         else { let b; try { b = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); } r = await database(env).releaseHandle(s.email, b && b.email); }
         if (r.ok) return json(r);
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
+      }
+
+      if (path === "/api/push" && request.method === "POST") {
+        // A device turns "we are going live" notifications on or off.
+        if (!originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (s.role === "none") return json({ error: "no_access" }, 403);
+        let b; try { b = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+        const r = b && b.action === "unsubscribe" ? await database(env).removePushSub(s.email, b.endpoint) : await database(env).addPushSub(s.email, b && b.subscription, url.origin);
+        return r.ok ? json(r) : json({ error: r.code, message: r.message }, 400);
+      }
+
+      if (path === "/api/announce" && (request.method === "GET" || request.method === "POST")) {
+        // Owners only: schedule the "we are going live" messages (1 hour, 30 minutes, now) to phones and Discord.
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (!s.owner) return json({ error: "forbidden", message: "Only owners can do that." }, 403);
+        const d = database(env); let r;
+        if (request.method === "GET") r = await d.announceState(s.email);
+        else {
+          let b; try { b = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+          b = b && typeof b === "object" ? b : {};
+          r = b.action === "schedule" ? await d.scheduleAnnounce(s.email, b, url.origin) : b.action === "cancel" ? await d.cancelAnnounce(s.email) : b.action === "test" ? await d.testPush(s.email) : { ok: false, code: "invalid", message: "Unknown action." };
+        }
+        return r.ok ? json(r) : json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }
 
       if (path === "/api/categorize" && (request.method === "GET" || request.method === "POST")) {

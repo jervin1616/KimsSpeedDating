@@ -7,6 +7,8 @@ import {
 } from "./rules.js";
 import { resolveRole, secretEntries, validEmail, verifySession, defaultRole, parseRoles } from "./auth.js";
 import { normHandle, handleKey, cleanSignup } from "./people.js";
+import { sendPush, okEndpoint, okKeys, pushConfigured } from "./webpush.js";
+import { STEPS, messageFor, okWebhook } from "./announce.js";
 
 function parseRolesFor(env, email) { return parseRoles(env.ROLES).get(String(email).toLowerCase()); }
 
@@ -41,6 +43,8 @@ export class Database extends DurableObject {
     for (const [t, c, d] of [["members", "mid", "TEXT"], ["members", "prev", "TEXT"], ["members", "hday", "INTEGER"], ["members", "hcount", "INTEGER"], ["members", "did", "TEXT"], ["signups", "merged", "TEXT"]]) { // copies made before these columns existed
       if (!this.sql.exec("PRAGMA table_info(" + t + ")").toArray().some((r) => r.name === c)) this.sql.exec("ALTER TABLE " + t + " ADD COLUMN " + c + " " + d);
     }
+    this.sql.exec("CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, email TEXT NOT NULL, ts INTEGER NOT NULL, fails INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS announce_items (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, live_at INTEGER NOT NULL, kind TEXT NOT NULL, msg TEXT NOT NULL, push INTEGER NOT NULL, discord INTEGER NOT NULL, ping INTEGER NOT NULL, status TEXT NOT NULL, sent INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, cursor TEXT NOT NULL DEFAULT '', note TEXT)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS revoked (email TEXT PRIMARY KEY, after INTEGER NOT NULL) WITHOUT ROWID");
     // the old "recently signed in" list becomes the permanent member list (once)
@@ -834,6 +838,136 @@ export class Database extends DurableObject {
     this.sql.exec("UPDATE members SET handle = NULL, hkey = NULL WHERE email = ?", e);
     this.sql.exec("DELETE FROM signups WHERE email = ? AND status = 'pending'", e);
     return { ok: true };
+  }
+
+  /* ---------- "we are going live" notifications (owners schedule them) ---------- */
+
+  // The site's own address is the "who is sending" contact that push services ask for (never a personal email).
+  rememberOrigin(origin) { if (typeof origin === "string" && /^https?:\/\/[\w.:-]+$/.test(origin)) this.sql.exec("INSERT INTO settings (key, value) VALUES ('origin', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", origin); }
+  pushSubject() { const r = this.sql.exec("SELECT value FROM settings WHERE key = 'origin'").toArray()[0]; return r ? r.value : "https://example.invalid"; }
+
+  addPushSub(email, sub, origin) {
+    this.rememberOrigin(origin);
+    const e = String(email || "").toLowerCase();
+    if (!sub || typeof sub.endpoint !== "string" || !sub.keys || !okEndpoint(this.env, sub.endpoint) || !okKeys(sub.keys.p256dh, sub.keys.auth)) return { ok: false, code: "invalid", message: "That notification setup was not accepted." };
+    const have = this.sql.exec("SELECT 1 AS x FROM push_subs WHERE endpoint = ?", sub.endpoint).toArray().length;
+    if (!have && this.sql.exec("SELECT COUNT(*) AS n FROM push_subs").one().n >= 6000) return { ok: false, code: "full", message: "Too many devices are signed up right now." };
+    this.sql.exec("INSERT INTO push_subs (endpoint, p256dh, auth, email, ts, fails) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT (endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, email = excluded.email, ts = excluded.ts, fails = 0",
+      sub.endpoint, sub.keys.p256dh, sub.keys.auth, e, Date.now());
+    return { ok: true };
+  }
+
+  removePushSub(email, endpoint) {
+    this.sql.exec("DELETE FROM push_subs WHERE endpoint = ? AND email = ?", String(endpoint || ""), String(email || "").toLowerCase());
+    return { ok: true };
+  }
+
+  announceState(actorEmail) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const items = this.sql.exec("SELECT id, at, live_at, kind, status, sent, failed, note, push, discord FROM announce_items ORDER BY at, id").toArray();
+    return { ok: true, items, devices: this.sql.exec("SELECT COUNT(*) AS n FROM push_subs").one().n, pushOn: pushConfigured(this.env), discordOn: okWebhook(this.env, this.env.DISCORD_WEBHOOK || ""), liveAt: items.length ? items[0].live_at : null };
+  }
+
+  scheduleAnnounce(actorEmail, o, origin) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const now = Date.now(), liveAt = Number(o && o.liveAt);
+    if (!Number.isFinite(liveAt) || liveAt < now - 60000 || liveAt > now + 7 * 86400000) return { ok: false, code: "invalid", message: "Pick a time in the future, within the next 7 days." };
+    const push = !!(o && o.push) && pushConfigured(this.env), discord = !!(o && o.discord) && okWebhook(this.env, this.env.DISCORD_WEBHOOK || ""), ping = !!(o && o.ping);
+    if (!push && !discord) return { ok: false, code: "invalid", message: "Turn on app notifications or the Discord post (and make sure they are set up)." };
+    this.rememberOrigin(origin);
+    const scale = this.announceScale();
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec("DELETE FROM announce_items"); // a new schedule replaces the old one, including what it already sent
+      for (const [kind, secs] of STEPS) {
+        const at = liveAt - secs * 1000 * scale, late = at < now - 120000 * scale; // more than 2 minutes late, so skip it
+        this.sql.exec("INSERT INTO announce_items (at, live_at, kind, msg, push, discord, ping, status, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          at, liveAt, kind, JSON.stringify(messageFor(kind, liveAt, origin)), push ? 1 : 0, discord ? 1 : 0, ping ? 1 : 0, late ? "skipped" : "pending", late ? "Its time had already passed" : null);
+      }
+    });
+    this.rearmAnnounce();
+    return this.announceState(actorEmail);
+  }
+
+  announceScale() { return Number(this.env.ANNOUNCE_SCALE) > 0 ? Number(this.env.ANNOUNCE_SCALE) : 1; } // tests squeeze the hour into seconds
+
+  cancelAnnounce(actorEmail) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    this.sql.exec("DELETE FROM announce_items WHERE status IN ('pending', 'sending')");
+    this.rearmAnnounce();
+    return this.announceState(actorEmail);
+  }
+
+  rearmAnnounce(soonMs) {
+    const now = Date.now();
+    const next = this.sql.exec("SELECT MIN(at) AS t FROM announce_items WHERE status = 'pending'").one().t;
+    const sending = this.sql.exec("SELECT COUNT(*) AS n FROM announce_items WHERE status = 'sending'").one().n;
+    const times = [];
+    if (sending) times.push(soonMs || now + 1000);
+    if (next !== null) times.push(Math.max(next, now + 50));
+    if (times.length) this.ctx.storage.setAlarm(Math.min(...times)); else this.ctx.storage.deleteAlarm();
+  }
+
+  async alarm() {
+    const now = Date.now();
+    const item = this.sql.exec("SELECT * FROM announce_items WHERE status IN ('pending', 'sending') AND at <= ? ORDER BY at, id LIMIT 1", now).toArray()[0];
+    if (!item) { this.rearmAnnounce(); return; }
+    if (item.status === "pending" && now - item.at > 5 * 60000 * this.announceScale()) { // the object slept through it: do not announce an hour-old "30 minutes to go"
+      this.sql.exec("UPDATE announce_items SET status = 'skipped', note = 'It was too late to send' WHERE id = ?", item.id);
+      this.rearmAnnounce(); return;
+    }
+    if (item.status === "pending") {
+      this.sql.exec("UPDATE announce_items SET status = 'sending' WHERE id = ?", item.id);
+      if (item.discord) await this.postDiscord(item);
+    }
+    let done = true;
+    if (item.push) done = await this.pushBatch(item);
+    if (done) this.sql.exec("UPDATE announce_items SET status = 'done' WHERE id = ?", item.id);
+    this.rearmAnnounce();
+  }
+
+  async postDiscord(item) {
+    const hook = this.env.DISCORD_WEBHOOK || "";
+    if (!okWebhook(this.env, hook)) return;
+    const m = JSON.parse(item.msg);
+    try {
+      const res = await fetch(hook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: (item.ping ? "@everyone " : "") + m.discord, allowed_mentions: { parse: item.ping ? ["everyone"] : [] } }) });
+      if (!res.ok) this.sql.exec("UPDATE announce_items SET note = ? WHERE id = ?", "Discord said " + res.status, item.id);
+      try { await res.arrayBuffer(); } catch (e) { /* ignore */ }
+    } catch (e) { this.sql.exec("UPDATE announce_items SET note = 'Could not reach Discord' WHERE id = ?", item.id); }
+  }
+
+  // One small batch per alarm: the free plan allows few outgoing requests and little CPU per invocation.
+  async pushBatch(item) {
+    const size = Math.min(40, Math.max(1, Number(this.env.PUSH_BATCH) || 10));
+    const rows = this.sql.exec("SELECT endpoint, p256dh, auth, email FROM push_subs WHERE endpoint > ? ORDER BY endpoint LIMIT ?", item.cursor, size).toArray();
+    if (!rows.length) return true;
+    const msg = JSON.parse(item.msg), payload = { title: msg.title, body: msg.body, url: "/", tag: "live-" + item.kind };
+    const subject = this.pushSubject();
+    let sent = 0, failed = 0;
+    await Promise.all(rows.map(async (r) => {
+      if (this.resolve(r.email).role === "none") return; // blocked people get nothing
+      const out = await sendPush(this.env, r, payload, subject);
+      if (out.ok) { sent++; return; }
+      failed++;
+      if (out.gone) this.sql.exec("DELETE FROM push_subs WHERE endpoint = ?", r.endpoint);
+      else this.sql.exec("UPDATE push_subs SET fails = fails + 1 WHERE endpoint = ?", r.endpoint);
+    }));
+    this.sql.exec("DELETE FROM push_subs WHERE fails >= 5");
+    this.sql.exec("UPDATE announce_items SET sent = sent + ?, failed = failed + ?, cursor = ? WHERE id = ?", sent, failed, rows[rows.length - 1].endpoint, item.id);
+    return rows.length < size;
+  }
+
+  // Owners: a test notification to their own devices only.
+  async testPush(actorEmail) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    if (!pushConfigured(this.env)) return { ok: false, code: "invalid", message: "App notifications are not set up yet." };
+    const rows = this.sql.exec("SELECT endpoint, p256dh, auth FROM push_subs WHERE email = ?", String(actorEmail).toLowerCase()).toArray();
+    let sent = 0, failed = 0;
+    await Promise.all(rows.map(async (r) => {
+      const out = await sendPush(this.env, r, { title: "Kim's Speed Dating", body: "Test: if you can read this, live notifications work on this device.", url: "/", tag: "live-test" }, this.pushSubject());
+      if (out.ok) sent++; else { failed++; if (out.gone) this.sql.exec("DELETE FROM push_subs WHERE endpoint = ?", r.endpoint); }
+    }));
+    return { ok: true, sent, failed, devices: rows.length };
   }
 
   /* ---------- question categories ---------- */

@@ -192,6 +192,11 @@
   PASS a blocked person gets no access even though the default is Viewer
   PASS a block can never apply to someone in the ROLES secret
   PASS a locked door turns away new sign-ins from unlisted people but not older sessions, added people or owners
+  PASS push services are allowed only on their real hosts (lookalikes and plain http are refused)
+  PASS Discord webhooks are only accepted on discord.com with a real webhook path
+  PASS the encryption for a phone is the standard one: a phone's own key decrypts it, nobody else's does
+  PASS Eastern time: 5 PM in winter is 22:00 UTC and in summer 21:00 UTC, including around the clock changes
+  PASS the time is written the same way on the page and in the messages
   PASS usernames: @ is optional, 2 to 24 letters, numbers, dots and underscores, capitals kept
   PASS sign-up checks mirror the host's dater form (18+, ranges, state only, confirmation)
   PASS a sign-up cannot smuggle extra fields into the dater record
@@ -380,6 +385,20 @@
   PASS the admin page confirms the merge and offers Undo
   PASS ...the merged sign-up leaves the pending list
   PASS Undo on the admin page returns the sign-up to pending
+  PASS a phone that can do notifications offers a 'Notify me when we go live' button
+  PASS tapping it turns them on, says so, and signs that phone up on the server
+  PASS 'Turn off' removes that phone and offers the button again
+  PASS on an iPhone in the browser (where notifications are not available) it explains to add the app to the home screen first
+  PASS a browser that cannot do notifications at all shows nothing
+  PASS only owners see the Announce button
+  PASS it opens with today's date, a 5:00 PM time, and says it is Eastern time
+  PASS it spells out when the three messages will go out
+  PASS a time that has passed is called out
+  PASS phones and Discord are both switched on, with the number of phones signed up
+  PASS scheduling lists the three messages as waiting
+  PASS it can be cancelled
+  PASS 'Send me a test' tells you to turn notifications on first when none of your phones are signed up
+  PASS Escape closes it
   PASS the sign-up screens show no JavaScript errors
   PASS previewing a merge lists exactly what would change, and the old name that stays searchable
   PASS previewing changes nothing, and only hosts may (403 for a Contributor)
@@ -402,6 +421,32 @@
   PASS linking a hand-made dater to a sign-up marks the account on the dater
   PASS a dater that is already linked cannot be linked to a second account (400)
   PASS a contributor cannot merge, unmerge or link (403)
+  PASS the page is told the public notification key (65 bytes), never the private one
+  PASS a device that is not a real push service is refused (400): other hosts, bad keys, plain http elsewhere
+  PASS signing up for notifications needs a login, and works for any role (viewer, Contributor)
+  PASS subscribing the same phone twice does not make a second entry
+  PASS a blocked person cannot turn notifications on or off (403)
+  PASS owners see how many phones are signed up, and whether phones and Discord are set up
+  PASS only owners can see or schedule it (403 for an Editor, a Contributor and a viewer, 401 with no login, 403 from a wrong origin)
+  PASS a time in the past, more than 7 days away, or with nothing switched on is refused (400)
+  PASS an owner schedules it: three messages, 1 hour, 30 minutes and live, all waiting
+  PASS every message is sent when its time comes, in batches, and the whole schedule finishes (13 phones can receive: 12 plus one Contributor's)
+  PASS each of the 12 phones got all three notifications, in order, readable only by that phone
+  PASS the times in the messages are written in Eastern time
+  PASS the notifications carry no email addresses or names
+  PASS each push is properly signed by the site (VAPID) and set to expire in an hour
+  PASS a phone the push service reports as gone is dropped from the list
+  PASS a blocked person's phone gets nothing
+  PASS no phone is ever sent the same message twice
+  PASS the Discord post goes out for each message, without pinging everyone
+  PASS a message whose time has already passed is skipped, not sent late, and says so
+  PASS with 'ping everyone' on, the Discord post pings @everyone (and only then)
+  PASS cancelling removes what has not been sent, and nothing goes out afterwards
+  PASS only owners can cancel (403 for an Editor)
+  PASS 'Send me a test' goes to the owner's own phone and nobody else's
+  PASS only owners can send a test (403)
+  PASS turning notifications off removes that phone
+  PASS ...somebody else cannot remove your phone
 
 == Browser: three roles, live sync, reconnect
   PASS Editor page opens in Host view
@@ -620,4 +665,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-585 passed, 0 failed, 585 total
+630 passed, 0 failed, 630 total

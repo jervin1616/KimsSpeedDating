@@ -292,6 +292,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     <span class="pill" id="role">Loading</span>
     <span class="pill" id="connPill" data-state="connecting" hidden><i class="cd"></i><span id="connTxt">Connecting</span></span>
     <a class="pill" id="signOut" href="#" role="button" style="text-decoration:none" hidden>Sign out</a>
+    <a class="pill" id="annBtn" href="#" role="button" style="text-decoration:none" hidden>Announce</a>
     <a class="pill" id="adminLink" href="/admin.html" target="_blank" rel="noopener" style="text-decoration:none" hidden>Admin</a>
   </header>
   <div class="streambar host-only" id="streamBar" hidden>
@@ -379,6 +380,11 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <div class="by" id="pbMsg" role="status"></div>
         <div class="by" id="pbSign"></div>
         <div class="toolbar"><button class="primary" id="pbSignBtn" type="button" hidden>Want to be a speed dater?</button><button class="ghost small" id="pbWithdraw" type="button" hidden>Withdraw my sign-up</button></div>
+      </div>
+      <div class="qbox" id="notifyBox" hidden>
+        <div class="lbl">Live notifications</div>
+        <div class="by" id="nbText"></div>
+        <div class="toolbar"><button class="primary" id="nbOn" type="button" hidden>Notify me when we go live</button><button class="ghost small" id="nbOff" type="button" hidden>Turn off</button></div>
       </div>
       <div class="toolbar">
         <select id="randomCat" class="catsel" aria-label="Random question category" hidden></select>
@@ -533,6 +539,20 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     </form>
   </div>
 </div>
+<div class="modal" id="annModal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="annTitle">
+    <h2 id="annTitle">Announce going live</h2>
+    <p class="note">Sends "we go live in 1 hour", "30 minutes to go" and "we are live now". Times are Eastern (ET).</p>
+    <div class="grid-form"><label>Date<input id="annDate" type="date"></label><label>Time (ET)<input id="annTime" type="time" value="17:00"></label></div>
+    <p class="note" id="annSum"></p>
+    <label class="check"><input id="annPush" type="checkbox" checked><span id="annPushLbl">Phone notifications</span></label>
+    <label class="check"><input id="annDiscord" type="checkbox" checked> Post to Discord</label>
+    <label class="check"><input id="annPing" type="checkbox"> Ping @everyone in Discord</label>
+    <div id="annItems"></div>
+    <p class="note" id="annMsg" role="status"></p>
+    <div class="toolbar"><button class="primary" id="annGo" type="button">Schedule it</button><button class="ghost" id="annTest" type="button">Send me a test</button><button class="ghost danger" id="annCancel" type="button" hidden>Cancel schedule</button><button class="ghost" id="annClose" type="button">Close</button></div>
+  </div>
+</div>
 <div class="modal" id="sumModal" hidden>
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="sumTitle">
     <h2 id="sumTitle">Stream summary</h2>
@@ -549,6 +569,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 <script src="/db-shim.js"></script>
 <script src="/match.js"></script>
 <script src="/mergeui.js"></script>
+<script src="/ettime.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -1229,6 +1250,95 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
   ["fName", "fAge", "fLoc"].forEach(function (id) { $(id).addEventListener("input", renderMatch); });
 
+  /* ---------- "we are going live": phone notifications (everyone) and the announcer (owners) ---------- */
+  var PUSHKEY = "", pushSynced = false;
+  function pushSupported() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+  function keyBytes(b64) { var p = "=".repeat((4 - (b64.length % 4)) % 4), s = atob((b64 + p).replace(/-/g, "+").replace(/_/g, "/")), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
+  function initPush() {
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});
+    fetch("/api/config").then(function (r) { return r.json(); }).then(function (c) { PUSHKEY = c.push || ""; renderNotify(); }).catch(function () {});
+  }
+  function renderNotify() {
+    var box = $("notifyBox");
+    if (!PUSHKEY || $("app").hidden) { box.hidden = true; return; }
+    $("nbOn").hidden = true; $("nbOff").hidden = true;
+    if (!pushSupported()) {
+      if (platform() === "ios" && !isStandalone()) { box.hidden = false; $("nbText").textContent = "On iPhone, add this app to your home screen first, then open it from there to turn on live notifications."; } else box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    if (Notification.permission === "denied") { $("nbText").textContent = "Notifications are blocked for this app. You can turn them on in your phone's settings."; return; }
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (sub && Notification.permission === "granted") {
+        $("nbText").textContent = "Live notifications are on. You will get a heads up an hour before, 30 minutes before, and when we go live.";
+        $("nbOff").hidden = false;
+        if (!pushSynced) { pushSynced = true; api("/api/push", "POST", { action: "subscribe", subscription: sub.toJSON() }).catch(function () {}); } // keeps this phone tied to your account
+      } else { $("nbText").textContent = "Want a nudge when we go live? Turn on notifications on this phone."; $("nbOn").hidden = false; }
+    }).catch(function () { box.hidden = true; });
+  }
+  $("nbOn").onclick = function () {
+    $("nbOn").disabled = true;
+    Notification.requestPermission().then(function (p) {
+      if (p !== "granted") { renderNotify(); return; }
+      return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(PUSHKEY) }); })
+        .then(function (sub) { return api("/api/push", "POST", { action: "subscribe", subscription: sub.toJSON() }); })
+        .then(function () { pushSynced = true; toast("Live notifications are on."); renderNotify(); });
+    }).catch(function () { toast("Could not turn notifications on. Try again."); }).then(function () { $("nbOn").disabled = false; });
+  };
+  $("nbOff").onclick = function () {
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return; var ep = sub.endpoint; return sub.unsubscribe().then(function () { return api("/api/push", "POST", { action: "unsubscribe", endpoint: ep }); });
+    }).then(function () { pushSynced = false; toast("Live notifications are off."); renderNotify(); }).catch(function () { toast("Could not turn them off. Try again."); });
+  };
+
+  // owners: schedule the three messages
+  var annTimer = null, annState = null;
+  var KINDS = { "1h": "1 hour before", "30m": "30 minutes before", "live": "We are live" };
+  function annLiveAt() { return window.EtTime.etToUtcMs($("annDate").value, $("annTime").value); }
+  function annSummary() {
+    var at = annLiveAt(), el2 = $("annSum");
+    if (!isFinite(at)) { el2.textContent = "Pick a date and a time."; return; }
+    var F = window.EtTime.fmtEt, mins = Math.round((at - Date.now()) / 60000);
+    el2.textContent = at < Date.now() - 60000 ? "That time has already passed." : "Live at " + F(at, true) + " ET. Messages go out at " + F(at - 3600000) + ", " + F(at - 1800000) + " and " + F(at) + " (" + (mins >= 120 ? "in about " + Math.round(mins / 60) + " hours" : "in " + Math.max(mins, 0) + " minutes") + ").";
+  }
+  function renderAnn() {
+    var s = annState; if (!s) return;
+    $("annPushLbl").textContent = "Phone notifications (" + s.devices + (s.devices === 1 ? " phone" : " phones") + " signed up)"; $("annPush").disabled = !s.pushOn; $("annDiscord").disabled = !s.discordOn;
+    if (!s.pushOn) $("annPush").checked = false; if (!s.discordOn) $("annDiscord").checked = false;
+    var box = $("annItems"); box.textContent = "";
+    s.items.forEach(function (it) {
+      var row = el("div", "pendrow"), left = el("div");
+      left.appendChild(el("div", "t", KINDS[it.kind] + " · " + window.EtTime.fmtEt(it.at, true) + " ET"));
+      left.appendChild(el("div", "m", it.status === "pending" ? "Waiting" : it.status === "sending" ? "Sending... " + it.sent + " phones so far" : it.status === "done" ? "Sent" + (it.push ? " to " + it.sent + " phone" + (it.sent === 1 ? "" : "s") + (it.failed ? " (" + it.failed + " did not go through)" : "") : "") + (it.discord ? " and posted to Discord" : "") : "Skipped. " + (it.note || "")));
+      row.appendChild(left); box.appendChild(row);
+    });
+    $("annCancel").hidden = !s.items.some(function (it) { return it.status === "pending" || it.status === "sending"; });
+  }
+  function loadAnn() { return api("/api/announce").then(function (s) { annState = s; renderAnn(); }).catch(function (e) { $("annMsg").textContent = e.message; }); }
+  function openAnn() {
+    if (!$("annDate").value) $("annDate").value = window.EtTime.todayEt();
+    $("annMsg").textContent = ""; annSummary(); $("annModal").hidden = false; loadAnn();
+    clearInterval(annTimer); annTimer = setInterval(function () { if (!$("annModal").hidden) loadAnn(); }, 5000);
+  }
+  function closeAnn() { $("annModal").hidden = true; clearInterval(annTimer); }
+  $("annBtn").onclick = function (ev) { ev.preventDefault(); openAnn(); };
+  $("annClose").onclick = closeAnn;
+  $("annModal").addEventListener("click", function (ev) { if (ev.target === $("annModal")) closeAnn(); });
+  $("annDate").oninput = annSummary; $("annTime").oninput = annSummary;
+  $("annGo").onclick = function () {
+    var at = annLiveAt(); if (!isFinite(at)) { $("annMsg").textContent = "Pick a date and a time."; return; }
+    $("annMsg").textContent = "Saving...";
+    api("/api/announce", "POST", { action: "schedule", liveAt: at, push: $("annPush").checked, discord: $("annDiscord").checked, ping: $("annPing").checked })
+      .then(function (s) { annState = s; renderAnn(); $("annMsg").textContent = "Scheduled for " + window.EtTime.fmtEt(at, true) + " ET."; }).catch(function (e) { $("annMsg").textContent = e.message; });
+  };
+  $("annCancel").onclick = function () { api("/api/announce", "POST", { action: "cancel" }).then(function (s) { annState = s; renderAnn(); $("annMsg").textContent = "Schedule cancelled."; }).catch(function (e) { $("annMsg").textContent = e.message; }); };
+  $("annTest").onclick = function () {
+    $("annMsg").textContent = "Sending...";
+    api("/api/announce", "POST", { action: "test" }).then(function (r) { $("annMsg").textContent = r.devices ? "Sent to " + r.sent + " of your " + r.devices + " phone" + (r.devices === 1 ? "" : "s") + "." : "You have not turned notifications on for any device yet. Do that on your phone first."; }).catch(function (e) { $("annMsg").textContent = e.message; });
+  };
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("annModal").hidden) closeAnn(); });
+  initPush();
+
   /* ---------- question form ---------- */
   $("qForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -1320,7 +1430,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     document.querySelectorAll(".host-only").forEach(function (e) { e.hidden = m !== "host"; });
     document.querySelectorAll(".contrib-only").forEach(function (e) { e.hidden = m === "viewer"; });
     $("myQBox").hidden = m !== "viewer"; syncCatSelects(); loadProfile(); loadPending();
-    $("adminLink").hidden = !window.claude.status().owner; // owners only
+    $("adminLink").hidden = !window.claude.status().owner; $("annBtn").hidden = !window.claude.status().owner; renderNotify(); // owners only
     $("signOut").hidden = false;
     $("connPill").hidden = false; showConn(window.claude.connection ? window.claude.connection() : "connecting"); syncBar(); syncInstallTip();
     $("tabs").hidden = m !== "host";

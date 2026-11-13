@@ -530,3 +530,23 @@ If nobody looks similar, approving works as before, with no extra tap. On the ad
 **Username changes.** People can change their TikTok username on their profile at any time, up to 3 times a day (case-only changes are free). If their linked dater's name is still their old username, it renames itself and keeps the old name for searching; a name you set by hand is left alone. Owners searching on the admin page also find people by their old usernames, shown as "was @oldname". A username someone gives up can be claimed by another account straight away.
 
 **Not solved:** the app cannot tell a real TikTok rename from someone typing a stranger's name, so check on camera if a name suddenly looks unrelated.
+
+## "We are going live" notifications (phones and Discord)
+
+**What it does.** An owner picks the go-live date and time (Eastern) with the **Announce** button next to Admin. The app then sends three messages: "We go live in 1 hour (5:00 PM ET)", "30 minutes until we go live (5:00 PM ET)" and "We are live now!", to every phone that turned notifications on and, if you connect it, to a Discord channel. Only owners can schedule. **Cancel schedule** removes what has not been sent. **Send me a test** sends one to your own phone only. A message whose time has already passed when you schedule is skipped, not sent late (schedule it at least an hour ahead to get all three).
+
+**Who gets phone notifications.** Only people who tap **Notify me when we go live** and allow it:
+- **Android (Chrome):** works in the browser and in the installed app.
+- **iPhone (iOS 16.4 or later):** only in the app added to the home screen and opened from there. In Safari the page tells them to add it first.
+- Delivery is by Apple's and Google's push services, so it is not guaranteed, and Focus or Do Not Disturb silences it. People who never turn it on get nothing, so keep the Discord post on as well.
+
+**One-time setup for phone notifications** (skip it and the Announce screen simply turns that option off):
+1. On your own computer, in the project folder, run `node scripts/make-vapid.mjs`. It prints one line (a private key). It does not save it anywhere.
+2. Run `npx wrangler secret put VAPID_KEYS` and paste that line when Wrangler asks. Never paste it anywhere else.
+3. Deploy again with `npx wrangler deploy`. The matching public key is sent to the page automatically.
+
+**One-time setup for the Discord post** (optional): in Discord, open the channel's settings, Integrations, Webhooks, create a webhook, copy its URL, then run `npx wrangler secret put DISCORD_WEBHOOK` and paste the URL when asked. The URL is a secret, so never post it. The "Ping @everyone" box is off unless you tick it.
+
+**Free plan limits.** The free plan allows 50 outgoing requests and about 10 ms of processing per invocation, so the app sends in small batches (10 phones about every second) using Durable Object alarms. 500 phones take about a minute. Set `PUSH_BATCH` in `wrangler.jsonc` vars (up to 40) to speed this up if your Cloudflare metrics show no CPU limit errors. Phones the push services say are gone are removed automatically.
+
+**What is stored:** one record per phone (its push address and keys, and the account email, so blocked people can be skipped). Turning notifications off removes it. The Privacy page says this.
