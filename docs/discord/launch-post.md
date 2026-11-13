@@ -44,3 +44,15 @@ Quick tour of the viewer screen 💘 Watch the board live, tap **Random question
 Watch the board live on your phone, tap **Random question for me** (only you see it), and pick a category. Free, Google sign-in, 18+.
 
 Watch this channel for the link. 💘
+
+## "Out now" video (docs/discord/viewer-outnow.mp4, 26 seconds)
+
+Post the video, with the link in the message text so it is tappable.
+
+**OUT NOW 💘 your own question button**
+
+Watch the board live, tap **Random question for me** (only you see it), and pick a category.
+
+👉 https://kims-speed-dating.jervin5612.workers.dev/
+
+Free. Sign in with Google. 18+ only. Panel members: use a second device or write your questions down first.

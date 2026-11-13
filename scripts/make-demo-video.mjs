@@ -2,6 +2,7 @@
 // Records a short phone-sized tour of the VIEWER screen against a local copy of the app, using made-up people only.
 //   node scripts/make-demo-video.mjs            -> docs/discord/viewer-tour.mp4
 //   node scripts/make-demo-video.mjs --teaser   -> docs/discord/viewer-teaser.mp4 (about 25 s, "drops today")
+//   node scripts/make-demo-video.mjs --outnow   -> docs/discord/viewer-outnow.mp4 (about 25 s, "out now" with the link)
 // Nothing real is touched: it starts its own throwaway local server and imports only the public question pack.
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -16,7 +17,9 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright"); // installed globally in this environment (not a project dependency)
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TEASER = process.argv.includes("--teaser");
+const OUTNOW = process.argv.includes("--outnow");
+const TEASER = process.argv.includes("--teaser") || OUTNOW; // both short versions share one script
+const TAG = OUTNOW ? "OUT NOW" : "DROPS TODAY";
 const PORT = 8796, BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = crypto.randomBytes(32).toString("hex"), ADMIN = crypto.randomBytes(24).toString("hex");
 const b64u = (x) => Buffer.from(typeof x === "string" ? x : JSON.stringify(x)).toString("base64url");
@@ -67,11 +70,11 @@ await ctx.addInitScript(([sess, noTip]) => {
   const css = document.createElement("style");
   css.textContent = "#demoCap{pointer-events:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9999;background:rgba(20,2,3,.9);color:#fff;border:1px solid #ff4d6d;border-radius:14px;padding:12px 14px;font:600 17px/1.3 system-ui,sans-serif;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5);transition:opacity .3s}"
     + "#demoCard{position:fixed;inset:0;z-index:10000;background:radial-gradient(circle at 50% 30%,#4a0710,#1b0203 70%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;font-family:system-ui,sans-serif;transition:opacity .4s}"
-    + "#demoCard h1{font:700 46px/1.05 LogoFont,system-ui,sans-serif;margin:0;color:#fff;text-shadow:0 0 18px #ff2d55}#demoCard p{margin:0;font-size:19px;color:#ffd5dc}#demoCard p:first-of-type{font-size:30px;font-weight:800;color:#ff8fa8;letter-spacing:.04em}"
+    + "#demoCard h1{font:700 46px/1.05 LogoFont,system-ui,sans-serif;margin:0;color:#fff;text-shadow:0 0 18px #ff2d55}#demoCard p{margin:0;font-size:19px;color:#ffd5dc}#demoCard p.url{font-size:17px;font-weight:700;color:#fff;background:rgba(255,45,85,.25);border:1px solid #ff4d6d;padding:10px 14px;border-radius:12px;white-space:nowrap;font-size:14px;letter-spacing:0}#demoCard p:first-of-type{font-size:30px;font-weight:800;color:#ff8fa8;letter-spacing:.04em}"
     + ".demoTap{position:fixed;z-index:10001;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid #fff;background:rgba(255,77,109,.45);pointer-events:none;animation:demoTap .6s ease-out forwards}@keyframes demoTap{from{transform:scale(.4);opacity:1}to{transform:scale(1.5);opacity:0}}";
   document.addEventListener("DOMContentLoaded", () => document.head.appendChild(css));
   window.__cap = (t) => { let e = document.getElementById("demoCap"); if (!t) { if (e) e.remove(); return; } if (!e) { e = document.createElement("div"); e.id = "demoCap"; document.body.appendChild(e); } e.textContent = t; };
-  window.__card = (title, sub, sub2) => { let e = document.getElementById("demoCard"); if (!title) { if (e) { e.style.opacity = 0; setTimeout(() => e.remove(), 450); } return; } if (!e) { e = document.createElement("div"); e.id = "demoCard"; document.body.appendChild(e); } e.innerHTML = ""; for (const [tag, txt] of [["h1", title], ["p", sub], ["p", sub2]]) if (txt) { const n = document.createElement(tag); n.textContent = txt; e.appendChild(n); } };
+  window.__card = (title, sub, sub2) => { let e = document.getElementById("demoCard"); if (!title) { if (e) { e.style.opacity = 0; setTimeout(() => e.remove(), 450); } return; } if (!e) { e = document.createElement("div"); e.id = "demoCard"; document.body.appendChild(e); } e.innerHTML = ""; for (const [tag, txt] of [["h1", title], ["p", sub], ["p", sub2]]) if (txt) { const n = document.createElement(tag); n.textContent = txt; if (/workers\.dev/.test(txt)) n.className = "url"; e.appendChild(n); } };
   document.addEventListener("pointerdown", (ev) => { const d = document.createElement("div"); d.className = "demoTap"; d.style.left = ev.clientX + "px"; d.style.top = ev.clientY + "px"; document.body.appendChild(d); setTimeout(() => d.remove(), 700); }, true);
 }, [viewer, TEASER]);
 const page = await ctx.newPage();
@@ -101,7 +104,7 @@ if (!TEASER) {
 
 if (TEASER) {
 // the teaser: board, private question, categories, then "drops today"
-await card("Kim's Speed Dating", "DROPS TODAY", "Your own question screen. Free. Sign in with Google. 18+ only.");
+await card("Kim's Speed Dating", TAG, "Your own question screen. Free. Sign in with Google. 18+ only.");
 await sleep(3000); await card(); await sleep(500);
 await cap("1. Watch the board live: who is in the hot seat and who is on the panel");
 await sleep(1500);
@@ -118,9 +121,9 @@ await cap("3. Pick a category to narrow it down");
 const ring = async (sel) => page.evaluate((s) => { const e = document.querySelector(s); e.style.outline = "3px solid #ffd166"; e.style.borderRadius = "8px"; setTimeout(() => { e.style.outline = ""; }, 1200); }, sel);
 await ring("#myCat"); await sleep(1000);
 for (const k of ["wyr", "flirty"]) { await page.selectOption("#myCat", k); await sleep(1900); }
-await cap("Drops today. Watch this channel for the link");
-await card("Kim's Speed Dating", "DROPS TODAY", "Watch this channel for the link.");
-await sleep(3400);
+await cap(OUTNOW ? "Out now. Tap the link in this post" : "Drops today. Watch this channel for the link");
+await card("Kim's Speed Dating", TAG, OUTNOW ? "Tap the link in this post." : "Watch this channel for the link.");
+await sleep(OUTNOW ? 4200 : 3400);
 } else {
 // 1. add to home screen first
 await cap("1. Add it to your home screen like an app");
@@ -191,15 +194,15 @@ const spans = []; const t0 = firstWall;
 capEvents.forEach((e, i) => { if (!e.text) return; const start = Math.max(0, (e.wall - t0) / 1000), end = i + 1 < capEvents.length ? (capEvents[i + 1].wall - t0) / 1000 : D; spans.push({ start, end: Math.min(end, D), text: e.text }); });
 const CY = BY + BH + 26, CH = H - CY - 24;
 for (let i = 0; i < spans.length; i++) {
-  const m = /^(\d)\.\s*(.*)$/.exec(spans[i].text), num = m ? m[1] : "", body = m ? m[2] : spans[i].text;
-  const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  await snap(`<style>${base}body{background:transparent;width:${W}px;height:${CH}px}.c{position:absolute;left:60px;right:60px;top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:22px;gap:14px;text-align:center}.n{width:58px;height:58px;border-radius:50%;background:#ff2d55;color:#fff;font:800 32px/58px system-ui,sans-serif;box-shadow:0 0 20px #ff2d55}.t{color:#fff;font:700 52px/1.18 system-ui,"Segoe UI",Roboto,Arial,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.6)}</style><body><div class="c">${num ? `<div class="n">${num}</div>` : ""}<div class="t">${esc(body)}</div></div></body>`, `cap${i}.png`, { x: 0, y: 0, width: W, height: CH }, true);
+  const m = /^(\d)\.\s*([\s\S]*)$/.exec(spans[i].text), num = m ? m[1] : "", body = m ? m[2] : spans[i].text;
+  const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").split("\n").map((l, k) => (k ? `<span class="u">${l}</span>` : l)).join("");
+  await snap(`<style>${base}body{background:transparent;width:${W}px;height:${CH}px}.c{position:absolute;left:60px;right:60px;top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:22px;gap:14px;text-align:center}.n{width:58px;height:58px;border-radius:50%;background:#ff2d55;color:#fff;font:800 32px/58px system-ui,sans-serif;box-shadow:0 0 20px #ff2d55}.u{display:block;margin-top:8px;font-size:42px;white-space:nowrap;color:#ffd5dc}.t{color:#fff;font:700 52px/1.18 system-ui,"Segoe UI",Roboto,Arial,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.6)}</style><body><div class="c">${num ? `<div class="n">${num}</div>` : ""}<div class="t">${esc(body)}</div></div></body>`, `cap${i}.png`, { x: 0, y: 0, width: W, height: CH }, true);
 }
 await art.close();
 
 // ---- put it all together: video inside the phone, caption under the phone
 mkdirSync(join(ROOT, "docs", "discord"), { recursive: true });
-const out = join(ROOT, "docs", "discord", TEASER ? "viewer-teaser.mp4" : "viewer-tour.mp4");
+const out = join(ROOT, "docs", "discord", OUTNOW ? "viewer-outnow.mp4" : TEASER ? "viewer-teaser.mp4" : "viewer-tour.mp4");
 const inputs = ["-f", "concat", "-safe", "0", "-i", join(frameDir, "list.txt"), "-loop", "1", "-i", join(assets, "bg.png"), "-loop", "1", "-i", join(assets, "bezel.png")];
 spans.forEach((_, i) => inputs.push("-loop", "1", "-i", join(assets, `cap${i}.png`)));
 let g = `[0:v]fps=30,scale=${SW}:${SH}:flags=lanczos[v];[1:v][v]overlay=${SX}:${SY}[a];[a][2:v]overlay=0:0[b0]`;
