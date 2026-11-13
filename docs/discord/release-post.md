@@ -51,3 +51,16 @@ Something broken, or a question you loved or hated? Tell us in this channel. We 
 Free. Sign in with Google. 18+ only. View only, so you can't change anything on stream.
 
 On the panel? Use a second device or write your questions down first, so you don't lose time with your date. 💬
+
+
+## Shortest version, for use with the video (server emoji is the heart on fire)
+
+**OUT NOW ❤️‍🔥 your own question screen**
+
+Watch the board live, tap for a random question only you can see, and filter by category. Quick tour in the video above.
+
+👉 https://kims-speed-dating.jervin5612.workers.dev/
+
+Free. Sign in with Google. 18+ only.
+
+On the panel? Use a second device or write your questions down first, so you don't lose time with your date. ❤️‍🔥
