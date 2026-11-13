@@ -72,6 +72,11 @@
     <p id="catNote"></p>
     <div><button id="catBtn" type="button" class="primary">Sort the questions into categories</button></div>
   </section>
+  <section class="card" id="packCard" hidden>
+    <h2>Question packs</h2>
+    <p>Add a ready-made set of questions to the bank. It only adds new ones and never changes questions you already have.</p>
+    <div id="packList"></div>
+  </section>
   <section class="card" id="listCard" hidden>
     <h2>Owners, editors and contributors <span class="count" id="staffCount">0</span></h2>
     <p>People with more than watch-only access.</p>
@@ -209,7 +214,7 @@
     $("blockedCard").hidden = !blocked.length; $("blockedCount").textContent = blocked.length;
     var bl = $("blockedList"); bl.textContent = ""; blocked.forEach(function (p) { bl.appendChild(personRow(p)); });
     renderLock(data);
-    loadCats();
+    loadCats(); loadPacks();
     $("eraseCard").hidden = false;
     if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
   }
@@ -243,6 +248,29 @@
         }).catch(function (e) { say(e.message, true); loadCats(); });
       };
     }).catch(function () { /* leave the card as is */ });
+  }
+  function loadPacks() {
+    fetch("/packs/index.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (packs) {
+      var box = $("packList"); box.textContent = "";
+      $("packCard").hidden = !packs.length;
+      packs.forEach(function (p) {
+        window.claude.authFetch("/api/pack?name=" + encodeURIComponent(p.name)).then(function (r) { return r.json(); }).then(function (st) {
+          if (!st.ok) return;
+          var row = document.createElement("div"); row.className = "row";
+          var who = document.createElement("div"); who.className = "who"; who.appendChild(document.createTextNode(p.title));
+          var meta = document.createElement("div"); meta.className = "meta"; meta.textContent = st.present + " of " + st.total + " already added";
+          who.appendChild(meta); row.appendChild(who);
+          var right = document.createElement("div"); right.className = "form";
+          var b = document.createElement("button"); b.type = "button"; b.className = "primary";
+          b.textContent = st.missing ? "Add " + st.missing + " questions" : "All added"; b.disabled = !st.missing;
+          b.onclick = function () {
+            say("Adding..."); b.disabled = true;
+            post("/api/pack", { name: p.name }).then(function (r) { say("Added " + r.added + " questions" + (r.skipped ? " (" + r.skipped + " were already there)" : "") + "."); loadPacks(); }).catch(function (e) { say(e.message, true); loadPacks(); });
+          };
+          right.appendChild(b); row.appendChild(right); box.appendChild(row);
+        }).catch(function () { /* skip this pack */ });
+      });
+    }).catch(function () { $("packCard").hidden = true; });
   }
   function labelOf(r) { return LABEL[r] || r; }
   function renderLog(log) {

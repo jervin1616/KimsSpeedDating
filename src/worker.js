@@ -159,6 +159,24 @@ export default {
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }
 
+      if (path === "/api/pack" && (request.method === "GET" || request.method === "POST")) {
+        // Owners only. Adds a question pack shipped with the site (/packs/NAME.json). Never changes existing questions.
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (!s.owner) return json({ error: "forbidden", message: "Only owners can do that." }, 403);
+        let name = url.searchParams.get("name") || "";
+        if (request.method === "POST") { try { name = String((await request.json()).name || ""); } catch (e) { return json({ error: "bad_request" }, 400); } }
+        if (!/^[a-z0-9-]{1,40}$/.test(name)) return json({ error: "bad_request", message: "Unknown pack." }, 400);
+        let pack;
+        try { pack = await (await env.ASSETS.fetch(new Request(url.origin + "/packs/" + name + ".json"))).json(); } catch (e) { return json({ error: "no_file", message: "That pack was not found on the site." }, 404); }
+        if (!pack || !Array.isArray(pack.questions) || pack.questions.length > 500) return json({ error: "no_file", message: "That pack is not valid." }, 500);
+        if (request.method === "GET") return json({ ok: true, name, ...(await database(env).packStatus(pack.questions.map((q) => String(q && q.id)))) });
+        const r = await database(env).addPack(s.email, pack.questions, CATEGORY_KEYS);
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
+      }
+
       if (path === "/api/export" && request.method === "GET") {
         const s = await sessionFromRequest(env, request);
         if (!s) return json({ error: "unauthorized" }, 401);

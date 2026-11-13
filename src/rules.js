@@ -13,7 +13,7 @@ export const RULES = {
 };
 
 // Question categories (the labels live in the page). 'chat' is for questions added by hand, 'other' is the fallback.
-export const CATEGORY_KEYS = ["first", "date", "flirty", "love", "wyr", "tot", "funny", "food", "media", "travel", "memories", "deep", "life", "hot", "chat", "other"];
+export const CATEGORY_KEYS = ["first", "date", "flirty", "love", "wyr", "tot", "funny", "food", "media", "travel", "memories", "deep", "life", "hot", "dilemma", "confess", "chat", "other"];
 
 export const MAX_DOC_BYTES = 32 * 1024;
 export const MAX_MESSAGE_BYTES = 64 * 1024;

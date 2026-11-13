@@ -745,7 +745,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
 
   /* ---------- questions ---------- */
-  var CATS = [["first", "First dates"], ["date", "About your date"], ["flirty", "Flirty"], ["love", "Love & relationships"], ["wyr", "Would you rather"], ["tot", "This or that"], ["funny", "Funny & hypothetical"], ["food", "Food & drink"], ["media", "Music, movies & games"], ["travel", "Travel & adventure"], ["memories", "Childhood & memories"], ["deep", "Deep & personal"], ["life", "Everyday life"], ["hot", "Hot takes & debates"], ["chat", "From chat"], ["other", "Other"]];
+  var CATS = [["first", "First dates"], ["date", "About your date"], ["flirty", "Flirty"], ["love", "Love & relationships"], ["wyr", "Would you rather"], ["tot", "This or that"], ["funny", "Funny & hypothetical"], ["food", "Food & drink"], ["media", "Music, movies & games"], ["travel", "Travel & adventure"], ["memories", "Childhood & memories"], ["deep", "Deep & personal"], ["life", "Everyday life"], ["hot", "Hot takes & debates"], ["dilemma", "What would you do?"], ["confess", "Confessions & icks"], ["chat", "From chat"], ["other", "Other"]];
   var CAT_LABEL = {}; CATS.forEach(function (c) { CAT_LABEL[c[0]] = c[1]; });
   function catOf(q) { return q && CAT_LABEL[q.cat] ? q.cat : "other"; }
   // Category filters only appear once some questions have been sorted into categories (see the admin page).

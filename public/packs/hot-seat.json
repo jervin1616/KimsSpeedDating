@@ -1,0 +1,1331 @@
+{
+ "name": "hot-seat",
+ "title": "Hot seat: thought-provoking questions for the daters",
+ "questions": [
+  {
+   "id": "hs9bd4ab9063de663ca9",
+   "text": "Your best friend's partner makes a pass at you. Do you tell your friend, and how soon?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs6b20e6a8dd3f24d5d6",
+   "text": "You find out your date's ex is a close friend of yours. Do you keep seeing them?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs7c5ddcef0e93710160",
+   "text": "Your partner wants to stay friends with their ex. What's your honest limit?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsb05e37cb6cce382062",
+   "text": "You're happy but bored in a relationship. Do you stay, or risk it for something more?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsb53155a133c2d262f2",
+   "text": "Someone you really like says they're not ready for a relationship. Do you wait or walk away?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs441f5fccb60ba402fb",
+   "text": "You catch your date in a small lie on the first date. Do you say something or watch what happens?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hse3b6aca6f2d5ca619a",
+   "text": "Your partner gets a dream job in another country. Do you go?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs7f87946d1547018a79",
+   "text": "Your friends all hate the person you're dating. Who do you listen to?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsb6b85b78baea890c54",
+   "text": "You find out your partner has been checking their ex's page for months. What do you do?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs6d5071cc665dbea8c6",
+   "text": "Someone you dated years ago texts you out of nowhere. Do you answer?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs10bd9c0e651cebc88b",
+   "text": "You like someone who is very different from what you said you wanted. Do you ignore your own list?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsff250b00c79dd00ef7",
+   "text": "Your date is perfect on paper but you feel nothing. Do you give it more time?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs55eeca5b397664c7a0",
+   "text": "You see your partner's phone light up with a message from someone you don't know. Do you look?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs2aa5265a2accd2ba19",
+   "text": "Your partner tells you a secret about their past on date three. How do you react?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs0c35b440355f32b07f",
+   "text": "You realize you like your friend more than a friend. Do you risk the friendship?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs41bab49e674d9b4a10",
+   "text": "Your date says they're still hurting over their last breakup. Do you stay or step back?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs7144650e334e8b212c",
+   "text": "You're asked to choose between your partner and your best friend. Who do you pick?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs8c88336cf3f9da03b2",
+   "text": "Your partner wants an open relationship and you don't. What happens next?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs933ea5dc17fe14fd0b",
+   "text": "Your date is rude to the waiter. Is the date over?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsfd4d0b65b40aa15c3d",
+   "text": "You're offered a lot of money to date someone you don't like for a year. Do you do it?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsaf786685fdeb2d4cfc",
+   "text": "A stranger tells you your partner is cheating. Do you believe them?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs542bb52badc8785582",
+   "text": "You're on a date and see your ex across the restaurant. What do you do?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs129ffaecb93dc11b72",
+   "text": "You find out you and your date voted for opposite sides on something you care about. Can it work?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs963c37309e9d3e6fb6",
+   "text": "Your partner never wants to meet your family. How long do you let it go?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs370588d1be27724d3d",
+   "text": "You fall for someone who lives three hours away. Who moves?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsb6e0898f386f1d1155",
+   "text": "Your date is great, but they still live with their parents. Does it matter?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs1296fc8493d254cccc",
+   "text": "Someone you're dating asks you to delete your exes' numbers. Do you?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hse52b52e4d3b1b1f701",
+   "text": "You can read your partner's mind for one day. Do you take the offer?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsdf37f4551a3ce72008",
+   "text": "Your partner forgets your birthday. Is it a big deal or a small one?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsa840be382229e2f72a",
+   "text": "You're asked to be someone's second choice. Do you take it?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsb96ce661743364de78",
+   "text": "Your best friend asks if you'd tell them if their partner was cheating. What's your honest answer?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs8375fc368341c53cb6",
+   "text": "You discover your partner has been lying about their age by a few years. Deal breaker?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs2b2971b81f7bbdbca1",
+   "text": "Your date asks how many people you've been with. Do you answer honestly?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs774416546d41fe7de0",
+   "text": "You get a text meant for someone else that is about you. Do you say anything?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsd18baf50a6f415c3d6",
+   "text": "You're in love but your family disapproves. What do you do?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsbe6625da933af604aa",
+   "text": "Your date wants to split the bill and you thought they'd pay. Does that change things?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs9d5313d880dae65371",
+   "text": "You can have a great relationship or a great career for the next five years. Not both. Which one?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs7e2c908eb5da339d95",
+   "text": "Your partner spends hours on their phone while you're together. When do you say something?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs26b6734128a159b25d",
+   "text": "You find out your date has a child you were not told about. How do you react?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hsfbd0c4e1d2194fc0ac",
+   "text": "Your partner posts you on their page only once a year. Does that bother you?",
+   "cat": "dilemma"
+  },
+  {
+   "id": "hs49e2540fd23868862c",
+   "text": "What's the ick that would end it for you in a minute?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs405e4db42188b39c94",
+   "text": "What's the pettiest thing you've ever held against someone you dated?",
+   "cat": "confess"
+  },
+  {
+   "id": "hsa3c11934fe37446414",
+   "text": "What's your most toxic dating habit that you haven't fixed?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs8f9e79c42b00f5d6cb",
+   "text": "What's a lie you told on a date that you never corrected?",
+   "cat": "confess"
+  },
+  {
+   "id": "hscdd54b5da164ea3698",
+   "text": "What's the most selfish reason you've stayed in a relationship?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs4305128961e4bcdb19",
+   "text": "When did you last look through an ex's social media, and why?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs0037ba9fbaa3458bb8",
+   "text": "What's the worst thing you've done to get someone's attention?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs4334dc0d9232be6041",
+   "text": "What's something you do in relationships that you know is not healthy?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs9555f35b5d01449c25",
+   "text": "What's the biggest red flag you've ever ignored, and how did it end?",
+   "cat": "confess"
+  },
+  {
+   "id": "hsc36b196caa4e91280c",
+   "text": "What's the most embarrassing way you've been rejected?",
+   "cat": "confess"
+  },
+  {
+   "id": "hsafbe54127ea6655a0b",
+   "text": "What's the worst thing you've done after a breakup?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs2c6296d3c551a1f340",
+   "text": "What's something you've never told anyone you've dated?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs25817245ad114e147f",
+   "text": "What's a lie you tell yourself about dating?",
+   "cat": "confess"
+  },
+  {
+   "id": "hsc1d1d8b1f9961bec43",
+   "text": "What's the meanest thing you've ever said in an argument?",
+   "cat": "confess"
+  },
+  {
+   "id": "hsd7a3206712742e9cdd",
+   "text": "What's the longest you've held on to someone who wasn't right for you?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs6fdac716fbc92b9520",
+   "text": "What's the pettiest reason you've ended something?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs6190e154229f524e6b",
+   "text": "When have you been the red flag in someone else's story?",
+   "cat": "confess"
+  },
+  {
+   "id": "hsad58b27c7f03355acc",
+   "text": "What's one thing you would change about how you treat people you date?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs6e9a9d6ad45160d9c5",
+   "text": "What's the worst date you've been on, and was it your fault?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs158c834a36749f706b",
+   "text": "What's something you pretend not to care about in dating but secretly do?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs277d0ae093e436d79e",
+   "text": "Who did you hurt the most in a relationship, and did they deserve it?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs8eec898eb5f6dcdd1c",
+   "text": "What's your most irrational jealousy?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs84d7eae7143db1b68f",
+   "text": "What did you do in your last relationship that you're not proud of?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs544a5c5275a15b99a9",
+   "text": "What's a rule you always preach but never follow?",
+   "cat": "confess"
+  },
+  {
+   "id": "hsef2f85b2c122f43ede",
+   "text": "What's the dumbest thing you've done for someone you liked?",
+   "cat": "confess"
+  },
+  {
+   "id": "hse4dc7279894f8ba7c0",
+   "text": "What's something you do to seem more interesting on a first date?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs4ed0d74bbbc5d402e3",
+   "text": "What's a habit of yours that a partner would hate within a month?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs243435108a0cdaa8d0",
+   "text": "When did you last cry over someone, and would you do it again?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs9a829298d236d8003d",
+   "text": "What's a thing about you that people only learn after dating you?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs38bb3631653895b7fc",
+   "text": "How do you act when you like someone more than they like you?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs29b513ad21e8dd6a21",
+   "text": "What's the longest you've gone without telling someone how you really feel?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs6959601469eeeabb30",
+   "text": "What's one thing you'll never admit to your date tonight?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs40e9c72fe5585358eb",
+   "text": "What's the first thing you lie about when you meet someone?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs9563792fa2535db263",
+   "text": "What's something petty that makes you instantly lose interest?",
+   "cat": "confess"
+  },
+  {
+   "id": "hse4116fc745cc81c0a6",
+   "text": "What's the most unfair thing you've ever expected from a partner?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs2444c8478855d1e364",
+   "text": "What's the biggest mistake you keep repeating in love?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs0f76e13bcbaa27e3ca",
+   "text": "What do your exes say about you that you disagree with?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs0097fcbfa3c02869fa",
+   "text": "What's the most jealous you've ever been, and what did you do about it?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs552d694ae58545a67d",
+   "text": "What's the thing you wish you could take back from your last relationship?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs0254702c93db42f85a",
+   "text": "What's a green flag people confuse for a red flag?",
+   "cat": "confess"
+  },
+  {
+   "id": "hs91137b2a60715e7d17",
+   "text": "Can people really change for someone, or only for themselves?",
+   "cat": "love"
+  },
+  {
+   "id": "hs86a397b2320c669009",
+   "text": "Is it possible to love someone and still not be able to be with them?",
+   "cat": "love"
+  },
+  {
+   "id": "hs15e0165a9e97f0501c",
+   "text": "What do you think is the number one reason relationships fail?",
+   "cat": "love"
+  },
+  {
+   "id": "hs4e78ff1e0ca3822ef7",
+   "text": "Would you rather be loved too much or not enough?",
+   "cat": "love"
+  },
+  {
+   "id": "hsb55a272234ee48a1b3",
+   "text": "Do you think you can fall out of love without anyone doing anything wrong?",
+   "cat": "love"
+  },
+  {
+   "id": "hs7de1b2fad1351771a1",
+   "text": "Is loyalty about actions or about feelings?",
+   "cat": "love"
+  },
+  {
+   "id": "hs196dbe23167fd87d9f",
+   "text": "What's the difference between being in love and being comfortable?",
+   "cat": "love"
+  },
+  {
+   "id": "hscb2e7689981b71f6a8",
+   "text": "Do you think jealousy is a sign of love or a sign of insecurity?",
+   "cat": "love"
+  },
+  {
+   "id": "hsd7a8d221915a543f02",
+   "text": "Is it better to date someone who is just like you or someone who challenges you?",
+   "cat": "love"
+  },
+  {
+   "id": "hs515b10bb5f4c57c480",
+   "text": "Can you build love slowly, or does it have to hit you right away?",
+   "cat": "love"
+  },
+  {
+   "id": "hs36c20d3a9fbf874a46",
+   "text": "What does someone have to do to earn your trust back after breaking it?",
+   "cat": "love"
+  },
+  {
+   "id": "hs675263b0bcad2dd7e5",
+   "text": "Would you want to know if your partner had a crush on someone else?",
+   "cat": "love"
+  },
+  {
+   "id": "hs36d23212b73b662815",
+   "text": "Do you believe in a one great love, or can there be several?",
+   "cat": "love"
+  },
+  {
+   "id": "hs2ce48d88ba0e391d01",
+   "text": "How much of a partner's past should you know before you commit?",
+   "cat": "love"
+  },
+  {
+   "id": "hsa3fd1b99ed110b750a",
+   "text": "Is it fair to compare someone to your ex, even in your own head?",
+   "cat": "love"
+  },
+  {
+   "id": "hs9d5b552a912e91234c",
+   "text": "Do you think love needs equal effort, or is it fine if one gives more?",
+   "cat": "love"
+  },
+  {
+   "id": "hsfe68632c8eaba888b7",
+   "text": "Can a relationship survive without physical attraction?",
+   "cat": "love"
+  },
+  {
+   "id": "hsc5482c38e6003efdc9",
+   "text": "What do you value more in love: passion or peace?",
+   "cat": "love"
+  },
+  {
+   "id": "hsa202d4eef3304eb0a5",
+   "text": "Do you believe in love after betrayal?",
+   "cat": "love"
+  },
+  {
+   "id": "hsc2c1c37c793128ab2e",
+   "text": "Is it OK to stay with someone for stability when the spark is gone?",
+   "cat": "love"
+  },
+  {
+   "id": "hs0bb091980092ee39f6",
+   "text": "What does it mean to you when someone says they love you?",
+   "cat": "love"
+  },
+  {
+   "id": "hs36a1c2dcd25940ec6b",
+   "text": "How long is too long to stay in a relationship that isn't going anywhere?",
+   "cat": "love"
+  },
+  {
+   "id": "hse005517f00ba3f71e7",
+   "text": "Is being single better than being with the wrong person?",
+   "cat": "love"
+  },
+  {
+   "id": "hs4df810ebf0a4ffa001",
+   "text": "Do you think timing matters more than the person?",
+   "cat": "love"
+  },
+  {
+   "id": "hs72fb95453dde9d3015",
+   "text": "What's the hardest part about letting someone in?",
+   "cat": "love"
+  },
+  {
+   "id": "hs6dfefe859680dfe2f4",
+   "text": "What do you want that you're afraid to ask a partner for?",
+   "cat": "love"
+  },
+  {
+   "id": "hs3873415e0db1f5b956",
+   "text": "Would you rather be with someone who adores you or someone you adore?",
+   "cat": "love"
+  },
+  {
+   "id": "hscf63ee3d9d1bc991c1",
+   "text": "What would you never forgive in a relationship?",
+   "cat": "love"
+  },
+  {
+   "id": "hsd3665474682242ecd3",
+   "text": "What do you think people get wrong about love at your age?",
+   "cat": "love"
+  },
+  {
+   "id": "hs942ab6a4bc42904557",
+   "text": "How do you know someone is the one, and have you ever been wrong?",
+   "cat": "love"
+  },
+  {
+   "id": "hsc2d8c378b86794a027",
+   "text": "What's the most attractive thing someone can do in an argument?",
+   "cat": "love"
+  },
+  {
+   "id": "hsc1fdfc287ad101568f",
+   "text": "What's something you need in love that you didn't know you needed until recently?",
+   "cat": "love"
+  },
+  {
+   "id": "hs9c35fe31a1c66a6df6",
+   "text": "Do you think you give more than you get in relationships?",
+   "cat": "love"
+  },
+  {
+   "id": "hs3df115b2ec0422a728",
+   "text": "What kind of love do you think you deserve, and do you believe it?",
+   "cat": "love"
+  },
+  {
+   "id": "hs0ac0d41b7c3b1caeab",
+   "text": "If love is a choice, what are you choosing right now?",
+   "cat": "love"
+  },
+  {
+   "id": "hs04e2244fd0039bfcef",
+   "text": "Is it ever OK to read your partner's messages?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsf0f9a1ae75a42d85e2",
+   "text": "Is it cheating if it only happens online?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsae4b55292c549d4e95",
+   "text": "Should you tell your partner everything, or do some things stay private?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs03eda52443ae84bed8",
+   "text": "Is it a red flag if someone has no friends of the opposite gender?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs4f400d2587839189d8",
+   "text": "Should couples share their phone passwords?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsc032dfa16dfefe2bdf",
+   "text": "Is a relationship that starts as friends better than one that starts on a date?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs2a8e20ad9a7f7b9d84",
+   "text": "Is it OK to date someone you know is not the one, just for company?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs1e48a46521cbdc295f",
+   "text": "Should the person who asks you out always pay?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs33b4bf5f06e0de0677",
+   "text": "Is age just a number, or does it matter in a relationship?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsa9654d22629f11f782",
+   "text": "Should you stay friends with your ex?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs4715b87c7f03a61360",
+   "text": "Is ghosting ever the kind thing to do?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs7530c535722d9f744a",
+   "text": "Is it better to be honest and hurt someone or lie to protect them?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs7f4b9ad1ef2b22a522",
+   "text": "Should people wait to move in together, or does it not matter?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsd702f01ad1ee11f64b",
+   "text": "Are dating apps ruining relationships or helping them?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsce0cdf8eba5cbf24f7",
+   "text": "Should you date someone who is not over their ex?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs36d00de72cb794636e",
+   "text": "Is it a red flag if someone talks about their exes a lot?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsd26c4fff2dfadb3592",
+   "text": "Should you ever give someone a second chance after cheating?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs3994c556e166d081cb",
+   "text": "Is it OK to have a type, or is that just a way to be picky?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs92b7fd5a4b2b2a7695",
+   "text": "Is marriage still important, or is it outdated?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs33e0f16818be11848e",
+   "text": "Should you tell a friend if you think their partner is wrong for them?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsb919794dcba249c027",
+   "text": "Is it a dealbreaker if someone doesn't want kids?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsb49d3fb97abde42bff",
+   "text": "Is a long distance relationship worth it or a waste of time?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsb42bd8e9afd90eec76",
+   "text": "Does a first date tell you everything you need to know?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs7a24ccdf9183900682",
+   "text": "Should you say I love you first or wait to hear it?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsf7305adbe936ac08ed",
+   "text": "Is it OK to keep a backup option while dating someone?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs578d96b395fee60ee6",
+   "text": "Is it a red flag if someone never apologizes first?",
+   "cat": "hot"
+  },
+  {
+   "id": "hsb5d7b1d846c3ed7ff1",
+   "text": "Are people more selfish in relationships now than they used to be?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs2b79e12af8521d1413",
+   "text": "Should you split everything 50/50 in a relationship?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs71879a9c2b5a41e80c",
+   "text": "Should couples have separate vacations sometimes?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs2b16e596c6295ea64b",
+   "text": "Do men or women have it harder in dating today?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs706ecba95329a9928b",
+   "text": "Is it OK to end a relationship by text?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs29fdb83eaba766aae4",
+   "text": "Is the three-date rule real, or is it nonsense?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs050355d6074a7e66b9",
+   "text": "Is it OK to date someone who is going through a hard time?",
+   "cat": "hot"
+  },
+  {
+   "id": "hse7e3dfdc50a42ca82d",
+   "text": "Do looks matter more than people admit?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs4481300fda83de2e8a",
+   "text": "Should you ever date a coworker?",
+   "cat": "hot"
+  },
+  {
+   "id": "hs29dd8cac8aa652af78",
+   "text": "What's something you're afraid people will find out about you?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsb66cfedea0a5afc717",
+   "text": "What's the loneliest you've ever felt, and what got you through it?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs0c85a9dcb4940d52f7",
+   "text": "What do you need most in a relationship that you've rarely gotten?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs1e1e70e4ed810ded1d",
+   "text": "What's a promise you broke that you still think about?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs18466ed5143cf57efe",
+   "text": "What part of yourself are you still learning to accept?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs901a60c0ed31e121e6",
+   "text": "What are you most afraid of losing?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs3a01891a9e500b2e11",
+   "text": "What's the hardest thing you've ever had to forgive?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs7bbb304d20f09f17a6",
+   "text": "What's something people see in you that you don't see in yourself?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs2ef87f9c5c163bed25",
+   "text": "When did you last feel truly seen by someone?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs2ac11b4854331e8019",
+   "text": "What's one thing you wish your past partners had understood about you?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs6378258423f9ec863b",
+   "text": "What would you do differently if no one was watching?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs4ce497320fa12e00c1",
+   "text": "What's a belief about love that you had to unlearn?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs0037273a68c32adde2",
+   "text": "What's the kindest thing someone did for you when you didn't deserve it?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs78a7e9f330ef33980a",
+   "text": "What's something you've been pretending is fine?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsd48a8a2a67e0002cfa",
+   "text": "What do you do when you feel like you're not enough?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs87aed28eb671ddebf0",
+   "text": "What did your family teach you about love, and was it right?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs3c770176d64182308d",
+   "text": "What's a decision you made that changed everything?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs2961ea812cf522d981",
+   "text": "What are you still angry about?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs420822bd8fba6823ca",
+   "text": "What do you wish someone had told you at 18?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs26167535b9d4721e42",
+   "text": "What does your inner critic say about you most often?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsfa386a5c08951fc7f1",
+   "text": "When you're hurt, do you go quiet, get angry, or pull away?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs77d2e93e2db0c306ab",
+   "text": "What's something you want to be known for that has nothing to do with dating?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsbeb889fa5e12709a1b",
+   "text": "What's a version of you that you've outgrown?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs97e461c32456307b58",
+   "text": "What do you think your biggest wall is?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsd5761daf1692957c7f",
+   "text": "Who in your life have you let down the most?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsf91c76efec40fcb5cb",
+   "text": "What are you holding on to that you should let go of?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs1bcac56608cf859493",
+   "text": "What's the bravest thing you've done in love?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsc375ff32233d0ea579",
+   "text": "What's something you need to hear tonight that no one has said?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsde5e1500cac34eef24",
+   "text": "What do you think your friends worry about when it comes to you?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs63edb386d9085b299e",
+   "text": "What would you want your partner to know on your worst day?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs9dcc7dd69028ad11a1",
+   "text": "If you had to describe your heart right now, what would you say?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsaf06a142c6bc959123",
+   "text": "What does the child version of you want from love?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs1f8a6cfced28f7c62c",
+   "text": "What's a risk you took on someone that wasn't worth it?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs5d78bd59549c06c571",
+   "text": "What's the first thing you would change about how you handle conflict?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs6a99b8fb919ca7ca1b",
+   "text": "What's something that took you a long time to say out loud?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs3312bd73d484057672",
+   "text": "When do you feel the most alone in a room full of people?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs775dd768fe1fab3339",
+   "text": "What's the one thing about your past you wish you could leave behind?",
+   "cat": "deep"
+  },
+  {
+   "id": "hsc385ecee80d193619c",
+   "text": "What's something you'd tell your date if you knew they would never judge you?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs9fc3dcb9e840da54b1",
+   "text": "What would someone need to do to truly earn your trust?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs70897f0858d1658431",
+   "text": "What are you most proud of that you rarely get to say?",
+   "cat": "deep"
+  },
+  {
+   "id": "hs65b4a0b8aafc896b50",
+   "text": "What was the first thing you noticed about your date, and what did you think?",
+   "cat": "date"
+  },
+  {
+   "id": "hs870290d069174e5a76",
+   "text": "What would you like to ask your date that you're a little nervous to ask?",
+   "cat": "date"
+  },
+  {
+   "id": "hs58160b6783784c4a37",
+   "text": "What's your honest first impression of your date, no filter?",
+   "cat": "date"
+  },
+  {
+   "id": "hsa230e78cc89ef6a727",
+   "text": "What's one thing about your date that already intrigues you?",
+   "cat": "date"
+  },
+  {
+   "id": "hsa198f4d94953dd264f",
+   "text": "What do you think your date is hiding?",
+   "cat": "date"
+  },
+  {
+   "id": "hs659ac13b4be79606e0",
+   "text": "Describe your date in three words after five minutes.",
+   "cat": "date"
+  },
+  {
+   "id": "hs73a5a050ab5919eea6",
+   "text": "What do you think your date's biggest red flag is, based on just now?",
+   "cat": "date"
+  },
+  {
+   "id": "hs8d02054d5745884ea8",
+   "text": "What do you think your date's biggest green flag is so far?",
+   "cat": "date"
+  },
+  {
+   "id": "hsb88508cad7e42251a1",
+   "text": "What do you think your date would be like in a relationship?",
+   "cat": "date"
+  },
+  {
+   "id": "hs918c1c6174f028f090",
+   "text": "What did your date say that made you want to know more?",
+   "cat": "date"
+  },
+  {
+   "id": "hsdbd6a6cee10f98884e",
+   "text": "What would you want to do with your date if you had the whole night?",
+   "cat": "date"
+  },
+  {
+   "id": "hsbad99e69eb44f044f1",
+   "text": "What's one thing you'd want your date to know about you before going any further?",
+   "cat": "date"
+  },
+  {
+   "id": "hs25bb579e38405010e0",
+   "text": "If you two dated, what would you argue about first?",
+   "cat": "date"
+  },
+  {
+   "id": "hs840afe3012c0f3ed2f",
+   "text": "What do you think your date would say about you to their friends after this?",
+   "cat": "date"
+  },
+  {
+   "id": "hseed6694c14c8469b0f",
+   "text": "What's one thing about your date you'd change, and one you'd never touch?",
+   "cat": "date"
+  },
+  {
+   "id": "hse7e5a29a2244190e81",
+   "text": "What vibe do you get from your date, and is it what you want?",
+   "cat": "date"
+  },
+  {
+   "id": "hs7892ca5a39fefebbbc",
+   "text": "What would be the best thing and the worst thing about dating your date?",
+   "cat": "date"
+  },
+  {
+   "id": "hsee271c4be7c3f20eeb",
+   "text": "If you could ask your date one question and they had to answer honestly, what would it be?",
+   "cat": "date"
+  },
+  {
+   "id": "hs254b15ecea2cfbbb75",
+   "text": "What's one thing you'd do on a second date that you wouldn't do on a first?",
+   "cat": "date"
+  },
+  {
+   "id": "hsb50594f5295fd934e8",
+   "text": "Do you and your date work as a couple, or are you better as friends?",
+   "cat": "date"
+  },
+  {
+   "id": "hs5ffa7ab97e9601f572",
+   "text": "What do you think you'd learn from dating your date?",
+   "cat": "date"
+  },
+  {
+   "id": "hsa90ad7e180db8f03bd",
+   "text": "Where do you think this would go in six months?",
+   "cat": "date"
+  },
+  {
+   "id": "hs937efb4a88beffbbcb",
+   "text": "What do you think your date is looking for, and are you it?",
+   "cat": "date"
+  },
+  {
+   "id": "hs6c3b686d9409baf416",
+   "text": "What kind of partner do you think your date would be?",
+   "cat": "date"
+  },
+  {
+   "id": "hsef889ac850dc581017",
+   "text": "What do you think your date is afraid of in love?",
+   "cat": "date"
+  },
+  {
+   "id": "hs92ab862321a420e7ac",
+   "text": "What's the one thing you hope your date is not like?",
+   "cat": "date"
+  },
+  {
+   "id": "hse7da7cbc8acb28b58a",
+   "text": "What's your read on how your date handles conflict?",
+   "cat": "date"
+  },
+  {
+   "id": "hs37ec44a643cefce683",
+   "text": "What do you think your date needs that they're not asking for?",
+   "cat": "date"
+  },
+  {
+   "id": "hs752ccc9565fff226f4",
+   "text": "What's one piece of dating advice you'd give your date?",
+   "cat": "date"
+  },
+  {
+   "id": "hsa24dca89bc01daf3f5",
+   "text": "What's the most honest thing you can say to your date right now?",
+   "cat": "date"
+  },
+  {
+   "id": "hs004d7ef1901ac88149",
+   "text": "What's the boldest thing you've ever done to get someone's attention?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hsbd277d86e718df7d84",
+   "text": "What's your favorite way to be pursued?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs396eee5386dabb35c9",
+   "text": "What makes you feel instantly drawn to someone?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs1dab6fea5d329d746a",
+   "text": "What's the most attractive thing someone can say to you?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hsf0571feeb94b21bd76",
+   "text": "What's a quality in someone that makes you lose your composure?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs946504eac0a2358641",
+   "text": "What's the best first kiss story you have?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hsd88644639cdff6b261",
+   "text": "What's something small that makes someone ten times more attractive?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs4316d4308d98b57fe3",
+   "text": "Do you like being the one who chases, or the one who's chased?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs485788e4f2dcd0a8b8",
+   "text": "What's the most romantic thing you'd do for someone you really liked?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs8e57b303b6bdcdea97",
+   "text": "What's the fastest you've ever fallen for someone?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs39cb3f7378a05426ad",
+   "text": "What kind of eye contact makes you nervous in a good way?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs05d6e180beda62f317",
+   "text": "How do you let someone know you're interested without saying it?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hsdbdedc1c00ac98cf60",
+   "text": "What's the most charming thing someone has done to win you over?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs1759babba5a2b5778e",
+   "text": "What's the one thing you'd want someone to say to you tonight?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hse757cf389a33a5fb52",
+   "text": "What do you do when someone catches you staring?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs4e0d5f70f55d3f7b14",
+   "text": "What's a compliment you want to hear more than any other?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hsc02c1262b1dd8cbb56",
+   "text": "What's the best way to ask someone out on a second date?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs381c92ef48f60fde21",
+   "text": "How do you know when the chemistry is real?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs33bcbdc5662f04b93f",
+   "text": "What's one thing that makes you weak in the knees?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hsa3a8b4b36be3efd98f",
+   "text": "What would make you say yes to a second date before this one even ends?",
+   "cat": "flirty"
+  },
+  {
+   "id": "hs1f88abd3768cf5f6f1",
+   "text": "Would you rather be with someone who is brutally honest or someone who tells you what you want to hear?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs27e3e69dfe98ae4594",
+   "text": "Would you rather know every thought your partner has about you or none?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs7475c19347309bf147",
+   "text": "Would you rather have a partner who is a great friend or a great lover?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs2835ba4623eb6edb28",
+   "text": "Would you rather your partner be too clingy or too distant?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsef66aaa60d74b7d63f",
+   "text": "Would you rather find out your partner lied or find out they hid something to protect you?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsc4730978d29db8b62e",
+   "text": "Would you rather be the one who loves more or the one who is loved more?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs510fd64437565f43a5",
+   "text": "Would you rather your partner flirt harmlessly with others or never look at anyone else?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsd4a6a7ef21c6cad31e",
+   "text": "Would you rather date someone who never says sorry or someone who says it all the time?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs3f1732c5b1bb1e364a",
+   "text": "Would you rather be the first love of someone's life or the last?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsbbd6cc44a0a26d53c5",
+   "text": "Would you rather relive your worst breakup or never feel butterflies again?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs837198b62bbc5313db",
+   "text": "Would you rather date someone ambitious who is always busy or someone relaxed with no goals?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsa75c76db38e86aa60d",
+   "text": "Would you rather your partner be your best friend or your biggest challenge?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs6049470db8303636be",
+   "text": "Would you rather be forgotten by an ex or remembered as the one who got away?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsfe747762f04b5c30d3",
+   "text": "Would you rather have a love that burns out fast or one that is slow and safe?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs2c5a972608e06662d3",
+   "text": "Would you rather date someone who is always right or always honest?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs649cf9db5573832842",
+   "text": "Would you rather your partner see your messages once or know your password forever?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs081b8e43d6fd5a4cba",
+   "text": "Would you rather be a person's rebound or their backup?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs2aed6a376de47af6ec",
+   "text": "Would you rather date someone famous or someone completely unknown who adores you?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsd9610be747e861df65",
+   "text": "Would you rather have a partner who agrees with you always or argues with you often?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hse5be668d53322ae3a3",
+   "text": "Would you rather know the exact day a relationship will end or never know?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs395966a5c572ff1c37",
+   "text": "Would you rather be loved for who you are or respected for what you do?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hsdbb524edcc427f1cd3",
+   "text": "Would you rather date your best friend's ex or your ex's best friend?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs7cd4032cfcde5c6844",
+   "text": "Would you rather spend a year single and happy or a year in love and anxious?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs06660c89172694dd19",
+   "text": "Would you rather your partner be too proud or too insecure?",
+   "cat": "wyr"
+  },
+  {
+   "id": "hs94ed6a9b8c35ae2c45",
+   "text": "Would you rather say I love you too early or too late?",
+   "cat": "wyr"
+  }
+ ]
+}

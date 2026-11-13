@@ -281,6 +281,16 @@
   PASS on a phone screen the category pickers fit without sideways scrolling
   screenshots: /tmp/cat-shots/viewer.png /tmp/cat-shots/host.png
   PASS the category pages show no JavaScript errors
+  PASS the pack file is well formed: unique ids, allowed categories, no dashes, sensible length, and the index count matches
+  PASS only owners can see or add packs (403 for an Editor, 401 with no login, 403 from a wrong origin)
+  PASS a made-up pack name is refused (400 for a bad name, 404 for one that does not exist)
+  PASS the status says none are added yet
+  PASS adding the pack adds every question that is not there yet and skips the one that already exists
+  PASS new questions arrive ready to ask, with their category and no handle
+  PASS the question that already existed is left exactly as it was
+  PASS adding it again changes nothing
+  PASS pages already open pick up the new categories at once (viewer picker and host filter)
+  PASS a viewer picking 'What would you do?' gets only those new questions
 
 == Browser: three roles, live sync, reconnect
   PASS Editor page opens in Host view
@@ -493,4 +503,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-458 passed, 0 failed, 458 total
+468 passed, 0 failed, 468 total

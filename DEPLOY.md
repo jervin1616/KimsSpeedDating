@@ -488,3 +488,11 @@ The categories are: First dates, About your date, Flirty, Love & relationships, 
 The sorting was done by rules, not by a person, so a few will be in the wrong place. Hosts can fix one in the Questions tab: each row has a category dropdown.
 
 **For a future question pack:** put `"cat": "food"` (or another key from the list) on each question in the pack file. Or add `"id": "category"` pairs to `public/categories.json`, deploy, and press the admin button again.
+
+## Question packs (the "Hot seat" set)
+
+`public/packs/hot-seat.json` is a set of 265 questions written for the host to ask the daters: dilemmas ("What would you do?"), confessions and icks, love and relationships, hot takes, deep and personal, about your date, flirty, and hard would-you-rathers. Two new categories come with it: **What would you do?** and **Confessions & icks**.
+
+To add it: deploy, sign in as an owner, open the admin page, find **Question packs**, press **Add N questions**. No key, no terminal. It only adds questions that are not there yet (matched by id), never changes an existing question, and pressing it twice does nothing. People who have the board open see the new categories right away.
+
+To make your own pack: copy `public/packs/hot-seat.json`, give each question a unique `id`, a `text`, and a `cat` (any category key from the list above), then add an entry to `public/packs/index.json`. The readable copy of the current pack is `docs/hot-seat-questions.md`.

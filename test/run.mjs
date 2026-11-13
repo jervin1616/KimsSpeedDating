@@ -698,7 +698,7 @@ try {
     check("each question got exactly the category from the list", wrong.length === 0, wrong.slice(0, 2));
     check("ask counts, handles and the question text are untouched, and a category set by hand is not overwritten", byIdQ.get(content[0].id).cat === "hot" && byIdQ.get(content[0].id).askCount === 7 && byIdQ.get(content[0].id).handle === "@keepme" && byIdQ.get(content[1].id).askCount === 4 && byIdQ.get(content[1].id).handle === "@keepme2" && byIdQ.get(content[1].id).text === content[1].text && byIdQ.get(content[1].id).cat === catMap[content[1].id]);
     check("the question nobody listed stays uncategorized", byIdQ.get("zz_unknown1").cat === undefined);
-    check("every category in the list is one the server allows", Object.values(catMap).every((k) => ["first", "date", "flirty", "love", "wyr", "tot", "funny", "food", "media", "travel", "memories", "deep", "life", "hot", "chat", "other"].includes(k)));
+    check("every category in the list is one the server allows", Object.values(catMap).every((k) => ["first", "date", "flirty", "love", "wyr", "tot", "funny", "food", "media", "travel", "memories", "deep", "life", "hot", "dilemma", "confess", "chat", "other"].includes(k)));
 
     // pages that were already open update live, without a reload
     check("the open viewer page shows its category picker at once", await until(async () => await catV.locator("#myCat").isVisible(), 6000));
@@ -739,6 +739,32 @@ try {
     await catV.locator("#myQBox").screenshot({ path: "/tmp/cat-shots/viewer.png" }); await catE.screenshot({ path: "/tmp/cat-shots/host.png", fullPage: false });
     console.log("  screenshots: " + "/tmp/cat-shots/viewer.png" + " " + "/tmp/cat-shots/host.png");
     check("the category pages show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0, [...catV.errors, ...catE.errors]);
+    // ---- question packs (owner adds a ready-made set, nothing existing is touched)
+    const pack = JSON.parse(readFileSync(join(ROOT, "public", "packs", "hot-seat.json"), "utf8"));
+    const packIndex = JSON.parse(readFileSync(join(ROOT, "public", "packs", "index.json"), "utf8"));
+    const allowedCats = ["first", "date", "flirty", "love", "wyr", "tot", "funny", "food", "media", "travel", "memories", "deep", "life", "hot", "dilemma", "confess", "chat", "other"];
+    check("the pack file is well formed: unique ids, allowed categories, no dashes, sensible length, and the index count matches", new Set(pack.questions.map((q) => q.id)).size === pack.questions.length && pack.questions.every((q) => allowedCats.includes(q.cat) && !q.text.includes("—") && q.text.length >= 15 && q.text.length <= 150 && /^[A-Za-z0-9_-]{1,64}$/.test(q.id)) && packIndex[0].name === "hot-seat" && packIndex[0].count === pack.questions.length, packIndex);
+    const packReq = (session, name, method = "GET", extra = {}) => method === "GET"
+      ? fetch(API_BASE + "/api/pack?name=" + name, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }))
+      : api("/api/pack", session, { name }, extra);
+    check("only owners can see or add packs (403 for an Editor, 401 with no login, 403 from a wrong origin)", (await packReq(ED, "hot-seat")).status === 403 && (await packReq(null, "hot-seat")).status === 401 && (await packReq(ED, "hot-seat", "POST")).status === 403 && (await packReq(O, "hot-seat", "POST", { Origin: "https://evil.example.com" })).status === 403);
+    check("a made-up pack name is refused (400 for a bad name, 404 for one that does not exist)", (await packReq(O, "..%2Fx")).status === 400 && (await packReq(O, "no-such-pack")).status === 404);
+    const ps0 = await packReq(O, "hot-seat");
+    check("the status says none are added yet", ps0.status === 200 && ps0.body.total === pack.questions.length && ps0.body.present === 0, ps0.body);
+    await cz.w("set", "questions", pack.questions[0].id, { text: "Mine stays", handle: "@mine", status: "ready", cat: "chat", ts: 1, askCount: 5 });
+    const pa = await packReq(O, "hot-seat", "POST");
+    check("adding the pack adds every question that is not there yet and skips the one that already exists", pa.status === 200 && pa.body.added === pack.questions.length - 1 && pa.body.skipped === 1, pa.body);
+    const snapP = new Map((await (await connect(O)).sub("questions")).docs.map((d) => [d.id, d.data]));
+    const sample = pack.questions[5];
+    check("new questions arrive ready to ask, with their category and no handle", snapP.get(sample.id) && snapP.get(sample.id).text === sample.text && snapP.get(sample.id).cat === sample.cat && snapP.get(sample.id).status === "ready" && snapP.get(sample.id).handle === "");
+    check("the question that already existed is left exactly as it was", snapP.get(pack.questions[0].id).text === "Mine stays" && snapP.get(pack.questions[0].id).askCount === 5 && snapP.get(pack.questions[0].id).handle === "@mine");
+    const pa2 = await packReq(O, "hot-seat", "POST");
+    check("adding it again changes nothing", pa2.body.added === 0 && pa2.body.skipped === pack.questions.length, pa2.body);
+    check("pages already open pick up the new categories at once (viewer picker and host filter)", await until(async () => (await catV.locator("#myCat option").allTextContents()).some((o) => /^What would you do\? \(\d+\)/.test(o)) && (await catE.locator("#qCat option").allTextContents()).some((o) => /^Confessions & icks \(\d+\)/.test(o)), 8000), await catV.locator("#myCat option").allTextContents());
+    await catV.selectOption("#myCat", "dilemma");
+    const dilTexts = new Set(pack.questions.filter((q) => q.cat === "dilemma").map((q) => q.text));
+    const dseen = []; for (let i = 0; i < 8; i++) { await catV.click("#myQBtn"); dseen.push(await catV.locator("#myQText").innerText()); }
+    check("a viewer picking 'What would you do?' gets only those new questions", dseen.every((t) => dilTexts.has(t)), dseen);
     await catPages.close(); cz.close();
   }
   API_BASE = BASE;

@@ -1,0 +1,293 @@
+# Hot seat question pack (265 questions)
+
+Questions the host asks the daters. Read through, tell me which to cut or rewrite.
+
+
+## What would you do? (40)
+
+- Your best friend's partner makes a pass at you. Do you tell your friend, and how soon?
+- You find out your date's ex is a close friend of yours. Do you keep seeing them?
+- Your partner wants to stay friends with their ex. What's your honest limit?
+- You're happy but bored in a relationship. Do you stay, or risk it for something more?
+- Someone you really like says they're not ready for a relationship. Do you wait or walk away?
+- You catch your date in a small lie on the first date. Do you say something or watch what happens?
+- Your partner gets a dream job in another country. Do you go?
+- Your friends all hate the person you're dating. Who do you listen to?
+- You find out your partner has been checking their ex's page for months. What do you do?
+- Someone you dated years ago texts you out of nowhere. Do you answer?
+- You like someone who is very different from what you said you wanted. Do you ignore your own list?
+- Your date is perfect on paper but you feel nothing. Do you give it more time?
+- You see your partner's phone light up with a message from someone you don't know. Do you look?
+- Your partner tells you a secret about their past on date three. How do you react?
+- You realize you like your friend more than a friend. Do you risk the friendship?
+- Your date says they're still hurting over their last breakup. Do you stay or step back?
+- You're asked to choose between your partner and your best friend. Who do you pick?
+- Your partner wants an open relationship and you don't. What happens next?
+- Your date is rude to the waiter. Is the date over?
+- You're offered a lot of money to date someone you don't like for a year. Do you do it?
+- A stranger tells you your partner is cheating. Do you believe them?
+- You're on a date and see your ex across the restaurant. What do you do?
+- You find out you and your date voted for opposite sides on something you care about. Can it work?
+- Your partner never wants to meet your family. How long do you let it go?
+- You fall for someone who lives three hours away. Who moves?
+- Your date is great, but they still live with their parents. Does it matter?
+- Someone you're dating asks you to delete your exes' numbers. Do you?
+- You can read your partner's mind for one day. Do you take the offer?
+- Your partner forgets your birthday. Is it a big deal or a small one?
+- You're asked to be someone's second choice. Do you take it?
+- Your best friend asks if you'd tell them if their partner was cheating. What's your honest answer?
+- You discover your partner has been lying about their age by a few years. Deal breaker?
+- Your date asks how many people you've been with. Do you answer honestly?
+- You get a text meant for someone else that is about you. Do you say anything?
+- You're in love but your family disapproves. What do you do?
+- Your date wants to split the bill and you thought they'd pay. Does that change things?
+- You can have a great relationship or a great career for the next five years. Not both. Which one?
+- Your partner spends hours on their phone while you're together. When do you say something?
+- You find out your date has a child you were not told about. How do you react?
+- Your partner posts you on their page only once a year. Does that bother you?
+
+## Confessions & icks (40)
+
+- What's the ick that would end it for you in a minute?
+- What's the pettiest thing you've ever held against someone you dated?
+- What's your most toxic dating habit that you haven't fixed?
+- What's a lie you told on a date that you never corrected?
+- What's the most selfish reason you've stayed in a relationship?
+- When did you last look through an ex's social media, and why?
+- What's the worst thing you've done to get someone's attention?
+- What's something you do in relationships that you know is not healthy?
+- What's the biggest red flag you've ever ignored, and how did it end?
+- What's the most embarrassing way you've been rejected?
+- What's the worst thing you've done after a breakup?
+- What's something you've never told anyone you've dated?
+- What's a lie you tell yourself about dating?
+- What's the meanest thing you've ever said in an argument?
+- What's the longest you've held on to someone who wasn't right for you?
+- What's the pettiest reason you've ended something?
+- When have you been the red flag in someone else's story?
+- What's one thing you would change about how you treat people you date?
+- What's the worst date you've been on, and was it your fault?
+- What's something you pretend not to care about in dating but secretly do?
+- Who did you hurt the most in a relationship, and did they deserve it?
+- What's your most irrational jealousy?
+- What did you do in your last relationship that you're not proud of?
+- What's a rule you always preach but never follow?
+- What's the dumbest thing you've done for someone you liked?
+- What's something you do to seem more interesting on a first date?
+- What's a habit of yours that a partner would hate within a month?
+- When did you last cry over someone, and would you do it again?
+- What's a thing about you that people only learn after dating you?
+- How do you act when you like someone more than they like you?
+- What's the longest you've gone without telling someone how you really feel?
+- What's one thing you'll never admit to your date tonight?
+- What's the first thing you lie about when you meet someone?
+- What's something petty that makes you instantly lose interest?
+- What's the most unfair thing you've ever expected from a partner?
+- What's the biggest mistake you keep repeating in love?
+- What do your exes say about you that you disagree with?
+- What's the most jealous you've ever been, and what did you do about it?
+- What's the thing you wish you could take back from your last relationship?
+- What's a green flag people confuse for a red flag?
+
+## Love & relationships (35)
+
+- Can people really change for someone, or only for themselves?
+- Is it possible to love someone and still not be able to be with them?
+- What do you think is the number one reason relationships fail?
+- Would you rather be loved too much or not enough?
+- Do you think you can fall out of love without anyone doing anything wrong?
+- Is loyalty about actions or about feelings?
+- What's the difference between being in love and being comfortable?
+- Do you think jealousy is a sign of love or a sign of insecurity?
+- Is it better to date someone who is just like you or someone who challenges you?
+- Can you build love slowly, or does it have to hit you right away?
+- What does someone have to do to earn your trust back after breaking it?
+- Would you want to know if your partner had a crush on someone else?
+- Do you believe in a one great love, or can there be several?
+- How much of a partner's past should you know before you commit?
+- Is it fair to compare someone to your ex, even in your own head?
+- Do you think love needs equal effort, or is it fine if one gives more?
+- Can a relationship survive without physical attraction?
+- What do you value more in love: passion or peace?
+- Do you believe in love after betrayal?
+- Is it OK to stay with someone for stability when the spark is gone?
+- What does it mean to you when someone says they love you?
+- How long is too long to stay in a relationship that isn't going anywhere?
+- Is being single better than being with the wrong person?
+- Do you think timing matters more than the person?
+- What's the hardest part about letting someone in?
+- What do you want that you're afraid to ask a partner for?
+- Would you rather be with someone who adores you or someone you adore?
+- What would you never forgive in a relationship?
+- What do you think people get wrong about love at your age?
+- How do you know someone is the one, and have you ever been wrong?
+- What's the most attractive thing someone can do in an argument?
+- What's something you need in love that you didn't know you needed until recently?
+- Do you think you give more than you get in relationships?
+- What kind of love do you think you deserve, and do you believe it?
+- If love is a choice, what are you choosing right now?
+
+## Hot takes & debates (35)
+
+- Is it ever OK to read your partner's messages?
+- Is it cheating if it only happens online?
+- Should you tell your partner everything, or do some things stay private?
+- Is it a red flag if someone has no friends of the opposite gender?
+- Should couples share their phone passwords?
+- Is a relationship that starts as friends better than one that starts on a date?
+- Is it OK to date someone you know is not the one, just for company?
+- Should the person who asks you out always pay?
+- Is age just a number, or does it matter in a relationship?
+- Should you stay friends with your ex?
+- Is ghosting ever the kind thing to do?
+- Is it better to be honest and hurt someone or lie to protect them?
+- Should people wait to move in together, or does it not matter?
+- Are dating apps ruining relationships or helping them?
+- Should you date someone who is not over their ex?
+- Is it a red flag if someone talks about their exes a lot?
+- Should you ever give someone a second chance after cheating?
+- Is it OK to have a type, or is that just a way to be picky?
+- Is marriage still important, or is it outdated?
+- Should you tell a friend if you think their partner is wrong for them?
+- Is it a dealbreaker if someone doesn't want kids?
+- Is a long distance relationship worth it or a waste of time?
+- Does a first date tell you everything you need to know?
+- Should you say I love you first or wait to hear it?
+- Is it OK to keep a backup option while dating someone?
+- Is it a red flag if someone never apologizes first?
+- Are people more selfish in relationships now than they used to be?
+- Should you split everything 50/50 in a relationship?
+- Should couples have separate vacations sometimes?
+- Do men or women have it harder in dating today?
+- Is it OK to end a relationship by text?
+- Is the three-date rule real, or is it nonsense?
+- Is it OK to date someone who is going through a hard time?
+- Do looks matter more than people admit?
+- Should you ever date a coworker?
+
+## Deep & personal (40)
+
+- What's something you're afraid people will find out about you?
+- What's the loneliest you've ever felt, and what got you through it?
+- What do you need most in a relationship that you've rarely gotten?
+- What's a promise you broke that you still think about?
+- What part of yourself are you still learning to accept?
+- What are you most afraid of losing?
+- What's the hardest thing you've ever had to forgive?
+- What's something people see in you that you don't see in yourself?
+- When did you last feel truly seen by someone?
+- What's one thing you wish your past partners had understood about you?
+- What would you do differently if no one was watching?
+- What's a belief about love that you had to unlearn?
+- What's the kindest thing someone did for you when you didn't deserve it?
+- What's something you've been pretending is fine?
+- What do you do when you feel like you're not enough?
+- What did your family teach you about love, and was it right?
+- What's a decision you made that changed everything?
+- What are you still angry about?
+- What do you wish someone had told you at 18?
+- What does your inner critic say about you most often?
+- When you're hurt, do you go quiet, get angry, or pull away?
+- What's something you want to be known for that has nothing to do with dating?
+- What's a version of you that you've outgrown?
+- What do you think your biggest wall is?
+- Who in your life have you let down the most?
+- What are you holding on to that you should let go of?
+- What's the bravest thing you've done in love?
+- What's something you need to hear tonight that no one has said?
+- What do you think your friends worry about when it comes to you?
+- What would you want your partner to know on your worst day?
+- If you had to describe your heart right now, what would you say?
+- What does the child version of you want from love?
+- What's a risk you took on someone that wasn't worth it?
+- What's the first thing you would change about how you handle conflict?
+- What's something that took you a long time to say out loud?
+- When do you feel the most alone in a room full of people?
+- What's the one thing about your past you wish you could leave behind?
+- What's something you'd tell your date if you knew they would never judge you?
+- What would someone need to do to truly earn your trust?
+- What are you most proud of that you rarely get to say?
+
+## About your date (30)
+
+- What was the first thing you noticed about your date, and what did you think?
+- What would you like to ask your date that you're a little nervous to ask?
+- What's your honest first impression of your date, no filter?
+- What's one thing about your date that already intrigues you?
+- What do you think your date is hiding?
+- Describe your date in three words after five minutes.
+- What do you think your date's biggest red flag is, based on just now?
+- What do you think your date's biggest green flag is so far?
+- What do you think your date would be like in a relationship?
+- What did your date say that made you want to know more?
+- What would you want to do with your date if you had the whole night?
+- What's one thing you'd want your date to know about you before going any further?
+- If you two dated, what would you argue about first?
+- What do you think your date would say about you to their friends after this?
+- What's one thing about your date you'd change, and one you'd never touch?
+- What vibe do you get from your date, and is it what you want?
+- What would be the best thing and the worst thing about dating your date?
+- If you could ask your date one question and they had to answer honestly, what would it be?
+- What's one thing you'd do on a second date that you wouldn't do on a first?
+- Do you and your date work as a couple, or are you better as friends?
+- What do you think you'd learn from dating your date?
+- Where do you think this would go in six months?
+- What do you think your date is looking for, and are you it?
+- What kind of partner do you think your date would be?
+- What do you think your date is afraid of in love?
+- What's the one thing you hope your date is not like?
+- What's your read on how your date handles conflict?
+- What do you think your date needs that they're not asking for?
+- What's one piece of dating advice you'd give your date?
+- What's the most honest thing you can say to your date right now?
+
+## Flirty (20)
+
+- What's the boldest thing you've ever done to get someone's attention?
+- What's your favorite way to be pursued?
+- What makes you feel instantly drawn to someone?
+- What's the most attractive thing someone can say to you?
+- What's a quality in someone that makes you lose your composure?
+- What's the best first kiss story you have?
+- What's something small that makes someone ten times more attractive?
+- Do you like being the one who chases, or the one who's chased?
+- What's the most romantic thing you'd do for someone you really liked?
+- What's the fastest you've ever fallen for someone?
+- What kind of eye contact makes you nervous in a good way?
+- How do you let someone know you're interested without saying it?
+- What's the most charming thing someone has done to win you over?
+- What's the one thing you'd want someone to say to you tonight?
+- What do you do when someone catches you staring?
+- What's a compliment you want to hear more than any other?
+- What's the best way to ask someone out on a second date?
+- How do you know when the chemistry is real?
+- What's one thing that makes you weak in the knees?
+- What would make you say yes to a second date before this one even ends?
+
+## Would you rather (25)
+
+- Would you rather be with someone who is brutally honest or someone who tells you what you want to hear?
+- Would you rather know every thought your partner has about you or none?
+- Would you rather have a partner who is a great friend or a great lover?
+- Would you rather your partner be too clingy or too distant?
+- Would you rather find out your partner lied or find out they hid something to protect you?
+- Would you rather be the one who loves more or the one who is loved more?
+- Would you rather your partner flirt harmlessly with others or never look at anyone else?
+- Would you rather date someone who never says sorry or someone who says it all the time?
+- Would you rather be the first love of someone's life or the last?
+- Would you rather relive your worst breakup or never feel butterflies again?
+- Would you rather date someone ambitious who is always busy or someone relaxed with no goals?
+- Would you rather your partner be your best friend or your biggest challenge?
+- Would you rather be forgotten by an ex or remembered as the one who got away?
+- Would you rather have a love that burns out fast or one that is slow and safe?
+- Would you rather date someone who is always right or always honest?
+- Would you rather your partner see your messages once or know your password forever?
+- Would you rather be a person's rebound or their backup?
+- Would you rather date someone famous or someone completely unknown who adores you?
+- Would you rather have a partner who agrees with you always or argues with you often?
+- Would you rather know the exact day a relationship will end or never know?
+- Would you rather be loved for who you are or respected for what you do?
+- Would you rather date your best friend's ex or your ex's best friend?
+- Would you rather spend a year single and happy or a year in love and anxious?
+- Would you rather your partner be too proud or too insecure?
+- Would you rather say I love you too early or too late?

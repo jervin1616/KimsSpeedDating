@@ -376,11 +376,12 @@
         if (sub.ready) dispatch(sub);
       });
     } else if (m.t === "bulk") {
-      // many small field changes in one message (for example question categories): merge them, tell listeners once
+      // many small changes in one message (question categories, a new question pack): apply them, tell listeners once
       Object.keys(subs).forEach(function (k) {
         var sub = subs[k];
-        if (sub.coll !== m.coll || sub.docId || !sub.mirror || !Array.isArray(m.patch)) return;
-        m.patch.forEach(function (p) { var cur = sub.mirror.get(p[0]); if (cur) sub.mirror.set(p[0], Object.assign({}, cur, p[1])); });
+        if (sub.coll !== m.coll || sub.docId || !sub.mirror) return;
+        if (Array.isArray(m.patch)) m.patch.forEach(function (p) { var cur = sub.mirror.get(p[0]); if (cur) sub.mirror.set(p[0], Object.assign({}, cur, p[1])); });
+        if (Array.isArray(m.add)) m.add.forEach(function (p) { sub.mirror.set(p[0], p[1]); });
         if (sub.ready) dispatch(sub);
       });
     } else if (m.t === "ack") {

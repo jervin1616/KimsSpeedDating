@@ -624,6 +624,45 @@ export class Database extends DurableObject {
     return { ok: true, applied: patch.length, already, unknown, total };
   }
 
+  packStatus(ids) {
+    let present = 0;
+    for (const id of ids) if (this.getRow("questions", id) !== null) present++;
+    return { total: ids.length, present, missing: ids.length - present };
+  }
+
+  // Adds the questions of a pack that are not there yet (matched by id). Existing questions are never touched.
+  addPack(actorEmail, questions, allowed) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const okKey = new Set(allowed);
+    const add = [];
+    let skipped = 0;
+    const base = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      for (const q of questions) {
+        if (!q || typeof q.id !== "string" || typeof q.text !== "string" || !okKey.has(q.cat) || !validDocId("questions", q.id) || q.text.length < 3 || q.text.length > 300) throw new RuleError("invalid-argument", "The pack has a bad entry.");
+        if (this.getRow("questions", q.id) !== null) { skipped++; continue; }
+        this.ensureRoom("questions");
+        const data = { text: q.text, handle: "", status: "ready", cat: q.cat, ts: base + add.length };
+        this.upsert("questions", q.id, validateDoc(data));
+        add.push([q.id, data]);
+      }
+    });
+    if (add.length) this.broadcastAdd("questions", add);
+    return { ok: true, added: add.length, skipped };
+  }
+
+  broadcastAdd(coll, add) {
+    this.snap.delete(coll);
+    const out = '{"t":"bulk","coll":' + JSON.stringify(coll) + ',"add":' + JSON.stringify(add) + "}";
+    const now = Math.floor(Date.now() / 1000);
+    for (const [ws, att] of this.loadMeta()) {
+      if (!att.colls.includes(coll) || att.exp <= now) continue;
+      const role = this.resolve(att.email, att.iat).role;
+      if (role === "none" || !canRead(role, coll)) continue;
+      this.send(ws, out);
+    }
+  }
+
   broadcastPatch(coll, patch) {
     this.snap.delete(coll);
     const out = '{"t":"bulk","coll":' + JSON.stringify(coll) + ',"patch":' + JSON.stringify(patch) + "}";
