@@ -56,3 +56,9 @@ Watch the board live, tap **Random question for me** (only you see it), and pick
 👉 https://kims-speed-dating.jervin5612.workers.dev/
 
 Free. Sign in with Google. 18+ only. Panel members: use a second device or write your questions down first.
+
+## Feature cards (card-speed-dater.png and card-notifications.png)
+
+**Want a seat on the show?** Sign up right in the app. Open it, add your TikTok username, tap **Want to be a speed dater?**, fill in your age, state and who you're looking for, and confirm you're 18+. The host approves you live. ❤️‍🔥
+
+**Never miss the start.** Turn on live notifications in the app and we'll nudge you 1 hour before, 30 minutes before, and the moment we go live. iPhone: add the app to your home screen first and open it from there. ❤️‍🔥
