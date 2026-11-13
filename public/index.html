@@ -332,7 +332,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <li>Find the Kim's Speed Dating icon on your home screen or in your app list and tap it.</li>
       </ol>
       <p class="note" id="howMissing" hidden>Do not see the option? Make sure you are not in a private or incognito tab, and that you signed in on this page first.</p>
-      <div class="how-actions"><button class="primary" id="howInstall" type="button" hidden>Install now</button><button class="ghost" id="howClose" type="button">Got it</button></div>
+      <div class="how-actions"><button class="primary" id="howInstall" type="button" hidden>Install now</button><button class="ghost" id="howClose" type="button">Got it</button><button class="primary" id="howDone" type="button">I've added it</button></div>
     </div>
   </div>
 
@@ -1209,21 +1209,25 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   if (isStandalone()) $("adminLink").removeAttribute("target");
 
   /* ---------- "Install the app" hint: only in a normal browser tab, never once it is installed ---------- */
-  var installPrompt = null, TIP_KEY = "sd.installTip.until";
+  var installPrompt = null, ADDED_KEY = "sd.installed", HIDE_KEY = "sd.installTip.hidden";
   function platform() {
     var ua = navigator.userAgent || "";
     if (/iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
     if (/Android/.test(ua)) return "android";
     return "desktop";
   }
-  function tipSnoozed() { try { return Number(localStorage.getItem(TIP_KEY) || 0) > Date.now(); } catch (e) { return false; } }
+  // The card keeps showing in a browser tab until the app is added. A browser cannot tell if the home screen shortcut exists,
+  // so it hides only when the page is opened as the app, the browser says it was installed, or the person taps "I've added it".
+  // "Not now" hides it for this visit only.
+  function tipSnoozed() { try { return localStorage.getItem(ADDED_KEY) === "1" || sessionStorage.getItem(HIDE_KEY) === "1"; } catch (e) { return false; } }
   function syncInstallTip() {
     var tip = $("installTip"), p = platform();
     var show = !isStandalone() && !tipSnoozed() && !$("app").hidden && (p !== "desktop" || !!installPrompt);
     tip.hidden = !show; if (!show) return;
     $("installHow").textContent = "Add it to your home screen for one-tap, full screen access.";
   }
-  function snoozeTip() { try { localStorage.setItem(TIP_KEY, String(Date.now() + 30 * 86400000)); } catch (e) { /* ignore */ } }
+  function markAdded() { try { localStorage.setItem(ADDED_KEY, "1"); } catch (e) { /* ignore */ } }
+  function hideForNow() { try { sessionStorage.setItem(HIDE_KEY, "1"); } catch (e) { /* ignore */ } }
   function showHow(which) {
     var ios = which === "ios";
     $("howIos").hidden = !ios; $("howAndroid").hidden = ios;
@@ -1239,15 +1243,16 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   $("howClose").onclick = closeHow;
   $("howOv").onclick = function (e) { if (e.target === $("howOv")) closeHow(); };
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("howOv").hidden) closeHow(); });
-  $("installNo").onclick = function () { snoozeTip(); syncInstallTip(); };
+  $("installNo").onclick = function () { hideForNow(); syncInstallTip(); };
+  $("howDone").onclick = function () { markAdded(); closeHow(); syncInstallTip(); };
   $("installBtn").onclick = openHow;
   $("howInstall").onclick = function () {
     if (!installPrompt) return;
     var ev = installPrompt; ev.prompt();
-    Promise.resolve(ev.userChoice).then(function (c) { installPrompt = null; if (c && c.outcome === "accepted") { snoozeTip(); closeHow(); } syncInstallTip(); }, function () { installPrompt = null; syncInstallTip(); });
+    Promise.resolve(ev.userChoice).then(function (c) { installPrompt = null; if (c && c.outcome === "accepted") { markAdded(); closeHow(); } syncInstallTip(); }, function () { installPrompt = null; syncInstallTip(); });
   };
   window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); installPrompt = e; syncInstallTip(); });
-  window.addEventListener("appinstalled", function () { installPrompt = null; snoozeTip(); syncInstallTip(); });
+  window.addEventListener("appinstalled", function () { installPrompt = null; markAdded(); syncInstallTip(); });
   $("signOut").onclick = function (ev) {
     ev.preventDefault();
     if (!window.confirm("Sign out of Kim's Speed Dating on this device?")) return;

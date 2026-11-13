@@ -496,3 +496,7 @@ The sorting was done by rules, not by a person, so a few will be in the wrong pl
 To add it: deploy, sign in as an owner, open the admin page, find **Question packs**, press **Add N questions**. No key, no terminal. It only adds questions that are not there yet (matched by id), never changes an existing question, and pressing it twice does nothing. People who have the board open see the new categories right away.
 
 To make your own pack: copy `public/packs/hot-seat.json`, give each question a unique `id`, a `text`, and a `cat` (any category key from the list above), then add an entry to `public/packs/index.json`. The readable copy of the current pack is `docs/hot-seat-questions.md`.
+
+## The "Install the app" card keeps showing until the app is added
+
+On a phone browser the card shows every visit after sign-in. It stops when: the page is opened as the home screen app, the browser reports it was installed, or the person taps **I've added it** in the guide. **Not now** only hides it for that visit. A phone browser cannot tell whether a home screen shortcut exists, so iPhone users who added it but keep using Safari will keep seeing the card until they tap **I've added it**. Anyone who tapped Not now under the old 30-day rule will see the card again.

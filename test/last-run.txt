@@ -423,8 +423,13 @@
   PASS the guide has an Android tab with its own steps
   PASS the guide fits a phone screen without sideways scroll
   PASS Got it closes the guide
-  PASS 'Not now' hides it...
-  PASS ...and it stays hidden after a reload (remembered for 30 days)
+  PASS 'Not now' hides it for this visit...
+  PASS ...and it stays hidden if the same tab is reloaded
+  PASS ...but it is back on the next visit, because the app has not been added yet
+  PASS the guide has an 'I've added it' button as well as Got it
+  PASS closing the guide with Got it does not hide the card (the app may not be added)
+  PASS 'I've added it' closes the guide and hides the card
+  PASS ...and it stays hidden on later visits on that phone
   PASS on Android the guide opens on the Android steps
   PASS when the browser offers a real install prompt, an Install now button appears in the guide
   PASS ...tapping it opens the browser's install prompt, closes the guide and hides the card
@@ -503,4 +508,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-468 passed, 0 failed, 468 total
+473 passed, 0 failed, 473 total
