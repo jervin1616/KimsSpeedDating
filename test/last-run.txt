@@ -192,6 +192,13 @@
   PASS a blocked person gets no access even though the default is Viewer
   PASS a block can never apply to someone in the ROLES secret
   PASS a locked door turns away new sign-ins from unlisted people but not older sessions, added people or owners
+  PASS usernames: @ is optional, 2 to 24 letters, numbers, dots and underscores, capitals kept
+  PASS sign-up checks mirror the host's dater form (18+, ranges, state only, confirmation)
+  PASS a sign-up cannot smuggle extra fields into the dater record
+  PASS matching: same username ignoring @, capitals, dots and underscores is a strong match
+  PASS matching: a similar username counts only with the same state or an age within a year
+  PASS matching: short or unrelated names do not match
+  PASS matching: the strongest match is listed first, at most three, and dismissed ones are skipped
   PASS DEFAULT_ROLE can be none, viewer or contributor
   PASS DEFAULT_ROLE can never make strangers editors or owners
   PASS ROLES accepts commas, semicolons, new lines and any letter case
@@ -291,6 +298,70 @@
   PASS adding it again changes nothing
   PASS pages already open pick up the new categories at once (viewer picker and host filter)
   PASS a viewer picking 'What would you do?' gets only those new questions
+  PASS everyone who signs in lands on the member list automatically (owners can search it by email)
+  PASS only owners can search people (403 for an Editor and a Contributor, 401 with no login, 400 for a one-letter search)
+  PASS a new viewer has no username and no sign-up yet
+  PASS a bad username is refused (too short, spaces, too long, leading dot)
+  PASS a username saves without the @ and keeps its capitals
+  PASS another account cannot claim the same username, even with different capitals (409)
+  PASS a Contributor can add a TikTok username too
+  PASS the owner's search finds people by TikTok username (and with the @)
+  PASS the erase tool finds people by TikTok username as well
+  PASS sign-up refused for under 18 (400)
+  PASS sign-up refused for a bad gender (400)
+  PASS sign-up refused for no 18+ confirmation (400)
+  PASS sign-up refused for a range under 18 (400)
+  PASS sign-up refused for a backwards range (400)
+  PASS sign-up refused for a street address as the state (400)
+  PASS sign-up refused for a bad sexuality (400)
+  PASS sign-up refused for a bad username (400)
+  PASS a bisexual sign-up needs all four ranges (400 without them)
+  PASS sign-up works (200) and shows as pending
+  PASS editing it is allowed and does not make a second one
+  PASS a bisexual sign-up with all ranges works and gets an overall range for the fit colors
+  PASS ...stored as min 25 and max 40
+  PASS a blocked account cannot sign up
+  PASS only hosts can see or act on the pending list (403 for a viewer and a Contributor, 401 with no login)
+  PASS a host sees sign-ups without email addresses; an owner also sees the email
+  PASS a sign-up from a wrong origin is refused (403)
+  PASS a host approves a sign-up: a dater is created from it
+  PASS ...hosts' open pages get the new dater at once, viewers do not
+  PASS ...and it is gone from the pending list
+  PASS approving twice gives the same dater and no duplicate
+  PASS the person now sees that they are on the list, and cannot sign up again (409)
+  PASS if the host later removes that dater, the person can sign up again
+  PASS a host declines a sign-up and it disappears
+  PASS approving a sign-up that is gone is a clean 404
+  PASS clearing removes every pending sign-up and leaves approved daters alone
+  PASS a host who adds the dater by hand can link the sign-up (it counts as approved)
+  PASS linking to a dater that does not exist is refused (404)
+  PASS only owners can free up a username (403 for an Editor), and then someone else can claim it
+  PASS forgetting a person removes their member entry and sign-up
+  PASS the member list keeps people after they are given a role
+  PASS a viewer sees the TikTok username box, and a host does not
+  PASS saving a username shows it back with a confirmation
+  PASS the sign-up button is there and says what it is
+  PASS the sign-up form opens with their username filled in
+  PASS the form will not send without the 18+ confirmation (the browser blocks it)
+  PASS signing up closes the form and shows the pending message
+  PASS a bisexual choice swaps in the four age range boxes
+  PASS the host's Daters tab shows how many sign-ups are waiting
+  PASS the pending list shows username, age, state and what they want
+  PASS searching the pending list filters it
+  PASS ...and finds a username by part of it, ignoring capitals
+  PASS opening a seat shows pending sign-ups at the top of the picker
+  PASS the picker's search covers pending sign-ups too
+  PASS tapping a pending sign-up approves them and seats them in one move
+  PASS ...and the dater exists on the server too
+  PASS typing someone who signed up brings a 'Could this be them?' prompt (same username ignoring capitals, spaces and underscores)
+  PASS someone unrelated brings no prompt
+  PASS a username a character or two off with the same state shows a 'similar' prompt
+  PASS 'No, different person' hides it for this add
+  PASS ...and it stays hidden while they keep typing
+  PASS 'Yes' fills the whole form from their sign-up
+  PASS adding the dater links the sign-up: it leaves the pending list
+  PASS the host's Clear all button asks first and then empties the list
+  PASS the sign-up screens show no JavaScript errors
 
 == Browser: three roles, live sync, reconnect
   PASS Editor page opens in Host view
@@ -405,7 +476,8 @@
   PASS the three policy pages link to each other
   PASS the sign-in screen asks for 18+ and links Terms and Privacy; every screen has a footer with all three
   PASS policies contain no em dashes and say 18 or older
-  PASS policy numbers match the code (300 sign-ins, 100 changes, 12 hours, 7 days)
+  PASS policy numbers match the code (100 changes, 12 hours, 7 days)
+  PASS the privacy page describes the member list, TikTok usernames and dater sign-ups, and who sees them
   PASS every page links the icons, the manifest and the banner colour
   PASS the main page has link-preview tags with a full https address for the card
   PASS home screen icons are fully opaque (no see-through corners, which phones paint black)
@@ -508,4 +580,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-473 passed, 0 failed, 473 total
+545 passed, 0 failed, 545 total

@@ -253,6 +253,9 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 .empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
 .note { color: var(--muted); font-size: 13px; margin: 0; }
 .catsel { width: auto; max-width: 100%; }
+.matchbox { border: 1px solid #ffd166; background: rgba(255,209,102,.08); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.matchbox .mrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+.pendrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .catpick { width: auto; font-size: 12px; padding: 4px 6px; }
 .note a, .legal a { color: #ff8fa8; }
 .legal { text-align: center; font-size: 12px; color: var(--muted); padding: 18px 12px 28px; }
@@ -370,6 +373,13 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <div class="by">Only you see this. It does not change the question on the stream.</div>
         <div class="toolbar"><select id="myCat" class="catsel" aria-label="Question category" hidden></select><button class="primary" id="myQBtn" type="button">Random question for me</button></div>
       </div>
+      <div class="qbox" id="profileBox" hidden>
+        <div class="lbl">Your TikTok username</div>
+        <form class="toolbar" id="pbForm"><input id="pbHandle" maxlength="25" placeholder="@yourusername" autocomplete="off" autocapitalize="off" aria-label="TikTok username"><button class="primary small" id="pbSave" type="submit">Save</button></form>
+        <div class="by" id="pbMsg" role="status"></div>
+        <div class="by" id="pbSign"></div>
+        <div class="toolbar"><button class="primary" id="pbSignBtn" type="button" hidden>Want to be a speed dater?</button><button class="ghost small" id="pbWithdraw" type="button" hidden>Withdraw my sign-up</button></div>
+      </div>
       <div class="toolbar">
         <select id="randomCat" class="catsel" aria-label="Random question category" hidden></select>
         <button class="primary contrib-only" id="randomQ">Random question</button>
@@ -398,6 +408,11 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <h2>Speed daters <span class="pill" id="daterCount">0</span></h2>
         <button class="primary small" id="addToggle" type="button" aria-controls="dForm" aria-expanded="false">+ Add dater</button>
       </div>
+      <div class="subform" id="pendBox" hidden>
+        <div class="toolbar" style="justify-content:space-between"><h2>Pending sign-ups <span class="pill" id="pendCount">0</span></h2><button class="ghost small danger" id="pendClear" type="button">Clear all</button></div>
+        <input id="pendSearch" type="search" placeholder="Search TikTok username" aria-label="Search pending sign-ups" autocomplete="off">
+        <div class="list scroll" id="pendList"></div>
+      </div>
       <form id="dForm" class="subform" hidden>
         <div class="grid-form">
           <label>Name or handle<input id="fName" maxlength="40" required autocomplete="off" placeholder="First name or @handle"></label>
@@ -417,6 +432,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
           <label>Women max age<input id="fMaxW" type="number" min="18" max="99" inputmode="numeric"></label>
         </div>
         <label class="check"><input id="fAdult" type="checkbox" required> This person confirmed they are 18 or older</label>
+        <div class="matchbox" id="matchPrompt" hidden role="status"></div>
         <div class="toolbar">
           <button class="primary" id="fSave" type="submit">Add dater</button>
           <button class="ghost" id="fCancel" type="button" hidden>Cancel edit</button>
@@ -491,8 +507,36 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
     <h2 id="pickTitle">Choose someone</h2>
     <input id="pickSearch" type="search" placeholder="Search name or location" aria-label="Search daters" autocomplete="off">
+    <div id="pickPend" hidden></div>
     <div class="list scroll" id="pickList"></div>
     <div class="toolbar"><button class="primary small" id="pickAdd" type="button">+ Add new dater</button><button class="ghost small" id="pickClose" type="button">Close</button></div>
+  </div>
+</div>
+<div class="modal" id="suModal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="suTitle">
+    <h2 id="suTitle">Sign up to be a speed dater</h2>
+    <form id="suForm" class="subform">
+      <div class="grid-form">
+        <label>TikTok username<input id="suHandle" maxlength="25" required autocomplete="off" autocapitalize="off" placeholder="@yourusername"></label>
+        <label>Age<input id="suAge" type="number" min="18" max="99" required inputmode="numeric"></label>
+        <label>State<input id="suLoc" maxlength="20" required autocomplete="off" placeholder="NC"></label>
+        <label>Gender<select id="suGender" required><option value="">Choose</option><option value="man">Man</option><option value="woman">Woman</option><option value="nonbinary">Non-binary</option></select></label>
+        <label>Sexuality<select id="suSex" required><option value="">Choose</option><option value="straight">Straight</option><option value="gay">Gay or lesbian</option><option value="bi">Bisexual</option><option value="other">Other</option></select></label>
+      </div>
+      <div class="grid-form" id="suRngSingle">
+        <label>Dating age: from<input id="suMin" type="number" min="18" max="99" inputmode="numeric"></label>
+        <label>Dating age: to<input id="suMax" type="number" min="18" max="99" inputmode="numeric"></label>
+      </div>
+      <div class="grid-form" id="suRngBi" hidden>
+        <label>Men: from<input id="suMinM" type="number" min="18" max="99" inputmode="numeric"></label>
+        <label>Men: to<input id="suMaxM" type="number" min="18" max="99" inputmode="numeric"></label>
+        <label>Women: from<input id="suMinW" type="number" min="18" max="99" inputmode="numeric"></label>
+        <label>Women: to<input id="suMaxW" type="number" min="18" max="99" inputmode="numeric"></label>
+      </div>
+      <label class="check"><input id="suAdult" type="checkbox" required> I confirm that I am 18 or older</label>
+      <p class="note">State only. The host approves sign-ups live. Only approved speed daters are shown on the board.</p>
+      <div class="toolbar"><button class="primary" id="suSave" type="submit">Sign up</button><button class="ghost" id="suCancel" type="button">Cancel</button><span class="note" id="suErr" role="alert"></span></div>
+    </form>
   </div>
 </div>
 <div class="modal" id="sumModal" hidden>
@@ -509,6 +553,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 <div class="toast" id="toast" hidden></div>
 
 <script src="/db-shim.js"></script>
+<script src="/match.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -1024,7 +1069,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     ["fMinM", "fMaxM", "fMinW", "fMaxW"].forEach(function (id) { $(id).required = bi; });
   }
   $("fSex").addEventListener("change", syncRange);
-  function openForm() { $("dForm").hidden = false; $("addToggle").textContent = "Close"; $("addToggle").setAttribute("aria-expanded", "true"); }
+  function openForm() { loadPending(); $("dForm").hidden = false; $("addToggle").textContent = "Close"; $("addToggle").setAttribute("aria-expanded", "true"); }
   function closeForm() { $("dForm").hidden = true; $("addToggle").textContent = "+ Add dater"; $("addToggle").setAttribute("aria-expanded", "false"); }
   function startEdit(d) {
     state.editing = d.id; state.moreFor = null; openForm();
@@ -1037,7 +1082,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     $("fSave").textContent = "Save changes"; $("fCancel").hidden = false; $("fName").focus();
     $("dForm").scrollIntoView({ block: "center" });
   }
-  function resetForm() { state.editing = null; state.seatAfterAdd = null; $("dForm").reset(); syncRange(); $("fSave").textContent = "Add dater"; $("fCancel").hidden = true; $("fErr").textContent = ""; closeForm(); }
+  function resetForm() { state.editing = null; state.seatAfterAdd = null; state.linkSignup = null; state.matchNo = {}; $("matchPrompt").hidden = true; $("dForm").reset(); syncRange(); $("fSave").textContent = "Add dater"; $("fCancel").hidden = true; $("fErr").textContent = ""; closeForm(); }
   $("fCancel").onclick = resetForm;
   $("addToggle").onclick = function () { if ($("dForm").hidden) { openForm(); $("fName").focus(); } else resetForm(); };
   function num(id) { return parseInt($(id).value, 10); }
@@ -1062,12 +1107,13 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     else if (!$("fAdult").checked) err = "Confirm the dater is 18 or older.";
     else if (/\d{2,}.*\b(st|street|ave|avenue|road|rd|dr|drive|ln|lane|blvd)\b/i.test(loc)) err = "Use the state only, no city or street address.";
     $("fErr").textContent = err; if (err) return;
-    var id = state.editing, old = id ? byId(id) : null, seatKey = id ? null : state.seatAfterAdd, newRef = null;
+    var id = state.editing, old = id ? byId(id) : null, seatKey = id ? null : state.seatAfterAdd, newRef = null, linkId = id ? null : state.linkSignup;
     queue(function () {
       if (id) { body.ts = (old && old.ts) || Date.now(); if (old && old.example) body.example = true; if (old && old.panelMs) { body.panelMs = old.panelMs; body.panelCount = old.panelCount || 0; } if (old && old.hotMs) { body.hotMs = old.hotMs; body.hotCount = old.hotCount || 0; } return state.db.collection("daters").doc(id).set(body); }
       body.ts = Date.now(); return state.db.collection("daters").add(body).then(function (r) { newRef = r; });
     }).then(function () {
       toast(id ? "Dater updated." : "Dater added.");
+      if (linkId && newRef) api("/api/signups", "POST", { action: "link", id: linkId, daterId: newRef.id }).then(loadPending).catch(function () {});
       var nd = seatKey && newRef && byId(newRef.id); // added from the seat picker: put them straight into that seat
       if (nd && !seatsNow()[seatKey]) {
         state.selected = seatKey === "hot" ? null : seatKey; seatDater(nd, seatKey === "hot" ? "hot" : "panel");
@@ -1076,6 +1122,142 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     });
     resetForm();
   });
+
+  /* ---------- TikTok username, dater sign-up and pending daters ---------- */
+  function api(path, method, body) {
+    return window.claude.authFetch(path, { method: method || "GET", headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.message || "Something went wrong. Try again."); e.status = r.status; throw e; } return j; }); });
+  }
+  var prof = null;
+  function loadProfile() { if (state.mode === "host") return; api("/api/profile").then(function (j) { prof = j; renderProfile(); }).catch(function () {}); }
+  function renderProfile() {
+    var box = $("profileBox"); box.hidden = state.mode === "host" || !prof; if (box.hidden) return;
+    if (document.activeElement !== $("pbHandle")) $("pbHandle").value = prof.handle ? "@" + prof.handle : "";
+    var su = (prof.signup && prof.signup.status) || "none";
+    $("pbMsg").textContent = prof.handle ? "Saved. The host can find you by this name." : "Add it so the host can find you.";
+    $("pbSign").textContent = su === "pending" ? "You are signed up. The host can approve you while live."
+      : su === "approved" ? "You are on the speed dater list. See you on stream!"
+      : su === "removed" ? "You were taken off the speed dater list. You can sign up again."
+      : "Want to be on the show? Sign up and the host can approve you while live.";
+    $("pbSignBtn").hidden = su === "approved";
+    $("pbSignBtn").textContent = su === "pending" ? "Edit my sign-up" : su === "removed" ? "Sign up again" : "Want to be a speed dater?";
+    $("pbWithdraw").hidden = su !== "pending";
+  }
+  $("pbForm").addEventListener("submit", function (ev) {
+    ev.preventDefault(); $("pbMsg").textContent = "Saving...";
+    api("/api/profile", "POST", { handle: $("pbHandle").value }).then(function (j) { prof = prof || { signup: { status: "none" } }; prof.handle = j.handle; renderProfile(); toast("Username saved."); })
+      .catch(function (e) { $("pbMsg").textContent = e.message; });
+  });
+  $("pbWithdraw").onclick = function () {
+    if (!window.confirm("Withdraw your sign-up?")) return;
+    api("/api/signup", "POST", { withdraw: true }).then(function () { toast("Sign-up withdrawn."); loadProfile(); }).catch(function (e) { toast(e.message); });
+  };
+  function syncSuRange() { var bi = $("suSex").value === "bi"; $("suRngSingle").hidden = bi; $("suRngBi").hidden = !bi; ["suMin", "suMax"].forEach(function (i) { $(i).required = !bi; }); ["suMinM", "suMaxM", "suMinW", "suMaxW"].forEach(function (i) { $(i).required = bi; }); }
+  $("suSex").addEventListener("change", syncSuRange);
+  function openSignup() {
+    $("suForm").reset(); $("suErr").textContent = "";
+    var d = prof && prof.signup && prof.signup.doc;
+    $("suHandle").value = d ? d.name : prof && prof.handle ? prof.handle : "";
+    if (d) {
+      $("suAge").value = d.age; $("suLoc").value = d.location; $("suGender").value = d.gender; $("suSex").value = d.sexuality;
+      if (d.sexuality === "bi") { $("suMinM").value = d.minM; $("suMaxM").value = d.maxM; $("suMinW").value = d.minW; $("suMaxW").value = d.maxW; } else { $("suMin").value = d.min; $("suMax").value = d.max; }
+    }
+    syncSuRange(); $("suModal").hidden = false; $("suHandle").focus();
+  }
+  function closeSignup() { $("suModal").hidden = true; }
+  $("pbSignBtn").onclick = openSignup; $("suCancel").onclick = closeSignup;
+  $("suModal").addEventListener("click", function (ev) { if (ev.target === $("suModal")) closeSignup(); });
+  $("suForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var iv = function (id) { return parseInt($(id).value, 10); };
+    var body = { handle: $("suHandle").value, age: iv("suAge"), location: $("suLoc").value, gender: $("suGender").value, sexuality: $("suSex").value, adult: $("suAdult").checked };
+    if (body.sexuality === "bi") { body.minM = iv("suMinM"); body.maxM = iv("suMaxM"); body.minW = iv("suMinW"); body.maxW = iv("suMaxW"); } else { body.min = iv("suMin"); body.max = iv("suMax"); }
+    $("suErr").textContent = ""; $("suSave").disabled = true;
+    api("/api/signup", "POST", body).then(function () { closeSignup(); toast("You are signed up. The host can approve you live."); loadProfile(); })
+      .catch(function (e) { $("suErr").textContent = e.message; }).then(function () { $("suSave").disabled = false; });
+  });
+
+  // host side: the pending dater list
+  state.pending = []; state.matchNo = {}; state.linkSignup = null;
+  function loadPending() {
+    if (state.mode !== "host") return Promise.resolve();
+    return api("/api/signups").then(function (j) { state.pending = j.pending || []; renderPending(); renderMatch(); if (!$("pickModal").hidden) renderPicker(); }).catch(function () {});
+  }
+  setInterval(function () { if (state.mode === "host" && !document.hidden && !$("app").hidden) loadPending(); }, 20000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) loadPending(); });
+  function whoOf(su) { return [su.location, whoText(su), "wants " + rangeText(su)].filter(Boolean).join(" · "); }
+  function dFromSu(su) { var d = Object.assign({}, su); d.id = "su:" + su.id; d.name = su.handle; return d; }
+  function renderPending() {
+    var n = state.pending.length, q = $("pendSearch").value.trim().toLowerCase().replace(/^@/, "");
+    $("tabD").textContent = n ? "Daters (" + n + " new)" : "Daters";
+    $("pendBox").hidden = state.mode !== "host" || !n; $("pendCount").textContent = n;
+    var box = $("pendList"); box.textContent = "";
+    state.pending.filter(function (su) { return !q || su.handle.toLowerCase().indexOf(q) >= 0; }).forEach(function (su) {
+      var row = el("div", "pendrow"), main = el("div");
+      main.appendChild(el("div", "t", "@" + su.handle + ", " + su.age)); main.appendChild(el("div", "m", whoOf(su)));
+      var acts = el("div", "racts");
+      var ok = el("button", "small primary", "Approve"); ok.onclick = function () { approvePending(su).then(function (d) { toast("Added @" + d.name + " to the dater list."); }).catch(function (e) { toast(e.message); loadPending(); }); };
+      var no = el("button", "small ghost danger", "Decline"); no.onclick = function () { api("/api/signups", "POST", { action: "decline", id: su.id }).then(loadPending).catch(function (e) { toast(e.message); }); };
+      acts.appendChild(ok); acts.appendChild(no); row.appendChild(main); row.appendChild(acts); box.appendChild(row);
+    });
+  }
+  $("pendSearch").oninput = renderPending;
+  $("pendClear").onclick = function () {
+    if (!window.confirm("Clear all " + state.pending.length + " pending sign-ups? Approved daters are not affected.")) return;
+    api("/api/signups", "POST", { action: "clear" }).then(function (r) { toast("Cleared " + r.cleared + " sign-ups."); loadPending(); }).catch(function (e) { toast(e.message); });
+  };
+  function approvePending(su) {
+    return api("/api/signups", "POST", { action: "approve", id: su.id }).then(function (r) {
+      var d = Object.assign({ id: r.daterId }, r.dater);
+      if (!byId(d.id)) state.daters.push(d);
+      state.pending = state.pending.filter(function (x) { return x.id !== su.id; });
+      renderAll(); renderPending();
+      return d;
+    });
+  }
+  function pickPending(su) {
+    var key = state.pickFor; closePicker();
+    approvePending(su).then(function (d) { state.selected = key === "hot" ? null : key; seatDater(d, key === "hot" ? "hot" : "panel"); })
+      .catch(function (e) { toast(e.message); loadPending(); });
+  }
+  function renderPickPending(q, useFit, hot) {
+    var box = $("pickPend"), items = state.pending.filter(function (su) { return !q || (su.handle + " " + su.location).toLowerCase().indexOf(q.replace(/^@/, "")) >= 0; });
+    box.hidden = !items.length; box.textContent = ""; if (!items.length) return;
+    box.appendChild(el("div", "lbl", "Pending sign-ups (tap to approve and seat)"));
+    items.slice(0, 6).forEach(function (su) {
+      var d = dFromSu(su), f = useFit ? fit(hot, d) : null;
+      var b = el("button", "pickrow"); b.type = "button";
+      if (f) b.setAttribute("data-fit", f.key);
+      var dot = el("span", "dot" + (f ? " " + f.key : "")); dot.setAttribute("aria-hidden", "true");
+      var main = el("div"); main.appendChild(el("div", "t", "@" + su.handle + ", " + su.age)); main.appendChild(el("div", "m", whoOf(su)));
+      b.appendChild(dot); b.appendChild(main); b.appendChild(el("span", "tag", f ? "Sign-up · " + f.label : "Sign-up"));
+      b.onclick = function () { pickPending(su); };
+      box.appendChild(b);
+    });
+    if (items.length > 6) box.appendChild(el("div", "note", "Showing 6 of " + items.length + ". Type to search."));
+  }
+  // when adding a dater by hand: does it look like someone who signed up?
+  function renderMatch() {
+    var box = $("matchPrompt");
+    if (state.editing || $("dForm").hidden || !state.pending.length || state.linkSignup || !$("fName").value.trim()) { box.hidden = true; return; }
+    var hits = window.SignupMatch.findMatches({ name: $("fName").value, age: num("fAge"), location: $("fLoc").value }, state.pending, state.matchNo);
+    box.hidden = !hits.length; box.textContent = ""; if (!hits.length) return;
+    hits.forEach(function (h) {
+      var su = h.signup, row = el("div", "mrow");
+      row.appendChild(el("div", "", "Is this them? @" + su.handle + ", " + su.age + ", " + su.location + " (" + (h.level === "strong" ? "same username" : "similar") + ")"));
+      var acts = el("div", "racts");
+      var yes = el("button", "small primary", "Yes, use their sign-up"); yes.type = "button"; yes.onclick = function () { fillFromSignup(su); };
+      var no = el("button", "small ghost", "No, different person"); no.type = "button"; no.onclick = function () { state.matchNo[su.id] = true; renderMatch(); };
+      acts.appendChild(yes); acts.appendChild(no); row.appendChild(acts); box.appendChild(row);
+    });
+  }
+  function fillFromSignup(su) {
+    $("fName").value = su.handle; $("fAge").value = su.age; $("fLoc").value = su.location; $("fGender").value = su.gender; $("fSex").value = su.sexuality;
+    RNG.forEach(function (id) { $(id).value = ""; });
+    if (su.sexuality === "bi") { $("fMinM").value = su.minM; $("fMaxM").value = su.maxM; $("fMinW").value = su.minW; $("fMaxW").value = su.maxW; } else { $("fMin").value = su.min; $("fMax").value = su.max; }
+    $("fAdult").checked = true; syncRange(); state.linkSignup = su.id; renderMatch(); toast("Filled in from their sign-up. Check it, then add.");
+  }
+  ["fName", "fAge", "fLoc"].forEach(function (id) { $(id).addEventListener("input", renderMatch); });
 
   /* ---------- question form ---------- */
   $("qForm").addEventListener("submit", function (ev) {
@@ -1167,7 +1349,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     var m = state.mode;
     document.querySelectorAll(".host-only").forEach(function (e) { e.hidden = m !== "host"; });
     document.querySelectorAll(".contrib-only").forEach(function (e) { e.hidden = m === "viewer"; });
-    $("myQBox").hidden = m !== "viewer"; syncCatSelects();
+    $("myQBox").hidden = m !== "viewer"; syncCatSelects(); loadProfile(); loadPending();
     $("adminLink").hidden = !window.claude.status().owner; // owners only
     $("signOut").hidden = false;
     $("connPill").hidden = false; showConn(window.claude.connection ? window.claude.connection() : "connecting"); syncBar(); syncInstallTip();
@@ -1279,6 +1461,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
       if (useFit) { var ra = a.f ? rank[a.f.key] : 3, rb = b.f ? rank[b.f.key] : 3; if (ra !== rb) return ra - rb; }
       return (b.d.ts || 0) - (a.d.ts || 0); // whoever joined most recently first
     });
+    renderPickPending(q, useFit, hot);
     var box = $("pickList"); box.textContent = "";
     if (!items.length) { box.appendChild(el("div", "empty", state.daters.length ? "No daters match that search." : "No daters yet. Use Add new dater.")); return; }
     var MAXROWS = 60;

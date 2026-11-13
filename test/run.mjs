@@ -12,6 +12,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { resolveRole, defaultRole, parseRoles, validEmail } from "../src/auth.js";
+import { normHandle, cleanSignup } from "../src/people.js";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
@@ -512,6 +513,14 @@ try {
   check("a blocked person gets no access even though the default is Viewer", resolveRole(lockEnv, "bad@x.com", "blocked").role === "none" && resolveRole(lockEnv, "bad@x.com", "blocked").blocked === true);
   check("a block can never apply to someone in the ROLES secret", resolveRole(lockEnv, "boss@x.com", "blocked").role === "editor");
   check("a locked door turns away new sign-ins from unlisted people but not older sessions, added people or owners", resolveRole(lockEnv, "n@x.com", undefined, { iat: 200, lockTs: 100 }).role === "none" && resolveRole(lockEnv, "n@x.com", undefined, { iat: 50, lockTs: 100 }).role === "viewer" && resolveRole(lockEnv, "n@x.com", "viewer", { iat: 200, lockTs: 100 }).role === "viewer" && resolveRole(lockEnv, "boss@x.com", undefined, { iat: 200, lockTs: 100 }).role === "editor" && resolveRole(lockEnv, "n@x.com", undefined, { iat: undefined, lockTs: 100 }).role === "viewer");
+  const sm = {}; new Function("window", readFileSync(join(ROOT, "public", "match.js"), "utf8"))(sm); const SM = sm.SignupMatch;
+  check("usernames: @ is optional, 2 to 24 letters, numbers, dots and underscores, capitals kept", normHandle("@Jess_NC") === "Jess_NC" && normHandle("ab") === "ab" && normHandle("a") === null && normHandle("x".repeat(25)) === null && normHandle("has space") === null && normHandle(".dot") === null && normHandle("emoji\u{1F600}") === null && normHandle("") === null && normHandle(null) === null);
+  check("sign-up checks mirror the host's dater form (18+, ranges, state only, confirmation)", cleanSignup({ handle: "a_b", age: 20, location: "NC", gender: "man", sexuality: "straight", min: 20, max: 30, adult: true }).ok && !cleanSignup({ handle: "a_b", age: "17", location: "NC", gender: "man", sexuality: "straight", min: 20, max: 30, adult: true }).ok && !cleanSignup({ handle: "a_b", age: 20, location: "NC", gender: "man", sexuality: "straight", min: 20, max: 30, adult: "yes" }).ok && cleanSignup({ handle: "a_b", age: "20", location: "NC", gender: "man", sexuality: "straight", min: "20", max: "30", adult: true }).doc.min === 20);
+  check("a sign-up cannot smuggle extra fields into the dater record", !("role" in cleanSignup({ handle: "a_b", age: 20, location: "NC", gender: "man", sexuality: "gay", min: 20, max: 30, adult: true, role: "editor", panelMs: 9 }).doc) && !("panelMs" in cleanSignup({ handle: "a_b", age: 20, location: "NC", gender: "man", sexuality: "gay", min: 20, max: 30, adult: true, panelMs: 9 }).doc));
+  check("matching: same username ignoring @, capitals, dots and underscores is a strong match", SM.compare({ name: "@Match Me", age: 1, location: "x" }, { handle: "match_me", age: 99, location: "y" }) === "strong" && SM.compare({ name: "Jess.NC", age: 1, location: "x" }, { handle: "jess_nc", age: 99, location: "y" }) === "strong");
+  check("matching: a similar username counts only with the same state or an age within a year", SM.compare({ name: "jessy_nc", age: 40, location: "NC" }, { handle: "jessi_nc", age: 22, location: "nc" }) === "possible" && SM.compare({ name: "jessy_nc", age: 28, location: "TX" }, { handle: "jessi_nc", age: 27, location: "NC" }) === "possible" && SM.compare({ name: "jessy_nc", age: 40, location: "TX" }, { handle: "jessi_nc", age: 22, location: "NC" }) === null);
+  check("matching: short or unrelated names do not match", SM.compare({ name: "Bob", age: 27, location: "NC" }, { handle: "bobby", age: 27, location: "NC" }) === null && SM.compare({ name: "Alex", age: 27, location: "NC" }, { handle: "zoe_88", age: 27, location: "NC" }) === null);
+  check("matching: the strongest match is listed first, at most three, and dismissed ones are skipped", (() => { const list = [{ id: "1", handle: "mattx_", age: 30, location: "NC" }, { id: "2", handle: "matt", age: 30, location: "NC" }, { id: "3", handle: "mattx", age: 30, location: "NC" }]; const r = SM.findMatches({ name: "mattx", age: 30, location: "NC" }, list); const r2 = SM.findMatches({ name: "mattx", age: 30, location: "NC" }, list, { 3: true }); return r[0].level === "strong" && r.length <= 3 && !r2.some((m) => m.signup.id === "3"); })());
   check("DEFAULT_ROLE can be none, viewer or contributor", defaultRole({}) === "none" && defaultRole({ DEFAULT_ROLE: "viewer" }) === "viewer" && defaultRole({ DEFAULT_ROLE: "contributor" }) === "contributor");
   check("DEFAULT_ROLE can never make strangers editors or owners", defaultRole({ DEFAULT_ROLE: "editor" }) === "none" && defaultRole({ DEFAULT_ROLE: "owner" }) === "none" && defaultRole({ DEFAULT_ROLE: "EDITOR " }) === "none");
   const envR = { ROLES: "Boss@x.com=owner, ed@x.com=editor ; c@x.com=contributor\nv@x.com=viewer", DEFAULT_ROLE: "viewer" };
@@ -765,6 +774,153 @@ try {
     const dilTexts = new Set(pack.questions.filter((q) => q.cat === "dilemma").map((q) => q.text));
     const dseen = []; for (let i = 0; i < 8; i++) { await catV.click("#myQBtn"); dseen.push(await catV.locator("#myQText").innerText()); }
     check("a viewer picking 'What would you do?' gets only those new questions", dseen.every((t) => dilTexts.has(t)), dseen);
+    // ---- member list, TikTok usernames, dater sign-ups and pending daters
+    {
+      const jget = (path, session) => fetch(API_BASE + path, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+      const U = {}; for (const n of ["su1", "su2", "su3", "su4", "su5", "su6"]) U[n] = (await login(n + "@example.com")).session;
+      const CT = (await login(EMAILS.contributor)).session;
+      const good = { handle: "Jess_NC", age: 27, location: "NC", gender: "woman", sexuality: "straight", min: 25, max: 35, adult: true };
+      const mem = await jget("/api/people?q=su1", O);
+      check("everyone who signs in lands on the member list automatically (owners can search it by email)", mem.status === 200 && mem.body.people.some((p) => p.email === "su1@example.com" && p.role === "viewer" && p.source === "default") && mem.body.total >= 6, mem.body);
+      check("only owners can search people (403 for an Editor and a Contributor, 401 with no login, 400 for a one-letter search)", (await jget("/api/people?q=su1", ED)).status === 403 && (await jget("/api/people?q=su1", CT)).status === 403 && (await jget("/api/people?q=su1", null)).status === 401 && (await jget("/api/people?q=s", O)).status === 400);
+
+      const p0 = await jget("/api/profile", U.su1);
+      check("a new viewer has no username and no sign-up yet", p0.status === 200 && p0.body.handle === null && p0.body.signup.status === "none", p0.body);
+      check("a bad username is refused (too short, spaces, too long, leading dot)", (await Promise.all(["a", "has space", "x".repeat(30), ".bad", ""].map((h) => api("/api/profile", U.su1, { handle: h })))).every((r) => r.status === 400));
+      const h1 = await api("/api/profile", U.su1, { handle: "@Jess_NC" });
+      check("a username saves without the @ and keeps its capitals", h1.status === 200 && h1.body.handle === "Jess_NC", h1.body);
+      const h2 = await api("/api/profile", U.su2, { handle: "jess_nc" });
+      check("another account cannot claim the same username, even with different capitals (409)", h2.status === 409, h2.body);
+      check("a Contributor can add a TikTok username too", (await api("/api/profile", CT, { handle: "mod_user" })).status === 200);
+      check("the owner's search finds people by TikTok username (and with the @)", (await jget("/api/people?q=%40jess", O)).body.people.some((p) => p.email === "su1@example.com" && p.handle === "Jess_NC"));
+      check("the erase tool finds people by TikTok username as well", (await api("/api/person", O, { action: "find", query: "jess_nc" })).body.accounts.some((a) => a.email === "su1@example.com"));
+
+      for (const [why, bad] of [["under 18", { age: 17 }], ["a bad gender", { gender: "x" }], ["no 18+ confirmation", { adult: false }], ["a range under 18", { min: 16 }], ["a backwards range", { min: 40, max: 30 }], ["a street address as the state", { location: "12 Main Street" }], ["a bad sexuality", { sexuality: "x" }], ["a bad username", { handle: "no spaces allowed" }]]) {
+        const r = await api("/api/signup", U.su1, { ...good, ...bad });
+        check(`sign-up refused for ${why} (400)`, r.status === 400 && r.body.message, r.body);
+      }
+      check("a bisexual sign-up needs all four ranges (400 without them)", (await api("/api/signup", U.su2, { handle: "Biuser", age: 30, location: "VA", gender: "man", sexuality: "bi", adult: true, minM: 25, maxM: 35 })).status === 400);
+      check("sign-up works (200) and shows as pending", (await api("/api/signup", U.su1, good)).status === 200 && (await jget("/api/profile", U.su1)).body.signup.status === "pending");
+      check("editing it is allowed and does not make a second one", (await api("/api/signup", U.su1, { ...good, age: 28 })).status === 200 && (await jget("/api/signups", ED)).body.pending.filter((x) => x.handle === "Jess_NC").length === 1 && (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "Jess_NC").age === 28);
+      check("a bisexual sign-up with all ranges works and gets an overall range for the fit colors", (await api("/api/signup", U.su2, { handle: "Biuser", age: 30, location: "VA", gender: "man", sexuality: "bi", adult: true, minM: 25, maxM: 35, minW: 28, maxW: 40 })).status === 200 && (() => true)());
+      const lst = await jget("/api/signups", ED);
+      const biRow = lst.body.pending.find((x) => x.handle === "Biuser");
+      check("...stored as min 25 and max 40", biRow && biRow.min === 25 && biRow.max === 40 && biRow.minW === 28, biRow);
+      check("a blocked account cannot sign up", (await roles(O, "POST", { email: "su6@example.com", role: "blocked" })).status === 200 && (await api("/api/signup", U.su6, good)).status === 403);
+
+      check("only hosts can see or act on the pending list (403 for a viewer and a Contributor, 401 with no login)", (await jget("/api/signups", U.su1)).status === 403 && (await jget("/api/signups", CT)).status === 403 && (await jget("/api/signups", null)).status === 401 && (await api("/api/signups", CT, { action: "approve", id: "x" })).status === 403 && (await api("/api/signups", U.su1, { action: "clear" })).status === 403);
+      check("a host sees sign-ups without email addresses; an owner also sees the email", !JSON.stringify(lst.body).includes("@example.com") && (await jget("/api/signups", O)).body.pending.some((x) => x.email === "su1@example.com"));
+      check("a sign-up from a wrong origin is refused (403)", (await api("/api/signup", U.su1, good, { Origin: "https://evil.example.com" })).status === 403);
+
+      // approve
+      const edWs = await connect(ED); await edWs.wait((m) => m.t === "hello"); await edWs.sub("daters");
+      const vWs = await connect(U.su3); await vWs.wait((m) => m.t === "hello"); await vWs.sub("seats");
+      const jessId = lst.body.pending.find((x) => x.handle === "Jess_NC").id;
+      const ap = await api("/api/signups", ED, { action: "approve", id: jessId });
+      check("a host approves a sign-up: a dater is created from it", ap.status === 200 && ap.body.daterId && ap.body.dater.name === "Jess_NC" && ap.body.dater.age === 28 && ap.body.dater.location === "NC" && ap.body.dater.gender === "woman" && ap.body.dater.min === 25 && ap.body.dater.max === 35, ap.body);
+      check("...hosts' open pages get the new dater at once, viewers do not", !!(await edWs.wait((m) => m.t === "chg" && m.coll === "daters" && m.id === ap.body.daterId, 3000)) && !vWs.msgs.some((m) => m.t === "chg" && m.coll === "daters"));
+      check("...and it is gone from the pending list", !(await jget("/api/signups", ED)).body.pending.some((x) => x.id === jessId));
+      check("approving twice gives the same dater and no duplicate", (await api("/api/signups", ED, { action: "approve", id: jessId })).body.daterId === ap.body.daterId);
+      check("the person now sees that they are on the list, and cannot sign up again (409)", (await jget("/api/profile", U.su1)).body.signup.status === "approved" && (await api("/api/signup", U.su1, good)).status === 409);
+      await edWs.w("delete", "daters", ap.body.daterId, null);
+      check("if the host later removes that dater, the person can sign up again", (await jget("/api/profile", U.su1)).body.signup.status === "removed" && (await api("/api/signup", U.su1, good)).status === 200 && (await jget("/api/profile", U.su1)).body.signup.status === "pending");
+
+      // decline, clear, link
+      const biId = (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "Biuser").id;
+      check("a host declines a sign-up and it disappears", (await api("/api/signups", ED, { action: "decline", id: biId })).status === 200 && !(await jget("/api/signups", ED)).body.pending.some((x) => x.id === biId) && (await jget("/api/profile", U.su2)).body.signup.status === "none");
+      check("approving a sign-up that is gone is a clean 404", (await api("/api/signups", ED, { action: "approve", id: biId })).status === 404);
+      await api("/api/signup", U.su3, { ...good, handle: "Third_One", age: 31 }); await api("/api/signup", U.su4, { ...good, handle: "Fourth_One", age: 33 }); await api("/api/signup", U.su5, { ...good, handle: "Fifth_One", age: 22 });
+      const pend = (await jget("/api/signups", ED)).body.pending;
+      const fifthId = pend.find((x) => x.handle === "Fifth_One").id;
+      const ap3 = await api("/api/signups", ED, { action: "approve", id: pend.find((x) => x.handle === "Third_One").id });
+      const cl = await api("/api/signups", ED, { action: "clear" });
+      check("clearing removes every pending sign-up and leaves approved daters alone", cl.status === 200 && cl.body.cleared >= 3 && (await jget("/api/signups", ED)).body.pending.length === 0 && (await jget("/api/profile", U.su3)).body.signup.status === "approved");
+      await api("/api/signup", U.su5, { ...good, handle: "Fifth_One", age: 22 });
+      const fifth = (await jget("/api/signups", ED)).body.pending.find((x) => x.handle === "Fifth_One");
+      const added = await edWs.w("add", "daters", null, { name: "fifth_one", age: 22, location: "NC", gender: "woman", sexuality: "straight", min: 25, max: 35, ts: 5 });
+      check("a host who adds the dater by hand can link the sign-up (it counts as approved)", (await api("/api/signups", ED, { action: "link", id: fifth.id, daterId: added.id })).status === 200 && (await jget("/api/profile", U.su5)).body.signup.status === "approved" && !(await jget("/api/signups", ED)).body.pending.some((x) => x.id === fifth.id));
+      check("linking to a dater that does not exist is refused (404)", (await api("/api/signups", ED, { action: "link", id: fifth.id, daterId: "nope" })).status === 404);
+
+      // release, forget
+      check("only owners can free up a username (403 for an Editor), and then someone else can claim it", (await api("/api/people/release", ED, { email: "su1@example.com" })).status === 403 && (await api("/api/people/release", O, { email: "su1@example.com" })).status === 200 && (await api("/api/profile", U.su2, { handle: "jess_nc" })).status === 200);
+      check("forgetting a person removes their member entry and sign-up", (await roles(O, "POST", { email: "su4@example.com", role: "forget" })).status === 200 && (await jget("/api/people?q=su4%40", O)).body.people.length === 0);
+      check("the member list keeps people after they are given a role", (await roles(O, "POST", { email: "su5@example.com", role: "contributor" })).status === 200 && (await jget("/api/people?q=su5", O)).body.people.some((p) => p.email === "su5@example.com" && p.role === "contributor" && p.handle === "Fifth_One"));
+      await roles(O, "POST", { email: "su5@example.com", role: "none" });
+      edWs.close(); vWs.close();
+    }
+
+    // the screens: viewer profile and sign-up, host pending list, seat picker, add form
+    {
+      const good = { handle: "Jess_NC", age: 27, location: "NC", gender: "woman", sexuality: "straight", min: 25, max: 35, adult: true };
+      const jpost = (path, session, body) => post(path, body, { Authorization: "Bearer " + session.token });
+      check("a viewer sees the TikTok username box, and a host does not", await until(async () => await catV.locator("#profileBox").isVisible(), 8000) && await catE.locator("#profileBox").isHidden());
+      await catV.fill("#pbHandle", "@viewer_ui"); await catV.click("#pbSave");
+      check("saving a username shows it back with a confirmation", await until(async () => /Saved/.test(await catV.locator("#pbMsg").innerText()) && (await catV.locator("#pbHandle").inputValue()) === "@viewer_ui", 6000));
+      check("the sign-up button is there and says what it is", /speed dater/.test(await catV.locator("#pbSignBtn").innerText()));
+      await catV.click("#pbSignBtn");
+      await catV.locator("#suModal .card").screenshot({ path: "/tmp/cat-shots/new-signup.png" }).catch(() => {});
+      check("the sign-up form opens with their username filled in", await catV.locator("#suModal").isVisible() && (await catV.locator("#suHandle").inputValue()) === "viewer_ui");
+      await catV.fill("#suAge", "29"); await catV.fill("#suLoc", "NC"); await catV.selectOption("#suGender", "woman"); await catV.selectOption("#suSex", "straight"); await catV.fill("#suMin", "26"); await catV.fill("#suMax", "38");
+      await catV.click("#suSave");
+      check("the form will not send without the 18+ confirmation (the browser blocks it)", await catV.locator("#suModal").isVisible());
+      await catV.check("#suAdult"); await catV.click("#suSave");
+      check("signing up closes the form and shows the pending message", await until(async () => await catV.locator("#suModal").isHidden() && /signed up/.test(await catV.locator("#pbSign").innerText()), 6000));
+      await catV.locator("#profileBox").screenshot({ path: "/tmp/cat-shots/new-profile.png" }).catch(() => {});
+      check("a bisexual choice swaps in the four age range boxes", (await (async () => { await catV.click("#pbSignBtn"); await catV.selectOption("#suSex", "bi"); const r = await catV.locator("#suRngBi").isVisible() && await catV.locator("#suRngSingle").isHidden(); await catV.click("#suCancel"); return r; })()));
+
+      await catE.click("#tabD");
+      await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      check("the host's Daters tab shows how many sign-ups are waiting", await until(async () => /\(1 new\)/.test(await catE.locator("#tabD").innerText()) && await catE.locator("#pendBox").isVisible(), 8000), await catE.locator("#tabD").innerText());
+      check("the pending list shows username, age, state and what they want", await until(async () => /@viewer_ui, 29/.test(await catE.locator("#pendList").innerText()) && /NC/.test(await catE.locator("#pendList").innerText()) && /wants 26 to 38/.test(await catE.locator("#pendList").innerText()), 4000));
+      await catE.locator("#pendBox").screenshot({ path: "/tmp/cat-shots/new-pending.png" }).catch(() => {});
+      await catE.fill("#pendSearch", "zzz");
+      check("searching the pending list filters it", (await catE.locator("#pendList .pendrow").count()) === 0);
+      await catE.fill("#pendSearch", "VIEWER");
+      check("...and finds a username by part of it, ignoring capitals", (await catE.locator("#pendList .pendrow").count()) === 1);
+
+      // seat picker approves and seats in one tap
+      await catE.fill("#pendSearch", "");
+      await jpost("/api/signup", (await login("su7@example.com")).session, { ...good, handle: "Seat_Me", age: 30 });
+      await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await until(async () => /Seat_Me/.test(await catE.locator("#pendList").innerText()), 6000);
+      await catE.locator("button.heart", { hasText: /./ }).first().scrollIntoViewIfNeeded();
+      const emptyHeart = catE.locator('button.heart[aria-label*="empty"]').first();
+      await emptyHeart.click();
+      check("opening a seat shows pending sign-ups at the top of the picker", await until(async () => await catE.locator("#pickModal").isVisible() && await catE.locator("#pickPend").isVisible() && /Seat_Me/.test(await catE.locator("#pickPend").innerText()), 6000));
+      await catE.locator("#pickModal .card").screenshot({ path: "/tmp/cat-shots/new-picker.png" }).catch(() => {});
+      await catE.fill("#pickSearch", "seat_");
+      check("the picker's search covers pending sign-ups too", /Seat_Me/.test(await catE.locator("#pickPend").innerText()));
+      await catE.locator("#pickPend .pickrow", { hasText: "Seat_Me" }).click();
+      check("tapping a pending sign-up approves them and seats them in one move", await until(async () => (await catE.locator('button.heart[aria-label*="Seat_Me"]').count()) === 1, 6000));
+      const daters3 = (await (await connect(O)).sub("daters")).docs;
+      check("...and the dater exists on the server too", daters3.some((d) => d.data.name === "Seat_Me" && d.data.age === 30 && d.data.src === "signup"));
+
+      // add form: does it look like someone who signed up?
+      await jpost("/api/signup", (await login("su8@example.com")).session, { ...good, handle: "match_me", age: 30, location: "NC" });
+      await catE.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await until(async () => /match_me/.test(await catE.locator("#pendList").innerText()), 6000);
+      await catE.click("#addToggle");
+      await catE.fill("#fName", "Match Me"); await catE.fill("#fAge", "30"); await catE.fill("#fLoc", "NC");
+      check("typing someone who signed up brings a 'Could this be them?' prompt (same username ignoring capitals, spaces and underscores)", await until(async () => await catE.locator("#matchPrompt").isVisible() && /Is this them\? @match_me/.test(await catE.locator("#matchPrompt").innerText()) && /same username/.test(await catE.locator("#matchPrompt").innerText()), 5000));
+      await catE.locator("#dForm").screenshot({ path: "/tmp/cat-shots/new-match.png" }).catch(() => {});
+      await catE.fill("#fName", "Totally Different"); await catE.fill("#fAge", "45"); await catE.fill("#fLoc", "OR");
+      check("someone unrelated brings no prompt", await catE.locator("#matchPrompt").isHidden());
+      await catE.fill("#fName", "matchmee"); await catE.fill("#fAge", "31"); await catE.fill("#fLoc", "NC");
+      check("a username a character or two off with the same state shows a 'similar' prompt", await catE.locator("#matchPrompt").isVisible() && /similar/.test(await catE.locator("#matchPrompt").innerText()));
+      await catE.getByRole("button", { name: "No, different person" }).click();
+      check("'No, different person' hides it for this add", await catE.locator("#matchPrompt").isHidden());
+      await catE.fill("#fName", "match_me"); await catE.fill("#fAge", "30");
+      check("...and it stays hidden while they keep typing", await catE.locator("#matchPrompt").isHidden());
+      await catE.click("#fCancel").catch(() => {}); await catE.click("#addToggle").catch(() => {});
+      await catE.click("#addToggle"); await catE.fill("#fName", "match_me");
+      await catE.getByRole("button", { name: "Yes, use their sign-up" }).click();
+      check("'Yes' fills the whole form from their sign-up", (await catE.locator("#fAge").inputValue()) === "30" && (await catE.locator("#fLoc").inputValue()) === "NC" && (await catE.locator("#fGender").inputValue()) === "woman" && (await catE.locator("#fSex").inputValue()) === "straight" && (await catE.locator("#fMin").inputValue()) === "25" && await catE.locator("#fAdult").isChecked());
+      await catE.click("#fSave");
+      check("adding the dater links the sign-up: it leaves the pending list", await until(async () => !/match_me/.test(await catE.locator("#pendList").innerText().catch(() => "")) , 8000) && (await (await connect(O)).sub("daters")).docs.some((d) => d.data.name === "match_me"));
+      await catE.fill("#pendSearch", "");
+      check("the host's Clear all button asks first and then empties the list", await (async () => { const before = await catE.locator("#pendList .pendrow").count(); if (!before) return true; catE.once("dialog", (d) => d.accept()); await catE.click("#pendClear"); return until(async () => await catE.locator("#pendBox").isHidden(), 6000); })());
+      check("the sign-up screens show no JavaScript errors", catV.errors.length === 0 && catE.errors.length === 0, [...catV.errors, ...catE.errors]);
+    }
     await catPages.close(); cz.close();
   }
   API_BASE = BASE;
@@ -1046,7 +1202,8 @@ try {
   check("the three policy pages link to each other", ["privacy.html", "terms.html", "security.html"].every((f) => ["privacy", "terms", "security"].every((n) => pages[f].includes(`href="/${n}.html"`))));
   check("the sign-in screen asks for 18+ and links Terms and Privacy; every screen has a footer with all three", /18 or older[^<]*<a href="\/terms.html">[^<]*<\/a> and the <a href="\/privacy.html"/.test(pages["index.html"]) && /<footer class="legal">[\s\S]*privacy\.html[\s\S]*terms\.html[\s\S]*security\.html/.test(pages["index.html"]));
   check("policies contain no em dashes and say 18 or older", ["privacy.html", "terms.html", "security.html"].every((f) => !pages[f].includes("\u2014")) && /18 or older/.test(pages["terms.html"]) && /18 or older/.test(pages["privacy.html"]));
-  check("policy numbers match the code (300 sign-ins, 100 changes, 12 hours, 7 days)", /300/.test(pages["privacy.html"]) && /100 changes/.test(pages["privacy.html"]) && /12 hours/.test(pages["privacy.html"]) && /7 days/.test(pages["privacy.html"]) && /300/.test(rolesTxt) && /100/.test(rolesTxt));
+  check("policy numbers match the code (100 changes, 12 hours, 7 days)", /100 changes/.test(pages["privacy.html"]) && /12 hours/.test(pages["privacy.html"]) && /7 days/.test(pages["privacy.html"]) && /100/.test(rolesTxt));
+  check("the privacy page describes the member list, TikTok usernames and dater sign-ups, and who sees them", /member list/.test(pages["privacy.html"]) && /TikTok username/.test(pages["privacy.html"]) && /dater sign-up/.test(pages["privacy.html"]) && /not email addresses/.test(pages["privacy.html"]) && /Signing up to be a speed dater/.test(pages["terms.html"]));
   check("every page links the icons, the manifest and the banner colour", ["index.html", "admin.html", "backup.html", "privacy.html", "terms.html", "security.html"].every((f) => /rel="icon"/.test(pages[f]) && /rel="apple-touch-icon"/.test(pages[f]) && /rel="manifest"/.test(pages[f]) && /name="theme-color" content="#1b0203"/.test(pages[f])));
   check("the main page has link-preview tags with a full https address for the card", /property="og:image" content="https:\/\/[^"]+\/og\.jpg"/.test(pages["index.html"]) && /property="og:title"/.test(pages["index.html"]) && /name="twitter:card" content="summary_large_image"/.test(pages["index.html"]));
   const iconPx = await A.evaluate(async () => {

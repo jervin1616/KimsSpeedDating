@@ -500,3 +500,20 @@ To make your own pack: copy `public/packs/hot-seat.json`, give each question a u
 ## The "Install the app" card keeps showing until the app is added
 
 On a phone browser the card shows every visit after sign-in. It stops when: the page is opened as the home screen app, the browser reports it was installed, or the person taps **I've added it** in the guide. **Not now** only hides it for that visit. A phone browser cannot tell whether a home screen shortcut exists, so iPhone users who added it but keep using Safari will keep seeing the card until they tap **I've added it**. Anyone who tapped Not now under the old 30-day rule will see the card again.
+
+## Member list, TikTok usernames, dater sign-ups and pending daters
+
+**Member list.** Everyone who signs in is added to a permanent member list (email, first and last sign-in, how many times). The old "recently signed in" list is copied into it automatically the first time the new version runs. The cap is 5,000; when full, the oldest people with no username and no sign-up are dropped first. Owners search it on the admin page under **Find a person** (by email or TikTok username). Nobody else can see emails.
+
+**TikTok username.** Every viewer (and Contributor) can add one in the **Your TikTok username** box. One account per username, checked on the server. If someone claims a name that belongs to someone else, an owner can press **Release username** in Find a person.
+
+**Dater sign-up.** Under the username box, **Want to be a speed dater?** opens a form: username, age, state, gender, sexuality, the age range they want, and an 18+ confirmation. One sign-up per account. They can edit or withdraw it until a host approves it. It is private to them and the hosts until approved.
+
+**Hosts (Editors and owners) see it three ways:**
+1. **Daters tab:** a "Pending sign-ups" box (with a count on the tab) with a search box, Approve, Decline and Clear all. Approve adds them to the dater list.
+2. **Seat picker:** pending sign-ups appear at the top. Tapping one approves them and seats them in one move. The picker's search covers them.
+3. **Add dater form:** if what you type looks like a pending sign-up (same username ignoring capitals, spaces, dots and underscores, or a close one plus the same state or an age within a year), it asks "Is this them?" with Yes (fills the form, links the sign-up when you add) and No (stops asking for that person).
+
+Contributors cannot see or approve sign-ups. Hosts never see email addresses. Pending sign-ups stay until approved, declined, withdrawn or cleared. If the host later removes the dater, that person can sign up again.
+
+**After you deploy:** the Privacy and Terms pages already describe all of this. Any older Discord post that says "we only use your email to let you in" is no longer true, so reword it.

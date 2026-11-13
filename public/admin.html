@@ -67,6 +67,12 @@
     <p id="lockState"></p>
     <div><button id="lockBtn" type="button" class="primary"></button></div>
   </section>
+  <section class="card" id="peopleCard" hidden>
+    <h2>Find a person <span class="count" id="peopleTotal">0</span></h2>
+    <p>Everyone who has signed in is on this list. Search by email or TikTok username.</p>
+    <form class="form" id="peopleForm"><input id="peopleQ" type="search" required minlength="2" maxlength="60" placeholder="email or @username" autocomplete="off" aria-label="Search people"><button class="primary" type="submit">Search</button></form>
+    <div id="peopleOut"></div>
+  </section>
   <section class="card" id="catCard" hidden>
     <h2>Question categories</h2>
     <p id="catNote"></p>
@@ -214,7 +220,7 @@
     $("blockedCard").hidden = !blocked.length; $("blockedCount").textContent = blocked.length;
     var bl = $("blockedList"); bl.textContent = ""; blocked.forEach(function (p) { bl.appendChild(personRow(p)); });
     renderLock(data);
-    loadCats(); loadPacks();
+    loadCats(); loadPacks(); $("peopleCard").hidden = false;
     $("eraseCard").hidden = false;
     if (!viewers.length) { var e2 = document.createElement("p"); e2.textContent = "No viewers added yet."; vl.appendChild(e2); }
   }
@@ -272,6 +278,29 @@
       });
     }).catch(function () { $("packCard").hidden = true; });
   }
+  function searchPeople() {
+    var q = $("peopleQ").value.trim(); if (q.length < 2) return;
+    window.claude.authFetch("/api/people?q=" + encodeURIComponent(q)).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || "Search failed."); return j; }); }).then(function (j) {
+      $("peopleTotal").textContent = j.total;
+      var box = $("peopleOut"); box.textContent = "";
+      if (!j.people.length) { var n = document.createElement("p"); n.textContent = "Nobody matches \"" + q + "\"."; box.appendChild(n); return; }
+      j.people.forEach(function (p) {
+        var row = document.createElement("div"); row.className = "row" + (p.role === "blocked" ? " blockedrow" : "");
+        var who = document.createElement("div"); who.className = "who"; who.appendChild(document.createTextNode(p.email));
+        var meta = document.createElement("div"); meta.className = "meta";
+        meta.textContent = [p.handle ? "TikTok @" + p.handle : "no username yet", (LABEL[p.role] || p.role) + (p.source === "default" ? " (default)" : ""), "signed in " + p.n + (p.n === 1 ? " time" : " times") + ", last " + ago(p.last), p.signup !== "none" ? "dater sign-up: " + p.signup : ""].filter(Boolean).join(" \u00b7 ");
+        who.appendChild(meta); row.appendChild(who);
+        var right = document.createElement("div"); right.className = "form";
+        if (p.handle) { var rel = document.createElement("button"); rel.type = "button"; rel.textContent = "Release username"; rel.onclick = function () { if (!window.confirm("Free up @" + p.handle + "? Their pending sign-up is removed too.")) return; say("Saving..."); post("/api/people/release", { email: p.email }).then(function () { say("Released @" + p.handle + "."); searchPeople(); }).catch(function (e) { say(e.message, true); }); }; right.appendChild(rel); }
+        if (p.source !== "secret") {
+          if (p.role !== "blocked") { var blk = document.createElement("button"); blk.type = "button"; blk.className = "danger"; blk.textContent = "Block"; blk.onclick = function () { if (window.confirm("Block " + p.email + "? You can undo it from Recent changes.")) change(p.email, "blocked").then(searchPeople); }; right.appendChild(blk); }
+          else { var ub = document.createElement("button"); ub.type = "button"; ub.className = "primary"; ub.textContent = "Unblock"; ub.onclick = function () { change(p.email, "none").then(searchPeople); }; right.appendChild(ub); }
+        }
+        right.appendChild(signOutBtn(p.email)); row.appendChild(right); box.appendChild(row);
+      });
+    }).catch(function (e) { say(e.message, true); });
+  }
+  $("peopleForm").onsubmit = function (ev) { ev.preventDefault(); searchPeople(); };
   function labelOf(r) { return LABEL[r] || r; }
   function renderLog(log) {
     $("logCard").hidden = !log.length;
@@ -310,7 +339,7 @@
       var who = document.createElement("div"); who.className = "who";
       who.appendChild(document.createTextNode(p.email));
       var meta = document.createElement("div"); meta.className = "meta";
-      meta.textContent = "Signed in " + p.n + (p.n === 1 ? " time" : " times") + ", last " + ago(p.last);
+      meta.textContent = (p.handle ? "TikTok @" + p.handle + " \u00b7 " : "") + "Signed in " + p.n + (p.n === 1 ? " time" : " times") + ", last " + ago(p.last);
       who.appendChild(meta); row.appendChild(who);
       var right = document.createElement("div"); right.className = "form";
       var sel = document.createElement("select"); sel.setAttribute("aria-label", "Role for " + p.email);

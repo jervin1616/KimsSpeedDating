@@ -6,6 +6,7 @@ import {
   parsePath, validateDoc, newId,
 } from "./rules.js";
 import { resolveRole, secretEntries, validEmail, verifySession, defaultRole, parseRoles } from "./auth.js";
+import { normHandle, handleKey, cleanSignup } from "./people.js";
 
 function parseRolesFor(env, email) { return parseRoles(env.ROLES).get(String(email).toLowerCase()); }
 
@@ -21,7 +22,8 @@ const BUCKET_SIZE = 200; // write/read messages allowed in a burst
 const BUCKET_REFILL_PER_SEC = 50;
 const MAX_VIOLATIONS = 200; // then the connection is closed
 const MAX_ASSIGNED_ROLES = 300;
-const MAX_SEEN = 300; // recent sign-ins kept; the oldest are dropped first
+const MAX_MEMBERS = 5000; // everyone who signed in; the oldest without a username or sign-up are dropped first
+const MAX_PENDING = 2000;
 
 export class Database extends DurableObject {
   constructor(ctx, env) {
@@ -33,8 +35,16 @@ export class Database extends DurableObject {
     this.sql.exec("CREATE TABLE IF NOT EXISTS roles (email TEXT PRIMARY KEY, role TEXT NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS seen (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS role_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, actor TEXT NOT NULL, email TEXT NOT NULL, from_role TEXT NOT NULL, to_role TEXT NOT NULL)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS members (email TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL, n INTEGER NOT NULL, handle TEXT, hkey TEXT) WITHOUT ROWID");
+    this.sql.exec("CREATE UNIQUE INDEX IF NOT EXISTS members_hkey ON members (hkey) WHERE hkey IS NOT NULL");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS signups (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, handle TEXT NOT NULL, doc TEXT NOT NULL, status TEXT NOT NULL, dater_id TEXT, ts INTEGER NOT NULL)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID");
     this.sql.exec("CREATE TABLE IF NOT EXISTS revoked (email TEXT PRIMARY KEY, after INTEGER NOT NULL) WITHOUT ROWID");
+    // the old "recently signed in" list becomes the permanent member list (once)
+    if (!this.sql.exec("SELECT 1 AS x FROM settings WHERE key = 'members_migrated'").toArray().length) {
+      this.sql.exec("INSERT OR IGNORE INTO members (email, first, last, n) SELECT email, first, last, n FROM seen");
+      this.sql.exec("INSERT INTO settings (key, value) VALUES ('members_migrated', '1')");
+    }
     this.lock = undefined; // { ts, by } while the door is locked, else null (loaded on first use)
     this.sql.exec("CREATE TABLE IF NOT EXISTS revoked_jti (jti TEXT PRIMARY KEY, until INTEGER NOT NULL) WITHOUT ROWID");
     this.revokedJti = null; // Set of signed-out session ids
@@ -46,7 +56,7 @@ export class Database extends DurableObject {
     this.meta = null; // ws -> attachment, built once per wake-up so a write never re-reads every socket
     this.nv = 0; this.ns = 0; // open viewer / staff connections
     this.snap = new Map(); // collection -> cached snapshot text (cleared on every change to that collection)
-    this.seenCount = null;
+    this.memberCount = null;
   }
 
   /* ---------- connections (cached per wake-up) ---------- */
@@ -159,25 +169,29 @@ export class Database extends DurableObject {
     return { ...this.resolve(email, iat), revoked: this.isRevoked(email, iat, jti) };
   }
 
-  // Used at sign-in only. People who are on no list (they get the default role, or nothing)
-  // are remembered so an owner can see them on the access page and give them more access.
+  // Used at sign-in only. Everyone who signs in is remembered (the permanent member list), so an owner can search them,
+  // give people on no list more access, and so people can add a TikTok username.
   loginInfo(email) {
     const me = this.resolve(email, Math.floor(Date.now() / 1000));
-    if (me.source === "default" && !me.locked) {
-      const e = String(email).toLowerCase(), now = Date.now();
-      const exists = this.sql.exec("SELECT 1 AS x FROM seen WHERE email = ?", e).toArray().length > 0;
-      if (!exists) {
-        if (this.seenCount === null) this.seenCount = this.sql.exec("SELECT COUNT(*) AS n FROM seen").one().n;
-        if (this.seenCount >= MAX_SEEN) {
-          const drop = this.seenCount - MAX_SEEN + 1;
-          this.sql.exec("DELETE FROM seen WHERE email IN (SELECT email FROM seen ORDER BY last ASC LIMIT ?)", drop);
-          this.seenCount -= drop;
-        }
-        this.seenCount++;
-      }
-      this.sql.exec("INSERT INTO seen (email, first, last, n) VALUES (?, ?, ?, 1) ON CONFLICT (email) DO UPDATE SET last = excluded.last, n = n + 1", e, now, now);
-    }
+    if (!me.locked && (me.source === "default" || me.role !== "none")) this.recordMember(String(email).toLowerCase());
     return me;
+  }
+
+  recordMember(e) {
+    const now = Date.now();
+    const exists = this.sql.exec("SELECT 1 AS x FROM members WHERE email = ?", e).toArray().length > 0;
+    if (!exists) {
+      if (this.memberCount === null) this.memberCount = this.sql.exec("SELECT COUNT(*) AS n FROM members").one().n;
+      if (this.memberCount >= MAX_MEMBERS) {
+        const drop = this.memberCount - MAX_MEMBERS + 50; // free a little room so this does not run on every sign-in
+        this.sql.exec("DELETE FROM members WHERE email IN (SELECT email FROM members WHERE handle IS NULL AND email NOT IN (SELECT email FROM signups) ORDER BY last ASC LIMIT ?)", drop);
+        this.memberCount = this.sql.exec("SELECT COUNT(*) AS n FROM members").one().n;
+        if (this.memberCount >= MAX_MEMBERS) return false; // full of people with profiles: do not record more
+      }
+      this.memberCount++;
+    }
+    this.sql.exec("INSERT INTO members (email, first, last, n) VALUES (?, ?, ?, 1) ON CONFLICT (email) DO UPDATE SET last = excluded.last, n = n + 1", e, now, now);
+    return true;
   }
 
   // Only owners may use the access page. Returns { ok, ... } or { ok:false, code, message }.
@@ -185,8 +199,8 @@ export class Database extends DurableObject {
     const actor = this.resolve(actorEmail);
     if (!actor.owner) return { ok: false, code: "forbidden", message: "Only owners can manage access." };
     const assigned = this.sql.exec("SELECT email, role, by, ts FROM roles ORDER BY email").toArray().map((r) => ({ ...r, source: "admin" }));
-    const seen = this.sql.exec("SELECT email, first, last, n FROM seen ORDER BY last DESC LIMIT 100").toArray()
-      .filter((r) => this.resolve(r.email).source === "default");
+    const seen = this.sql.exec("SELECT email, first, last, n, handle FROM members ORDER BY last DESC LIMIT 400").toArray()
+      .filter((r) => this.resolve(r.email).source === "default").slice(0, 100);
     const log = this.sql.exec("SELECT id, ts, actor, email, from_role, to_role FROM role_log ORDER BY id DESC LIMIT 25").toArray();
     return { ok: true, you: { email: actorEmail, owner: actor.owner }, people: [...secretEntries(this.env), ...assigned], seen, log, defaultRole: defaultRole(this.env), locked: this.loadLock() };
   }
@@ -200,14 +214,14 @@ export class Database extends DurableObject {
     if (!validEmail(target)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
     if (!["viewer", "contributor", "editor", "blocked", "none", "forget"].includes(role)) return { ok: false, code: "invalid", message: "Unknown role." };
     if (role === "forget") {
-      this.sql.exec("DELETE FROM seen WHERE email = ?", target); this.seenCount = null;
+      this.sql.exec("DELETE FROM signups WHERE email = ?", target);
+      this.sql.exec("DELETE FROM members WHERE email = ?", target); this.memberCount = null;
       return { ok: true, email: target, role };
     }
     const current = this.resolve(target);
     if (current.source === "secret") return { ok: false, code: "locked", message: "That person is set in the ROLES secret and can only be changed there." };
     const roles = this.loadRoles();
     const prev = roles.get(target);
-    this.sql.exec("DELETE FROM seen WHERE email = ?", target); this.seenCount = null; // they are on a list now (or were just removed)
     if (role === "none") {
       this.sql.exec("DELETE FROM roles WHERE email = ?", target);
       roles.delete(target);
@@ -281,7 +295,7 @@ export class Database extends DurableObject {
 
     const emails = new Map();
     for (const r of this.sql.exec("SELECT email, role FROM roles").toArray()) if (r.email.includes(q)) emails.set(r.email, { email: r.email, kind: r.role === "blocked" ? "blocked" : "on the list as " + r.role });
-    for (const r of this.sql.exec("SELECT email FROM seen").toArray()) if (r.email.includes(q) && !emails.has(r.email)) emails.set(r.email, { email: r.email, kind: "recent sign-in" });
+    for (const r of this.sql.exec("SELECT email, handle FROM members").toArray()) if ((r.email.includes(q) || (r.handle && r.handle.toLowerCase().includes(q))) && !emails.has(r.email)) emails.set(r.email, { email: r.email, kind: r.handle ? "member, TikTok @" + r.handle : "member" });
     for (const r of this.sql.exec("SELECT email FROM revoked").toArray()) if (r.email.includes(q) && !emails.has(r.email)) emails.set(r.email, { email: r.email, kind: "sign-out record" });
     for (const a of emails.values()) {
       a.locked = !!parseRolesFor(this.env, a.email);
@@ -335,13 +349,14 @@ export class Database extends DurableObject {
     this.ctx.storage.transactionSync(() => {
       for (const a of accounts) {
         this.sql.exec("DELETE FROM roles WHERE email = ?", a.email);
-        this.sql.exec("DELETE FROM seen WHERE email = ?", a.email);
+        this.sql.exec("DELETE FROM members WHERE email = ?", a.email);
+        this.sql.exec("DELETE FROM signups WHERE email = ?", a.email);
         this.sql.exec("DELETE FROM revoked WHERE email = ?", a.email);
         this.sql.exec("UPDATE role_log SET email = '(erased)' WHERE email = ?", a.email);
         this.sql.exec("UPDATE role_log SET actor = '(erased)' WHERE actor = ?", a.email);
         this.sql.exec("UPDATE roles SET by = '(erased)' WHERE by = ?", a.email);
       }
-      if (accounts.length) { this.dbRoles = null; this.revokedMap = null; this.seenCount = null; }
+      if (accounts.length) { this.dbRoles = null; this.revokedMap = null; this.memberCount = null; }
       for (const d of daters) { this.sql.exec("DELETE FROM docs WHERE coll = 'daters' AND id = ?", d.id); changes.push({ coll: "daters", id: d.id, text: null }); }
       for (const x of matches) { this.sql.exec("DELETE FROM docs WHERE coll = 'matches' AND id = ?", x.id); changes.push({ coll: "matches", id: x.id, text: null }); }
       for (const x of questions) {
@@ -588,6 +603,137 @@ export class Database extends DurableObject {
       if (!canRead(role, coll)) continue;
       this.send(ws, out);
     }
+  }
+
+  /* ---------- profiles, sign-ups and pending daters ---------- */
+
+  isEditor(email) { return this.resolve(email).role === "editor"; } // owners resolve to editor level
+
+  claimHandle(e, handle) { // sets this person's TikTok username; one account per username
+    const key = handleKey(handle);
+    const taken = this.sql.exec("SELECT email FROM members WHERE hkey = ? AND email <> ?", key, e).toArray();
+    if (taken.length) return { ok: false, code: "taken", message: "That TikTok username is already claimed by another account. If it is yours, ask the host to free it up." };
+    if (!this.sql.exec("SELECT 1 AS x FROM members WHERE email = ?", e).toArray().length && !this.recordMember(e)) return { ok: false, code: "full", message: "The member list is full right now." };
+    this.sql.exec("UPDATE members SET handle = ?, hkey = ? WHERE email = ?", handle, key, e);
+    this.sql.exec("UPDATE signups SET handle = ?, doc = json_set(doc, '$.name', ?) WHERE email = ? AND status = 'pending'", handle, handle, e);
+    return { ok: true, handle };
+  }
+
+  // The person's own profile and sign-up status.
+  myProfile(email) {
+    const e = String(email || "").toLowerCase();
+    const m = this.sql.exec("SELECT handle FROM members WHERE email = ?", e).toArray();
+    const su = this.sql.exec("SELECT id, handle, doc, status, dater_id FROM signups WHERE email = ?", e).toArray()[0];
+    let signup = { status: "none" };
+    if (su) {
+      const gone = su.status === "approved" && su.dater_id && this.getRow("daters", su.dater_id) === null;
+      signup = { status: gone ? "removed" : su.status, doc: JSON.parse(su.doc) };
+    }
+    return { ok: true, handle: m.length ? m[0].handle : null, signup };
+  }
+
+  setHandle(email, raw) {
+    const e = String(email || "").toLowerCase(), h = normHandle(raw);
+    if (!h) return { ok: false, code: "invalid", message: "Enter your TikTok username (2 to 24 letters, numbers, dots or underscores)." };
+    const r = this.claimHandle(e, h);
+    return r.ok ? { ok: true, handle: h } : r;
+  }
+
+  submitSignup(email, body) {
+    const e = String(email || "").toLowerCase();
+    if (body && body.withdraw === true) {
+      const row = this.sql.exec("SELECT status FROM signups WHERE email = ?", e).toArray()[0];
+      if (row && row.status === "approved") return { ok: false, code: "locked", message: "You are already on the list. Ask the host if you want to be removed." };
+      this.sql.exec("DELETE FROM signups WHERE email = ? AND status = 'pending'", e);
+      return { ok: true, status: "none" };
+    }
+    const c = cleanSignup(body);
+    if (!c.ok) return { ok: false, code: "invalid", message: c.message };
+    const row = this.sql.exec("SELECT id, status, dater_id FROM signups WHERE email = ?", e).toArray()[0];
+    if (row && row.status === "approved" && this.getRow("daters", row.dater_id) !== null) return { ok: false, code: "locked", message: "You are already on the speed dater list. Ask the host to change anything." };
+    if (!row) {
+      const n = this.sql.exec("SELECT COUNT(*) AS n FROM signups WHERE status = 'pending'").one().n;
+      if (n >= MAX_PENDING) return { ok: false, code: "full", message: "The sign-up list is full right now." };
+    }
+    const h = this.claimHandle(e, c.handle);
+    if (!h.ok) return h;
+    this.sql.exec("INSERT INTO signups (id, email, handle, doc, status, dater_id, ts) VALUES (?, ?, ?, ?, 'pending', NULL, ?) ON CONFLICT (email) DO UPDATE SET handle = excluded.handle, doc = excluded.doc, status = 'pending', dater_id = NULL, ts = excluded.ts",
+      row ? row.id : newId(), e, c.handle, JSON.stringify(c.doc), Date.now());
+    return { ok: true, status: "pending" };
+  }
+
+  // Host side. Hosts (editors and owners) see sign-ups without email addresses; owners also see the email.
+  listSignups(actorEmail) {
+    if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can see sign-ups." };
+    const owner = this.resolve(actorEmail).owner;
+    const rows = this.sql.exec("SELECT id, email, handle, doc, ts FROM signups WHERE status = 'pending' ORDER BY ts DESC LIMIT 500").toArray();
+    return { ok: true, pending: rows.map((r) => ({ id: r.id, handle: r.handle, ts: r.ts, ...JSON.parse(r.doc), ...(owner ? { email: r.email } : {}) })) };
+  }
+
+  approveSignup(actorEmail, id) {
+    if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can approve sign-ups." };
+    const su = this.sql.exec("SELECT id, handle, doc, status, dater_id FROM signups WHERE id = ?", String(id || "")).toArray()[0];
+    if (!su) return { ok: false, code: "not_found", message: "That sign-up is gone (declined or withdrawn)." };
+    if (su.status === "approved" && su.dater_id) {
+      const row = this.getRow("daters", su.dater_id);
+      if (row !== null) return { ok: true, daterId: su.dater_id, dater: JSON.parse(row), already: true };
+    }
+    let out;
+    this.ctx.storage.transactionSync(() => {
+      this.ensureRoom("daters");
+      const data = { ...JSON.parse(su.doc), ts: Date.now(), src: "signup" };
+      const daterId = newId();
+      const text = validateDoc(data);
+      this.upsert("daters", daterId, text);
+      this.sql.exec("UPDATE signups SET status = 'approved', dater_id = ? WHERE id = ?", daterId, su.id);
+      out = { daterId, data, text };
+    });
+    this.broadcast("daters", out.daterId, out.text);
+    return { ok: true, daterId: out.daterId, dater: out.data };
+  }
+
+  declineSignup(actorEmail, id) {
+    if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can decline sign-ups." };
+    this.sql.exec("DELETE FROM signups WHERE id = ? AND status = 'pending'", String(id || ""));
+    return { ok: true };
+  }
+
+  clearSignups(actorEmail) {
+    if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can clear sign-ups." };
+    const n = this.sql.exec("SELECT COUNT(*) AS n FROM signups WHERE status = 'pending'").one().n;
+    this.sql.exec("DELETE FROM signups WHERE status = 'pending'");
+    return { ok: true, cleared: n };
+  }
+
+  // The host added the dater by hand and confirmed it is the same person as this sign-up.
+  linkSignup(actorEmail, id, daterId) {
+    if (!this.isEditor(actorEmail)) return { ok: false, code: "forbidden", message: "Only hosts can do that." };
+    if (typeof daterId !== "string" || this.getRow("daters", daterId) === null) return { ok: false, code: "not_found", message: "That dater does not exist." };
+    this.sql.exec("UPDATE signups SET status = 'approved', dater_id = ? WHERE id = ? AND status = 'pending'", daterId, String(id || ""));
+    return { ok: true };
+  }
+
+  // Owners only: search everyone who has signed in, by email or TikTok username.
+  findPeople(actorEmail, q) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can search people." };
+    const t = String(q || "").trim().toLowerCase().replace(/^@+/, "");
+    if (t.length < 2 || t.length > 60) return { ok: false, code: "invalid", message: "Type at least 2 characters." };
+    const like = "%" + t.replace(/[\\%_]/g, (c) => "\\" + c) + "%";
+    const rows = this.sql.exec("SELECT email, first, last, n, handle FROM members WHERE lower(email) LIKE ? ESCAPE '\\' OR hkey LIKE ? ESCAPE '\\' ORDER BY last DESC LIMIT 50", like, like).toArray();
+    const people = rows.map((r) => {
+      const me = this.resolve(r.email), su = this.sql.exec("SELECT status FROM signups WHERE email = ?", r.email).toArray()[0];
+      return { ...r, role: me.source === "secret" ? (me.owner ? "owner" : me.role) : me.blocked ? "blocked" : me.role, source: me.source, signup: su ? su.status : "none" };
+    });
+    return { ok: true, people, total: this.sql.exec("SELECT COUNT(*) AS n FROM members").one().n };
+  }
+
+  releaseHandle(actorEmail, email) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const e = String(email || "").trim().toLowerCase();
+    if (!validEmail(e)) return { ok: false, code: "invalid", message: "That does not look like an email address." };
+    this.sql.exec("UPDATE members SET handle = NULL, hkey = NULL WHERE email = ?", e);
+    this.sql.exec("DELETE FROM signups WHERE email = ? AND status = 'pending'", e);
+    return { ok: true };
   }
 
   /* ---------- question categories ---------- */

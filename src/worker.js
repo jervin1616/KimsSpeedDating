@@ -141,6 +141,57 @@ export default {
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }
 
+      if (path === "/api/profile" || path === "/api/signup") {
+        // A signed-in person's own TikTok username and dater sign-up (one sign-up per email).
+        if (request.method !== "GET" && request.method !== "POST") return json({ error: "not_found" }, 404);
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (s.role === "none") return json({ error: "no_access" }, 403);
+        let r;
+        if (request.method === "GET") r = await database(env).myProfile(s.email);
+        else {
+          let body;
+          try { body = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+          r = path === "/api/profile" ? await database(env).setHandle(s.email, body && body.handle) : await database(env).submitSignup(s.email, body);
+        }
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "taken" || r.code === "locked" ? 409 : 400);
+      }
+
+      if (path === "/api/signups" && (request.method === "GET" || request.method === "POST")) {
+        // Hosts (editors and owners): the pending dater list, approve, decline, clear, link.
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (LEVEL[s.role] < LEVEL.editor) return json({ error: "forbidden", message: "Only hosts can do that." }, 403);
+        let r;
+        if (request.method === "GET") r = await database(env).listSignups(s.email);
+        else {
+          let b;
+          try { b = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+          b = b && typeof b === "object" ? b : {};
+          const d = database(env);
+          r = b.action === "approve" ? await d.approveSignup(s.email, b.id) : b.action === "decline" ? await d.declineSignup(s.email, b.id)
+            : b.action === "clear" ? await d.clearSignups(s.email) : b.action === "link" ? await d.linkSignup(s.email, b.id, b.daterId) : { ok: false, code: "invalid", message: "Unknown action." };
+        }
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : r.code === "not_found" ? 404 : 400);
+      }
+
+      if ((path === "/api/people" && request.method === "GET") || (path === "/api/people/release" && request.method === "POST")) {
+        // Owners only: search everyone who has signed in (email or TikTok username); free up a claimed username.
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (!s.owner) return json({ error: "forbidden", message: "Only owners can do that." }, 403);
+        let r;
+        if (request.method === "GET") r = await database(env).findPeople(s.email, url.searchParams.get("q"));
+        else { let b; try { b = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); } r = await database(env).releaseHandle(s.email, b && b.email); }
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
+      }
+
       if (path === "/api/categorize" && (request.method === "GET" || request.method === "POST")) {
         // Owners only. Sorts questions that have no category using the list shipped with the site (/categories.json).
         if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
