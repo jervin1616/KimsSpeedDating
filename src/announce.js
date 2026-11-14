@@ -7,13 +7,14 @@ export function fmtEt(ms, withDay) {
 }
 
 // { title, body, discord } for one step. `origin` is the site address.
-// Discord posts link to the TikTok profile (it works whether or not the live is on). Phone notifications open the app.
+// The 1 hour and 30 minute posts link to the TikTok profile (works whether or not the live is on); the live-now post links to the profile's /live page. Phone notifications open the app.
 export const DISCORD_LINK = "https://www.tiktok.com/@kimbrrlee8";
+export const DISCORD_LIVE_LINK = DISCORD_LINK + "/live"; // the "we are live now" post drops people straight into the live
 
 export function messageFor(kind, liveAtMs, origin) {
   const t = fmtEt(liveAtMs) + " ET";
   const body = kind === "1h" ? `We go live in 1 hour (${t}).` : kind === "30m" ? `30 minutes until we go live (${t}).` : "We are live now!";
-  return { title: "Kim's Speed Dating", body, discord: (kind === "live" ? "**We are live now!** ❤️‍🔥" : "**" + body + "** ❤️‍🔥") + "\n" + DISCORD_LINK };
+  return { title: "Kim's Speed Dating", body, discord: (kind === "live" ? "**We are live now!** ❤️‍🔥" : "**" + body + "** ❤️‍🔥") + "\n" + (kind === "live" ? DISCORD_LIVE_LINK : DISCORD_LINK) };
 }
 
 export function okWebhook(env, u) {
