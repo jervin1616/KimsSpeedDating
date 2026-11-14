@@ -267,6 +267,20 @@ export default {
         return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }
 
+      if (path === "/api/rundown" && (request.method === "GET" || request.method === "POST")) {
+        // Hosts read the closing line and reminder interval for the panel rundown. Only owners change them.
+        if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);
+        const s = await sessionFromRequest(env, request);
+        if (!s) return json({ error: "unauthorized" }, 401);
+        if (LEVEL[s.role] < LEVEL.editor) return json({ error: "forbidden", message: "Only hosts can do that." }, 403);
+        if (request.method === "GET") return json(await database(env).rundownGet());
+        let body; try { body = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
+        body = body && typeof body === "object" ? body : {};
+        const r = await database(env).rundownSet(s.email, body);
+        if (r.ok) return json(r);
+        return json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
+      }
+
       if (path === "/api/shelf" && (request.method === "GET" || request.method === "POST")) {
         // Owners only. Whole question categories: put away for now, bring back, or delete for good.
         if (request.method === "POST" && !originOk(request, env, url, false)) return json({ error: "bad_origin" }, 403);

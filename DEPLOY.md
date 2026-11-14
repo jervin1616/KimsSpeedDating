@@ -594,3 +594,13 @@ Notes:
 - Adding a ready-made pack does not bring back questions that are put away.
 - A backup file includes put-away questions under `shelved`. Importing a backup does not put them back on the shelf, so restore from a backup only if you accept that.
 - No new secrets or settings. It uses one new small table, created automatically.
+
+## The panel rundown
+
+A **Rundown** button sits under the board for hosts and owners (viewers and contributors never see it). It is for the quiet moments when the panel has people but nobody is waiting for the hot seat.
+
+- Tap it to see each panelist one at a time: name, age, state, gender and sexuality, and who they are looking for (ages). Back and Next move between them. The last card is the closing line, for example "Want to talk to someone? Join the queue." Empty seats are skipped. With an empty panel the button only says so.
+- **Owners only** can edit the closing line (3 to 80 characters) and the reminder time (off, or every 5 to 60 minutes, default 20). Both are saved on the server, so every host phone shows the same.
+- The reminder: the count starts when anyone is on a panel seat, and every 20 minutes the Rundown button pulses and says "Rundown time". Who is in the hot seat makes no difference. Opening the rundown clears the pulse and starts the next 20 minutes. When the panel is empty the reminder stops and the count resets. A page reload restarts the count from that moment.
+- It is visual only: no sound, vibration or push notification. Nothing is shown to viewers.
+- No new secrets or settings. The closing line and interval use the existing settings table.

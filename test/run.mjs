@@ -906,6 +906,102 @@ try {
       check("the category tools show no JavaScript errors", adm.errors.length === 0, adm.errors);
       await adm.context().close();
     }
+    // ---- the panel rundown
+    {
+      const rj = (session, path = "/api/rundown") => fetch(API_BASE + path, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+      const r0 = await rj(O);
+      check("the rundown settings start with the default closing line and a 20 minute reminder", r0.status === 200 && r0.body.close === "Want to talk to someone? Join the queue." && r0.body.mins === 20, r0.body);
+      const CTR = (await login(EMAILS.contributor)).session;
+      check("hosts and owners can read them; contributors, viewers and signed-out people cannot", (await rj(ED)).status === 200 && (await rj(CTR)).status === 403 && (await rj((await login("rdview@example.com")).session)).status === 403 && (await rj(null)).status === 401);
+      check("only owners can change them (403 for an Editor, 403 from a wrong origin)", (await api("/api/rundown", ED, { close: "Hi there friends" })).status === 403 && (await api("/api/rundown", O, { close: "Hi there friends" }, { Origin: "https://evil.example" })).status === 403);
+      const bad = [{ close: "ab" }, { close: "x".repeat(81) }, { close: "bad\u0007line" }, { close: 5 }, { mins: -1 }, { mins: 3 }, { mins: 61 }, { mins: 5.5 }, { mins: "soon" }];
+      check("bad closing lines and reminder times are refused (400)", (await Promise.all(bad.map((b) => api("/api/rundown", O, b)))).every((r) => r.status === 400), bad.length);
+      const set1 = await api("/api/rundown", O, { close: "  Want to chat?   Join   the queue on TikTok!  ", mins: 15 });
+      check("an owner can save the closing line (spaces tidied) and the interval, and a host reads them back", set1.status === 200 && set1.body.close === "Want to chat? Join the queue on TikTok!" && set1.body.mins === 15 && (await rj(ED)).body.close === "Want to chat? Join the queue on TikTok!" && (await rj(ED)).body.mins === 15, set1.body);
+      check("the reminder can be switched off (0)", (await api("/api/rundown", O, { mins: 0 })).body.mins === 0);
+      await api("/api/rundown", O, { close: "Want to talk to someone? Join the queue.", mins: 20 });
+
+      // seats for the page tests (restored afterwards)
+      const seatWs = await connect(O);
+      const seatsBefore = (await seatWs.sub("seats")).docs;
+      const clearSeats = async () => { for (const k of ["hot", "s1", "s2", "s3", "s4", "s5"]) await cz.w("set", "seats", k, k === "hot" ? { dater: null, view: null, since: null } : { dater: null, view: null, unlocked: false, since: null }); };
+      await clearSeats();
+      const mk = async (name, extra) => (await cz.w("add", "daters", null, { ...dataFor.daters, name, age: 29, location: "NC", gender: "woman", sexuality: "straight", min: 28, max: 36, ...extra })).id;
+      const dA = await mk("RD_Jess", {}), dB = await mk("RD_Dre", { gender: "man", min: 30, max: 38 }), dC = await mk("RD_Bi", { sexuality: "bi", minM: 25, maxM: 31, minW: 27, maxW: 33, min: 25, max: 33 });
+      const putSeat = (k, id, unlocked = true) => cz.w("set", "seats", k, { dater: id, view: null, unlocked, since: Date.now() });
+      const ctx = await catPages.newContext({ viewport: { width: 1100, height: 1300 } });
+      await ctx.route(/fonts\.(googleapis|gstatic)\.com|accounts\.google\.com/, (r) => r.abort());
+      await ctx.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }, ["sd.session.v1", JSON.stringify(O)]);
+      const rp = await ctx.newPage(); rp.errors = []; rp.on("pageerror", (e) => rp.errors.push(e.message));
+      await rp.clock.install({ time: Date.now() });
+      await rp.goto(API_BASE + "/");
+      await until(async () => await rp.locator("#rdBtn").isVisible(), 10000);
+      check("the Rundown button is on the board for hosts, and says so when no one is on the panel", await rp.locator("#rdBtn").isVisible() && /No one on the panel yet/.test(await rp.locator("#rdNote").innerText()));
+      await rp.click("#rdBtn");
+      check("tapping it with an empty panel opens nothing (just a note)", await rp.locator("#rdModal").isHidden());
+      await putSeat("s1", dA); await putSeat("s2", dB); await putSeat("s3", dC);
+      await until(async () => { const t = await rp.locator(".stage").innerText(); return t.includes("RD_Jess") && t.includes("RD_Dre") && t.includes("RD_Bi"); }, 10000);
+      await sleep(500);
+      await rp.click("#rdBtn");
+      check("with people on the panel it opens the first card of three (empty seats are skipped)", await rp.locator("#rdModal").isVisible() && /1 of 3/.test(await rp.locator("#rdCount").innerText()) && /RD_Jess/.test(await rp.locator("#rdBody").innerText()), [await rp.locator("#rdCount").innerText(), await rp.locator("#rdBody").innerText()]);
+      const c1 = (await rp.locator("#rdBody").innerText()).replace(/\s+/g, " ");
+      check("a card shows name, age, state, gender and sexuality, and who they are looking for (ages)", /RD_Jess 29 · NC Woman · Straight Looking for ages 28 to 36/i.test(c1), c1);
+      check("no timers and no 'on the panel' minutes anywhere on the card", !/min/i.test(await rp.locator("#rdBody").innerText()));
+      await rp.click("#rdNext");
+      check("Next shows the second person", /2 of 3/.test(await rp.locator("#rdCount").innerText()) && /RD_Dre/.test(await rp.locator("#rdBody").innerText()) && /ages 30 to 38/.test(await rp.locator("#rdBody").innerText()));
+      await rp.click("#rdNext");
+      check("a bisexual dater shows both ranges", /RD_Bi/.test(await rp.locator("#rdBody").innerText()) && /men 25 to 31, women 27 to 33/.test(await rp.locator("#rdBody").innerText()), await rp.locator("#rdBody").innerText());
+      await rp.click("#rdBack");
+      check("Back goes back one", /2 of 3/.test(await rp.locator("#rdCount").innerText()));
+      await rp.click("#rdNext"); await rp.click("#rdNext");
+      check("after the last person comes the closing line, with Done instead of Next", await rp.locator("#rdDone").isVisible() && await rp.locator("#rdNext").isHidden() && /Want to talk to someone\? Join the queue\./.test(await rp.locator("#rdBody").innerText()) && !/app/i.test(await rp.locator("#rdBody").innerText()));
+      check("an owner can edit the closing line right there", await rp.locator("#rdCloseText").isVisible() && await rp.locator("#rdOwner").isVisible());
+      await rp.fill("#rdCloseText", "Anyone want a spot? Hop in the TikTok queue!"); await rp.getByRole("button", { name: "Save closing line" }).click();
+      check("saving it works and the server keeps it", await until(async () => (await rj(ED)).body.close === "Anyone want a spot? Hop in the TikTok queue!", 6000) && /Saved/.test(await rp.locator("#rdMsg").innerText()));
+      await rp.fill("#rdCloseText", "no"); await rp.getByRole("button", { name: "Save closing line" }).click();
+      check("a too-short line is refused with a clear message", await until(async () => /3 to 80 characters/.test(await rp.locator("#rdMsg").innerText()), 6000));
+      await rp.keyboard.press("Escape");
+      check("Escape closes the rundown", await rp.locator("#rdModal").isHidden());
+      // the reminder
+      await rp.click("#rdBtn"); await rp.click("#rdClose");
+      await rp.clock.fastForward("19:00"); await sleep(200);
+      check("after 19 minutes there is no reminder yet", !(await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due"))) && (await rp.locator("#rdBtn").innerText()) === "Rundown");
+      await rp.clock.fastForward("02:00"); await sleep(300);
+      check("after 20 minutes the Rundown button pulses and says Rundown time", await until(async () => await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due")) && (await rp.locator("#rdBtn").innerText()) === "Rundown time", 4000), await rp.locator("#rdBtn").innerText());
+      await putSeat("hot", dB);
+      await rp.clock.fastForward("30:00"); await sleep(300);
+      check("a person in the hot seat makes no difference: it keeps pulsing", await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due")));
+      await rp.click("#rdBtn"); await rp.click("#rdClose");
+      check("opening the rundown clears the pulse", !(await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due"))) && (await rp.locator("#rdBtn").innerText()) === "Rundown");
+      await rp.clock.fastForward("21:00"); await sleep(300);
+      check("and 20 minutes later it pulses again (it repeats while the panel has people)", await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due")));
+      await clearSeats(); await sleep(1500); await clearSeats(); await until(async () => /No one on the panel yet/.test(await rp.locator("#rdNote").innerText()), 10000);
+      check("when the panel empties the reminder stops", !(await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due"))), [await rp.locator("#rdNote").innerText(), await rp.locator(".stage").innerText()]);
+      await putSeat("s1", dA); await until(async () => (await rp.locator("#rdNote").innerText()) === "", 8000);
+      await rp.clock.fastForward("19:00"); await sleep(200);
+      check("the count starts again from zero when someone joins the panel", !(await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due"))), await rp.locator("#rdNote").innerText());
+      await rp.click("#rdBtn"); await rp.selectOption("#rdMins", "0");
+      check("an owner can switch the reminder off from the rundown screen", await until(async () => (await rj(ED)).body.mins === 0, 6000));
+      await rp.click("#rdClose"); await rp.clock.fastForward("45:00"); await sleep(300);
+      check("with the reminder off it never pulses", !(await rp.locator("#rdBtn").evaluate((b) => b.classList.contains("due"))));
+      await api("/api/rundown", O, { mins: 20 });
+      await rp.setViewportSize({ width: 390, height: 844 }); await rp.click("#rdBtn"); await sleep(300);
+      check("on a phone the rundown card fits without sideways scrolling", await rp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+      await rp.screenshot({ path: "/tmp/cat-shots/rundown.png" }).catch(() => {});
+      check("the rundown shows no JavaScript errors", rp.errors.length === 0, rp.errors);
+      // a host who is not an owner, and a viewer
+      const hp = await pageFor(ED, "/");
+      await until(async () => await hp.locator("#rdBtn").isVisible(), 10000);
+      await hp.click("#rdBtn"); await hp.click("#rdNext").catch(() => {}); await sleep(200);
+      for (let i = 0; i < 4 && await hp.locator("#rdDone").isHidden(); i++) await hp.click("#rdNext");
+      check("a host who is not an owner sees the closing line but cannot edit it, and has no reminder setting", await hp.locator("#rdDone").isVisible() && (await hp.locator("#rdCloseText").count()) === 0 && await hp.locator("#rdOwner").isHidden() && /Want to talk to someone\? Join the queue\./.test(await hp.locator("#rdBody").innerText()) || /Anyone want a spot|Join the queue/.test(await hp.locator("#rdBody").innerText()));
+      check("viewers never see the Rundown button", await catV.locator("#rdBtn").isHidden() && await catV.locator("#rdWrap").isHidden());
+      await clearSeats();
+      for (const d of seatsBefore) await cz.w("set", "seats", d.id, d.data);
+      for (const id of [dA, dB, dC]) await cz.w("delete", "daters", id);
+      seatWs.close();
+      await hp.context().close(); await ctx.close();
+    }
     // ---- member list, TikTok usernames, dater sign-ups and pending daters
     {
       const jget = (path, session) => fetch(API_BASE + path, { headers: { Authorization: "Bearer " + (session ? session.token : "none") } }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));

@@ -339,6 +339,38 @@
   PASS typing 'delete' removes the category for good
   PASS on a phone the category list fits without sideways scrolling
   PASS the category tools show no JavaScript errors
+  PASS the rundown settings start with the default closing line and a 20 minute reminder
+  PASS hosts and owners can read them; contributors, viewers and signed-out people cannot
+  PASS only owners can change them (403 for an Editor, 403 from a wrong origin)
+  PASS bad closing lines and reminder times are refused (400)
+  PASS an owner can save the closing line (spaces tidied) and the interval, and a host reads them back
+  PASS the reminder can be switched off (0)
+  PASS the Rundown button is on the board for hosts, and says so when no one is on the panel
+  PASS tapping it with an empty panel opens nothing (just a note)
+  PASS with people on the panel it opens the first card of three (empty seats are skipped)
+  PASS a card shows name, age, state, gender and sexuality, and who they are looking for (ages)
+  PASS no timers and no 'on the panel' minutes anywhere on the card
+  PASS Next shows the second person
+  PASS a bisexual dater shows both ranges
+  PASS Back goes back one
+  PASS after the last person comes the closing line, with Done instead of Next
+  PASS an owner can edit the closing line right there
+  PASS saving it works and the server keeps it
+  PASS a too-short line is refused with a clear message
+  PASS Escape closes the rundown
+  PASS after 19 minutes there is no reminder yet
+  PASS after 20 minutes the Rundown button pulses and says Rundown time
+  PASS a person in the hot seat makes no difference: it keeps pulsing
+  PASS opening the rundown clears the pulse
+  PASS and 20 minutes later it pulses again (it repeats while the panel has people)
+  PASS when the panel empties the reminder stops
+  PASS the count starts again from zero when someone joins the panel
+  PASS an owner can switch the reminder off from the rundown screen
+  PASS with the reminder off it never pulses
+  PASS on a phone the rundown card fits without sideways scrolling
+  PASS the rundown shows no JavaScript errors
+  PASS a host who is not an owner sees the closing line but cannot edit it, and has no reminder setting
+  PASS viewers never see the Rundown button
   PASS everyone who signs in lands on the member list automatically (owners can search it by email)
   PASS only owners can search people (403 for an Editor and a Contributor, 401 with no login, 400 for a one-letter search)
   PASS a new viewer has no username and no sign-up yet
@@ -738,4 +770,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-703 passed, 0 failed, 703 total
+735 passed, 0 failed, 735 total

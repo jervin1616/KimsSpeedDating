@@ -285,6 +285,32 @@ export class Database extends DurableObject {
     return { ok: true, email: t };
   }
 
+  /* ---------- the panel rundown (closing line and reminder interval) ---------- */
+
+  static RUNDOWN_CLOSE = "Want to talk to someone? Join the queue.";
+
+  rundownGet() {
+    const g = (k) => { const r = this.sql.exec("SELECT value FROM settings WHERE key = ?", k).toArray()[0]; return r ? r.value : null; };
+    const close = g("rundown_close"), mins = g("rundown_mins");
+    return { ok: true, close: close || Database.RUNDOWN_CLOSE, mins: mins === null ? 20 : Number(mins) };
+  }
+
+  rundownSet(actorEmail, body) {
+    if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    const put = (k, v) => this.sql.exec("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", k, String(v));
+    if (body.close !== undefined) {
+      const t = typeof body.close === "string" ? body.close.replace(/\s+/g, " ").trim() : "";
+      if (t.length < 3 || t.length > 80 || /[\u0000-\u001f\u007f]/.test(t)) return { ok: false, code: "invalid-argument", message: "The closing line must be 3 to 80 characters." };
+      put("rundown_close", t);
+    }
+    if (body.mins !== undefined) {
+      const m = Number(body.mins);
+      if (!Number.isInteger(m) || !(m === 0 || (m >= 5 && m <= 60))) return { ok: false, code: "invalid-argument", message: "The reminder must be off (0) or 5 to 60 minutes." };
+      put("rundown_mins", m);
+    }
+    return this.rundownGet();
+  }
+
   setLock(actorEmail, locked) {
     if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
     if (locked) {

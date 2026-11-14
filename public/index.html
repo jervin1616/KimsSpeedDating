@@ -168,6 +168,17 @@ button.heart:hover { border: 0; }
 .bar.mutual { border-color: var(--mutual); } .bar.close { border-color: var(--close); } .bar.nofit { border-color: var(--nofit); }
 .acts { display: flex; flex-wrap: wrap; gap: 8px; }
 
+.rdwrap { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rdbtn.due { animation: rdpulse 1.4s ease-in-out infinite; border-color: var(--flame); box-shadow: 0 0 0 0 rgba(255,120,60,.55); }
+@keyframes rdpulse { 50% { box-shadow: 0 0 0 9px rgba(255,120,60,0); } }
+.rd { max-width: 520px; text-align: center; }
+.rd .rdn { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; }
+.rd .rdname { font-size: clamp(2rem, 9vw, 3rem); font-weight: 800; color: var(--flame); overflow-wrap: anywhere; line-height: 1.1; }
+.rd .rdbig { font-size: clamp(1.2rem, 5vw, 1.6rem); font-weight: 600; }
+.rd .rdsm { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.rd .rdclose { font-size: clamp(1.5rem, 6.5vw, 2.1rem); font-weight: 800; text-wrap: balance; overflow-wrap: anywhere; }
+.rd textarea { width: 100%; min-height: 72px; }
+.rd .rdbody { display: flex; flex-direction: column; gap: 10px; min-height: 220px; justify-content: center; }
 .qbox { border: 1px dashed var(--pink); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .qbox .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .qbox .qt { font-size: clamp(1.05rem, 3.6vw, 1.35rem); font-weight: 600; text-wrap: balance; overflow-wrap: anywhere; }
@@ -267,7 +278,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   .row .racts { grid-column: 1 / -1; justify-content: flex-start; }
   .row.nodot { grid-template-columns: minmax(0, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) { .heart path { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .heart path { transition: none; } .rdbtn.due { animation: none; box-shadow: 0 0 0 4px rgba(255,120,60,.6); } }
 </style>
 
 <div class="wrap">
@@ -363,6 +374,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <span style="--c:var(--nofit)">Off by 3 or more years, or a mismatch</span>
       </div>
       <div class="bar host-only" id="bar"></div>
+      <div class="rdwrap host-only" id="rdWrap" hidden><button class="primary rdbtn" id="rdBtn" type="button">Rundown</button><span class="note" id="rdNote" role="status"></span></div>
       <div class="qbox">
         <div class="lbl">Question</div>
         <div class="qt" id="qtext">No question picked yet.</div>
@@ -537,6 +549,16 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
       <p class="note">State only. The host approves sign-ups live. Only approved speed daters are shown on the board.</p>
       <div class="toolbar"><button class="primary" id="suSave" type="submit">Sign up</button><button class="ghost" id="suCancel" type="button">Cancel</button><span class="note" id="suErr" role="alert"></span></div>
     </form>
+  </div>
+</div>
+<div class="modal" id="rdModal" hidden>
+  <div class="card rd" role="dialog" aria-modal="true" aria-labelledby="rdTitle">
+    <div class="rdn"><span id="rdTitle">Panel rundown</span><span id="rdCount" aria-live="polite"></span></div>
+    <div class="rdbody" id="rdBody" aria-live="polite"></div>
+    <div class="toolbar" style="justify-content:center"><button class="ghost" id="rdBack" type="button">Back</button><button class="primary" id="rdNext" type="button">Next</button><button class="ghost" id="rdDone" type="button" hidden>Done</button></div>
+    <div id="rdOwner" hidden><label class="note" for="rdMins">Remind me to do a rundown</label> <select id="rdMins" aria-label="Rundown reminder interval"><option value="0">Off</option><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="20">Every 20 minutes</option><option value="30">Every 30 minutes</option><option value="45">Every 45 minutes</option><option value="60">Every 60 minutes</option></select></div>
+    <p class="note" id="rdMsg" role="status"></p>
+    <button class="ghost small" id="rdClose" type="button">Close</button>
   </div>
 </div>
 <div class="modal" id="annModal" hidden>
@@ -1314,6 +1336,62 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     });
     $("annCancel").hidden = !s.items.some(function (it) { return it.status === "pending" || it.status === "sending"; });
   }
+  // ---- the panel rundown: introduce whoever is on the panel, with a repeating reminder
+  var rd = { close: "Want to talk to someone? Join the queue.", mins: 20, nextAt: 0, due: false, idx: 0, list: [], loaded: false, toasted: false };
+  function rdPanel() { var s = seatsNow(), out = []; PANEL.forEach(function (k) { var d = byId(s[k]); if (d) out.push(d); }); return out; }
+  function rdLoad() { return api("/api/rundown").then(function (j) { rd.close = j.close; rd.mins = j.mins; rd.loaded = true; rdTick(); }).catch(function () {}); }
+  function rdTick() {
+    if (state.mode !== "host") return;
+    var n = rdPanel().length, now = Date.now();
+    if (!rd.mins || !n) { rd.nextAt = 0; rd.due = false; rd.toasted = false; }
+    else {
+      if (!rd.nextAt) rd.nextAt = now + rd.mins * 60000;
+      if (now >= rd.nextAt) { rd.due = true; if (!rd.toasted) { rd.toasted = true; toast("Time for a panel rundown."); } }
+    }
+    var btn = $("rdBtn"); if (!btn) return;
+    $("rdWrap").hidden = false;
+    btn.classList.toggle("due", rd.due);
+    btn.textContent = rd.due ? "Rundown time" : "Rundown";
+    btn.setAttribute("aria-label", rd.due ? "Rundown time. Open the panel rundown" : "Open the panel rundown");
+    $("rdNote").textContent = n ? (rd.due ? "It has been a while. Tap to introduce the panel." : "") : "No one on the panel yet";
+  }
+  function rdShow() {
+    var n = rd.list.length, last = rd.idx >= n, body = $("rdBody"); body.textContent = "";
+    $("rdCount").textContent = last ? "" : (rd.idx + 1) + " of " + n;
+    $("rdBack").disabled = rd.idx === 0; $("rdNext").hidden = last; $("rdDone").hidden = !last;
+    if (!last) {
+      var d = rd.list[rd.idx];
+      body.appendChild(el("div", "rdname", d.name));
+      body.appendChild(el("div", "rdbig", d.age + " · " + (d.location || "")));
+      var who = whoText(d); if (who) body.appendChild(el("div", "rdbig", who));
+      body.appendChild(el("div", "rdsm", "Looking for"));
+      body.appendChild(el("div", "rdbig", (isBi(d) ? "" : "ages ") + rangeText(d)));
+    } else if (window.claude.status().owner) {
+      var ta = el("textarea"); ta.id = "rdCloseText"; ta.maxLength = 80; ta.value = rd.close; ta.setAttribute("aria-label", "Closing line, up to 80 characters");
+      body.appendChild(el("div", "rdsm", "Closing line (owners can edit)")); body.appendChild(ta);
+      var sv = el("button", "small", "Save closing line"); sv.onclick = function () {
+        $("rdMsg").textContent = "Saving...";
+        api("/api/rundown", "POST", { close: ta.value }).then(function (j) { rd.close = j.close; ta.value = j.close; $("rdMsg").textContent = "Saved."; }).catch(function (e) { $("rdMsg").textContent = e.message; });
+      }; body.appendChild(sv);
+      body.appendChild(el("div", "rdclose", rd.close));
+    } else body.appendChild(el("div", "rdclose", rd.close));
+  }
+  function rdOpen() {
+    rd.list = rdPanel();
+    if (!rd.list.length) { toast("No one is on the panel yet."); return; }
+    rd.idx = 0; rd.due = false; rd.toasted = false; rd.nextAt = rd.mins ? Date.now() + rd.mins * 60000 : 0; $("rdMsg").textContent = "";
+    var own = window.claude.status().owner; $("rdOwner").hidden = !own; $("rdMins").value = String(rd.mins);
+    rdShow(); $("rdModal").hidden = false; $("rdNext").hidden || $("rdNext").focus(); rdTick(); rdLoad();
+  }
+  function rdClose() { $("rdModal").hidden = true; }
+  $("rdBtn").onclick = rdOpen; $("rdClose").onclick = rdClose; $("rdDone").onclick = rdClose;
+  $("rdBack").onclick = function () { if (rd.idx > 0) { rd.idx--; rdShow(); } };
+  $("rdNext").onclick = function () { if (rd.idx < rd.list.length) { rd.idx++; rdShow(); } };
+  $("rdMins").onchange = function () { $("rdMsg").textContent = "Saving..."; api("/api/rundown", "POST", { mins: Number($("rdMins").value) }).then(function (j) { rd.mins = j.mins; rd.nextAt = 0; rdTick(); $("rdMsg").textContent = j.mins ? "Reminder every " + j.mins + " minutes." : "Reminder off."; }).catch(function (e) { $("rdMsg").textContent = e.message; }); };
+  $("rdModal").addEventListener("click", function (ev) { if (ev.target === $("rdModal")) rdClose(); });
+  document.addEventListener("keydown", function (ev) { if ($("rdModal").hidden) return; if (ev.key === "Escape") rdClose(); else if (ev.key === "ArrowRight" && !$("rdNext").hidden) $("rdNext").click(); else if (ev.key === "ArrowLeft") $("rdBack").click(); });
+  setInterval(rdTick, 5000); document.addEventListener("visibilitychange", function () { if (!document.hidden) rdTick(); });
+  window.addEventListener("claude-conn", function (e) { if (e.detail && e.detail.state === "live" && state.mode === "host") rdLoad(); });
   function loadAnn() { return api("/api/announce").then(function (s) { annState = s; renderAnn(); }).catch(function (e) { $("annMsg").textContent = e.message; }); }
   function openAnn() {
     if (!$("annDate").value) $("annDate").value = window.EtTime.todayEt();
@@ -1456,7 +1534,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     }
   }
 
-  function renderAll() { renderStage(); renderDaters(); renderQuestions(); renderMatches(); renderStream(); renderStreams(); if (!$("pickModal").hidden) renderPicker(); }
+  function renderAll() { rdTick(); renderStage(); renderDaters(); renderQuestions(); renderMatches(); renderStream(); renderStreams(); if (!$("pickModal").hidden) renderPicker(); }
 
   /* ---------- private question picker (viewers only, writes nothing) ---------- */
   var myBag = [], myLast = null, myBagCat = "";
