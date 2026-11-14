@@ -604,3 +604,5 @@ A **Rundown** button sits under the board for hosts and owners (viewers and cont
 - The reminder: the count starts when anyone is on a panel seat, and every 20 minutes the Rundown button pulses and says "Rundown time". Who is in the hot seat makes no difference. Opening the rundown clears the pulse and starts the next 20 minutes. When the panel is empty the reminder stops and the count resets. A page reload restarts the count from that moment.
 - It is visual only: no sound, vibration or push notification. Nothing is shown to viewers.
 - No new secrets or settings. The closing line and interval use the existing settings table.
+
+**Where the Discord posts link:** to the TikTok profile, `https://www.tiktok.com/@kimbrrlee8` (set in `src/announce.js` as `DISCORD_LINK`). A profile link works whether or not the live is on. Phone notifications still open the app when tapped. To change the link, edit that one line and deploy.

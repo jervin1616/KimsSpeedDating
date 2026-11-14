@@ -1471,7 +1471,7 @@ try {
       check("a phone the push service reports as gone is dropped from the list", fine(gone).length >= 1 && (await jget("/api/announce", O)).body.devices === 1 + 12 + 1, (await jget("/api/announce", O)).body.devices);
       check("a blocked person's phone gets nothing", fine(blocked).length === 0);
       check("no phone is ever sent the same message twice", devs.every((d) => fine(d).length === 3) && fine(probe).length === 3);
-      check("the Discord post goes out for each message, without pinging everyone", hookHits.length === 3 && hookHits.every((h, i) => h.content.includes(kinds[i].replace("!", "")) && h.content.includes("/") && !h.content.includes("@everyone") && Array.isArray(h.allowed_mentions.parse) && h.allowed_mentions.parse.length === 0), hookHits);
+      check("the Discord post goes out for each message, without pinging everyone", hookHits.length === 3 && hookHits.every((h, i) => h.content.includes(kinds[i].replace("!", "")) && h.content.includes("https://www.tiktok.com/@kimbrrlee8") && !/is_from_webapp|sender_device/.test(h.content) && !h.content.includes(BASE) && !h.content.includes("@everyone") && Array.isArray(h.allowed_mentions.parse) && h.allowed_mentions.parse.length === 0), hookHits);
 
       // ping, skipping the ones already past, cancelling
       hookHits.length = 0;
