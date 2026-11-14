@@ -315,6 +315,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
       <button class="danger small" id="endYes" type="button">Yes, end it</button>
       <button class="ghost small" id="endNo" type="button">Cancel</button>
     </span>
+    <span class="rdwrap" id="rdWrap" hidden><button class="primary small rdbtn" id="rdBtn" type="button">Rundown</button><span class="note" id="rdNote" role="status"></span></span>
   </div>
 
   <p class="note" id="modeNote" hidden></p>
@@ -374,7 +375,6 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
         <span style="--c:var(--nofit)">Off by 3 or more years, or a mismatch</span>
       </div>
       <div class="bar host-only" id="bar"></div>
-      <div class="rdwrap host-only" id="rdWrap" hidden><button class="primary rdbtn" id="rdBtn" type="button">Rundown</button><span class="note" id="rdNote" role="status"></span></div>
       <div class="qbox">
         <div class="lbl">Question</div>
         <div class="qt" id="qtext">No question picked yet.</div>
@@ -1282,7 +1282,7 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
   function renderNotify() {
     var box = $("notifyBox");
-    if (!PUSHKEY || $("app").hidden) { box.hidden = true; return; }
+    if (!PUSHKEY || $("app").hidden || window.claude.status().owner) { box.hidden = true; return; } // owners use the Announce button, not this box
     $("nbOn").hidden = true; $("nbOff").hidden = true;
     if (!pushSupported()) {
       if (platform() === "ios" && !isStandalone()) { box.hidden = false; $("nbText").textContent = "On iPhone, add this app to your home screen first, then open it from there to turn on live notifications."; } else box.hidden = true;

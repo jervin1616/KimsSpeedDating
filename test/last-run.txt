@@ -346,6 +346,8 @@
   PASS an owner can save the closing line (spaces tidied) and the interval, and a host reads them back
   PASS the reminder can be switched off (0)
   PASS the Rundown button is on the board for hosts, and says so when no one is on the panel
+  PASS the Rundown button sits in the stream bar, next to Start stream
+  PASS owners no longer see the 'Notify me when we go live' box on the board
   PASS tapping it with an empty panel opens nothing (just a note)
   PASS with people on the panel it opens the first card of three (empty seats are skipped)
   PASS a card shows name, age, state, gender and sexuality, and who they are looking for (ages)
@@ -770,4 +772,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-735 passed, 0 failed, 735 total
+737 passed, 0 failed, 737 total

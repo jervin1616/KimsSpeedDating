@@ -937,6 +937,8 @@ try {
       await rp.goto(API_BASE + "/");
       await until(async () => await rp.locator("#rdBtn").isVisible(), 10000);
       check("the Rundown button is on the board for hosts, and says so when no one is on the panel", await rp.locator("#rdBtn").isVisible() && /No one on the panel yet/.test(await rp.locator("#rdNote").innerText()));
+      check("the Rundown button sits in the stream bar, next to Start stream", await rp.locator("#streamBar #rdBtn").isVisible() && await rp.locator("#streamBar #streamStart").isVisible() && await rp.evaluate(() => { const a = document.getElementById("streamStart").getBoundingClientRect(), b = document.getElementById("rdBtn").getBoundingClientRect(); return Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 40; }));
+      check("owners no longer see the 'Notify me when we go live' box on the board", await rp.locator("#notifyBox").isHidden());
       await rp.click("#rdBtn");
       check("tapping it with an empty panel opens nothing (just a note)", await rp.locator("#rdModal").isHidden());
       await putSeat("s1", dA); await putSeat("s2", dB); await putSeat("s3", dC);
