@@ -1,5 +1,10 @@
 // "We are going live" announcements: the three messages, and how a time is written for people (Eastern time).
 export const STEPS = [["1h", 3600], ["30m", 1800], ["live", 0]]; // kind, seconds before going live
+export const STEPS_TWO = [["1h", 3600], ["live", 0]]; // the daily default: no 30 minute message
+
+// The Eastern calendar day ("2026-11-14") and wall time ("17:00") of a moment.
+export function etDay(ms) { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(ms)); }
+export function etHm(ms) { return new Intl.DateTimeFormat("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(ms)); }
 
 export function fmtEt(ms, withDay) {
   const o = withDay ? { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" } : { hour: "numeric", minute: "2-digit" };

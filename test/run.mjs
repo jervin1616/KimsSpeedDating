@@ -1248,18 +1248,39 @@ try {
         // the owner's announcer
         check("only owners see the Announce button", await catE.locator("#annBtn").isVisible() && await catV.locator("#annBtn").isHidden());
         await catE.click("#annBtn");
-        check("it opens with today's date, a 5:00 PM time, and says it is Eastern time", await catE.locator("#annModal").isVisible() && /^\d{4}-\d{2}-\d{2}$/.test(await catE.locator("#annDate").inputValue()) && (await catE.locator("#annTime").inputValue()) === "17:00" && /Eastern/.test(await catE.locator("#annModal").innerText()));
-        const tomorrow = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(Date.now() + 86400000));
-        await catE.fill("#annDate", tomorrow); await catE.fill("#annTime", "17:00");
-        check("it spells out when the three messages will go out", await until(async () => { const t = await catE.locator("#annSum").innerText(); return /5:00 PM ET/.test(t) && /4:00 PM/.test(t) && /4:30 PM/.test(t); }, 4000), await catE.locator("#annSum").innerText());
-        await catE.fill("#annDate", "2020-01-01");
-        check("a time that has passed is called out", /already passed/.test(await catE.locator("#annSum").innerText()));
-        await catE.fill("#annDate", tomorrow);
+        check("it opens with the next 14 days to tick, a usual time of 5:00 PM, and says it is Eastern time", await catE.locator("#annModal").isVisible() && (await catE.locator("#annDays .annday").count()) === 14 && (await catE.locator("#annTime").inputValue()) === "17:00" && /Eastern/.test(await catE.locator("#annModal").innerText()));
+        const dayLabels = await catE.locator("#annDays .annday label").allInnerTexts();
+        check("the first two days are marked today and tomorrow, and each day has its own time", /\(today\)/.test(dayLabels[0]) && /\(tomorrow\)/.test(dayLabels[1]) && (await catE.locator('#annDays .annday input[type="time"]').count()) === 14, dayLabels.slice(0, 2));
+        await catE.click("#annFill");
+        const enabledN = await catE.locator('#annDays .annday input[type="checkbox"]:not([disabled])').count();
+        check("'Fill every day' ticks every day that has not already passed", enabledN >= 13 && (await catE.locator('#annDays .annday input[type="checkbox"]:checked').count()) === enabledN && new RegExp(enabledN + " days ticked").test(await catE.locator("#annSum").innerText()), await catE.locator("#annSum").innerText());
+        await catE.click("#annNone");
+        check("'Clear' unticks them all", (await catE.locator('#annDays .annday input[type="checkbox"]:checked').count()) === 0 && /Tick the days/.test(await catE.locator("#annSum").innerText()));
+        await catE.click("#annGo");
+        check("scheduling with nothing ticked says so", /Tick at least one day/.test(await catE.locator("#annMsg").innerText()));
+        const rowsE = catE.locator("#annDays .annday");
+        await rowsE.nth(1).locator('input[type="checkbox"]').check(); await rowsE.nth(2).locator('input[type="checkbox"]').check();
+        await rowsE.nth(2).locator('input[type="time"]').fill("19:00");
+        check("ticking two days (one at 7 PM) is summed up", await until(async () => /2 days ticked/.test(await catE.locator("#annSum").innerText()) && /1 hour|an hour/.test(await catE.locator("#annSum").innerText()), 3000), await catE.locator("#annSum").innerText());
+
         check("phones and Discord are both switched on, with the number of phones signed up", await until(async () => await catE.locator("#annPush").isChecked() && await catE.locator("#annDiscord").isChecked() && !(await catE.locator("#annPing").isChecked()) && /Phone notifications \(\d+ phones? signed up\)/.test(await catE.locator("#annPushLbl").innerText()), 5000), { probe: await catE.evaluate(async () => { try { const r = await window.claude.authFetch("/api/announce"); return [r.status, (await r.text()).slice(0, 200)]; } catch (e) { return "threw " + e.message; } }), msg: await catE.locator("#annMsg").innerText(), push: await catE.locator("#annPush").isChecked(), pushDis: await catE.locator("#annPush").isDisabled(), disc: await catE.locator("#annDiscord").isChecked(), discDis: await catE.locator("#annDiscord").isDisabled(), text: (await catE.locator("#annModal").innerText()).slice(0, 300) });
         await catE.locator("#annModal .card").screenshot({ path: "/tmp/cat-shots/new-announce.png" }).catch(() => {});
         await catE.click("#annGo");
-        check("scheduling lists the three messages as waiting", await until(async () => { const t = await catE.locator("#annItems").innerText(); return /1 hour before/.test(t) && /30 minutes before/.test(t) && /We are live/.test(t) && (t.match(/Waiting/g) || []).length === 3; }, 6000) && /Scheduled for/.test(await catE.locator("#annMsg").innerText()));
-        check("it can be cancelled", await catE.locator("#annCancel").isVisible() && await (async () => { await catE.click("#annCancel"); return until(async () => (await catE.locator("#annItems .pendrow").count()) === 0 && await catE.locator("#annCancel").isHidden(), 6000); })());
+        check("scheduling lists each day with its own two messages (1 hour before and live), all waiting, and no 30 minute message", await until(async () => { const t = await catE.locator("#annItems").innerText(); return (await catE.locator("#annItems .pendrow").count()) === 2 && /live at 5:00 PM ET/.test(t) && /live at 7:00 PM ET/.test(t) && (t.match(/1 hour before/g) || []).length === 2 && (t.match(/We are live/g) || []).length === 2 && !/30 minutes before/.test(t) && (t.match(/Waiting/g) || []).length === 4; }, 6000) && /Scheduled 2 days/.test(await catE.locator("#annMsg").innerText()), await catE.locator("#annItems").innerText());
+        check("the ticks clear after scheduling", (await catE.locator('#annDays .annday input[type="checkbox"]:checked').count()) === 0);
+        await rowsE.nth(3).locator('input[type="checkbox"]').check(); await rowsE.nth(3).locator('input[type="time"]').fill("18:30"); await catE.check("#annThirty");
+        await catE.click("#annGo");
+        check("with the 30 minute box ticked, that day gets three messages", await until(async () => (await catE.locator("#annItems .pendrow").count()) === 3 && (await catE.locator("#annItems .pendrow").nth(2).innerText()).includes("30 minutes before"), 6000), await catE.locator("#annItems").innerText());
+        await catE.uncheck("#annThirty");
+        await catE.getByRole("button", { name: /^Cancel .*\d+$/ }).nth(1).click();
+        check("'Cancel this day' removes just that day and leaves the others", await until(async () => (await catE.locator("#annItems .pendrow").count()) === 2 && /live at 5:00 PM ET/.test(await catE.locator("#annItems").innerText()) && /live at 6:30 PM ET/.test(await catE.locator("#annItems").innerText()), 6000), await catE.locator("#annItems").innerText());
+        await catE.keyboard.press("Escape"); await catE.click("#annBtn");
+        await catE.click("#annSame");
+        check("'Same time as last show' reuses the last time that was scheduled (6:30 PM)", (await catE.locator("#annTime").inputValue()) === "18:30" && (await catE.locator('#annDays .annday input[type="time"]').nth(5).inputValue()) === "18:30");
+        await catE.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+        check("on a phone the announcer fits without sideways scrolling", await catE.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth && document.querySelector("#annModal .card").scrollWidth <= document.querySelector("#annModal .card").clientWidth + 1));
+        await catE.setViewportSize({ width: 1100, height: 1300 });
+        check("everything can be cancelled at once", await catE.locator("#annCancel").isVisible() && await (async () => { await catE.click("#annCancel"); return until(async () => (await catE.locator("#annItems .pendrow").count()) === 0 && await catE.locator("#annCancel").isHidden(), 6000); })());
         await catE.click("#annTest");
         check("'Send me a test' tells you to turn notifications on first when none of your phones are signed up", await until(async () => /not turned notifications on/.test(await catE.locator("#annMsg").innerText()), 6000));
         await catE.keyboard.press("Escape");
@@ -1451,6 +1472,35 @@ try {
       check("owners see how many phones are signed up, and whether phones and Discord are set up", st.status === 200 && st.body.devices === 1 + 12 + 1 + 1 && st.body.pushOn === true && st.body.discordOn === true && st.body.items.length === 0, st.body);
       check("only owners can see or schedule it (403 for an Editor, a Contributor and a viewer, 401 with no login, 403 from a wrong origin)", (await jget("/api/announce", ED)).status === 403 && (await jget("/api/announce", CT)).status === 403 && (await jget("/api/announce", devs[0].session)).status === 403 && (await jget("/api/announce", null)).status === 401 && (await api("/api/announce", ED, { action: "schedule", liveAt: Date.now() + 9000, push: true })).status === 403 && (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 9000, push: true }, { Origin: "https://evil.example.com" })).status === 403);
       check("a time in the past, more than 7 days away, or with nothing switched on is refused (400)", (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() - 600000, push: true })).status === 400 && (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 8 * 86400000, push: true })).status === 400 && (await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 9000, push: false, discord: false })).status === 400 && (await api("/api/announce", O, { action: "bogus" })).status === 400);
+      {
+        const dt = (n, hm = "17:00") => et.EtTime.etToUtcMs(et.EtTime.addDays(et.EtTime.todayEt(), n), hm);
+        const dayOf = (ms) => et.EtTime.dayEt(ms);
+        const sched = (body, session = O) => api("/api/announce", session, { action: "schedule", push: true, discord: true, ...body });
+        const bad2 = [{ days: [] }, { days: Array.from({ length: 15 }, (_, i) => ({ liveAt: dt(i + 1) })) }, { days: [{ liveAt: dt(15) }] }, { days: [{ liveAt: Date.now() - 600000 }] }, { days: [{ liveAt: dt(2) }, { liveAt: dt(2, "20:00") }] }, { days: [{ liveAt: "soon" }] }, { days: [{ liveAt: dt(2) }], push: false, discord: false }];
+        check("multi-day scheduling refuses nothing ticked, more than 14 days, a past or far-off time, two shows on one day, or no channel (400)", (await Promise.all(bad2.map((b) => sched(b)))).every((r) => r.status === 400), (await Promise.all(bad2.map((b) => sched(b)))).map((r) => r.status));
+        check("only owners can schedule days (403 for an Editor)", (await sched({ days: [{ liveAt: dt(2) }] }, ED)).status === 403);
+        const m1 = await sched({ days: [{ liveAt: dt(1) }, { liveAt: dt(2) }, { liveAt: dt(3) }] });
+        const kinds1 = m1.body.items.map((i) => i.kind);
+        check("three days at 5 PM give two messages each (1 hour before and live, no 30 minute one)", m1.status === 200 && m1.body.items.length === 6 && kinds1.filter((k) => k === "1h").length === 3 && kinds1.filter((k) => k === "live").length === 3 && !kinds1.includes("30m"), m1.body);
+        check("the app remembers the last time used (17:00)", m1.body.lastTime === "17:00");
+        const m2 = await sched({ days: [{ liveAt: dt(4, "18:30") }], thirty: true });
+        const d4 = m2.body.items.filter((i) => dayOf(i.live_at) === dayOf(dt(4)));
+        check("a day with the 30 minute box gets three messages, and earlier days are kept", m2.status === 200 && d4.length === 3 && d4.some((i) => i.kind === "30m") && m2.body.items.length === 9 && m2.body.lastTime === "18:30", m2.body.items.length);
+        const m3 = await sched({ days: [{ liveAt: dt(2, "19:00") }] });
+        const d2 = m3.body.items.filter((i) => dayOf(i.live_at) === dayOf(dt(2)));
+        check("scheduling a day again replaces only that day (new time, still two messages, others untouched)", m3.status === 200 && d2.length === 2 && d2.every((i) => i.live_at === dt(2, "19:00")) && m3.body.items.length === 9 && m3.body.items.filter((i) => dayOf(i.live_at) === dayOf(dt(1))).every((i) => i.live_at === dt(1)), m3.body.items.length);
+        const m4 = await sched({ days: [{ liveAt: dt(13) }] });
+        check("a day just inside 14 days is accepted", m4.status === 200 && m4.body.items.length === 11, m4.status);
+        const c1 = await api("/api/announce", O, { action: "cancel", liveAt: dt(3) });
+        check("cancelling one day removes just that day", c1.status === 200 && c1.body.items.length === 9 && !c1.body.items.some((i) => dayOf(i.live_at) === dayOf(dt(3))) && c1.body.items.some((i) => dayOf(i.live_at) === dayOf(dt(1))), c1.body.items.length);
+        check("cancelling a day needs an owner and a real time (403 Editor, 400 nonsense)", (await api("/api/announce", ED, { action: "cancel", liveAt: dt(1) })).status === 403 && (await api("/api/announce", O, { action: "cancel", liveAt: "x" })).status === 400);
+        const c2 = await api("/api/announce", O, { action: "cancel" });
+        check("cancelling without a day removes everything waiting", c2.status === 200 && c2.body.items.length === 0, c2.body.items.length);
+        const old = await sched({ days: [{ liveAt: dt(1) }] });
+        const legacy = await api("/api/announce", O, { action: "schedule", liveAt: Date.now() + 3 * 3600000, push: true, discord: true });
+        check("the older one-time schedule still works, and replaces everything", old.status === 200 && legacy.status === 200 && legacy.body.items.length === 3 && legacy.body.items.map((i) => i.kind).join() === "1h,30m,live", legacy.body.items.length);
+        await api("/api/announce", O, { action: "cancel" });
+      }
 
       // schedule: the hour is squeezed into seconds on this test server
       pushHits.length = 0; hookHits.length = 0;

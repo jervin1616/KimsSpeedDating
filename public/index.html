@@ -168,6 +168,13 @@ button.heart:hover { border: 0; }
 .bar.mutual { border-color: var(--mutual); } .bar.close { border-color: var(--close); } .bar.nofit { border-color: var(--nofit); }
 .acts { display: flex; flex-wrap: wrap; gap: 8px; }
 
+.modal .card.ann { max-width: 520px; }
+.annh { margin: 6px 0 0; font-size: 15px; }
+.annday { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.annday label { flex: 1; display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 0; font-size: 15px; }
+.annday input[type=checkbox] { width: 22px; height: 22px; flex: none; margin: 0; }
+.annday input[type=time] { width: 8.5em; }
+.annday .gone { color: var(--muted); font-size: 12px; }
 .rdwrap { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .rdbtn.due { animation: rdpulse 1.4s ease-in-out infinite; border-color: var(--flame); box-shadow: 0 0 0 0 rgba(255,120,60,.55); }
 @keyframes rdpulse { 50% { box-shadow: 0 0 0 9px rgba(255,120,60,0); } }
@@ -562,17 +569,20 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   </div>
 </div>
 <div class="modal" id="annModal" hidden>
-  <div class="card" role="dialog" aria-modal="true" aria-labelledby="annTitle">
+  <div class="card ann" role="dialog" aria-modal="true" aria-labelledby="annTitle">
     <h2 id="annTitle">Announce going live</h2>
-    <p class="note">Sends "we go live in 1 hour", "30 minutes to go" and "we are live now". Times are Eastern (ET).</p>
-    <div class="grid-form"><label>Date<input id="annDate" type="date"></label><label>Time (ET)<input id="annTime" type="time" value="17:00"></label></div>
-    <p class="note" id="annSum"></p>
+    <p class="note">Tick the days you go live and set the time. Each day sends "We go live in 1 hour" and "We are live now!". Times are Eastern (ET).</p>
+    <div class="toolbar"><label class="note" for="annTime">Usual time</label><input id="annTime" type="time" value="17:00" aria-label="Usual time, Eastern"><button class="small" id="annFill" type="button">Fill every day</button><button class="ghost small" id="annSame" type="button">Same time as last show</button><button class="ghost small" id="annNone" type="button">Clear</button></div>
+    <div id="annDays" class="scrolly" tabindex="0" role="region" aria-label="Days to schedule, scrollable"></div>
+    <p class="note" id="annSum" role="status"></p>
+    <label class="check"><input id="annThirty" type="checkbox"> Also send the 30 minute message</label>
     <label class="check"><input id="annPush" type="checkbox" checked><span id="annPushLbl">Phone notifications</span></label>
     <label class="check"><input id="annDiscord" type="checkbox" checked> Post to Discord</label>
     <label class="check"><input id="annPing" type="checkbox"> Ping @everyone in Discord</label>
+    <h3 class="annh">Scheduled</h3>
     <div id="annItems"></div>
     <p class="note" id="annMsg" role="status"></p>
-    <div class="toolbar"><button class="primary" id="annGo" type="button">Schedule it</button><button class="ghost" id="annTest" type="button">Send me a test</button><button class="ghost danger" id="annCancel" type="button" hidden>Cancel schedule</button><button class="ghost" id="annClose" type="button">Close</button></div>
+    <div class="toolbar"><button class="primary" id="annGo" type="button">Schedule the ticked days</button><button class="ghost" id="annTest" type="button">Send me a test</button><button class="ghost danger" id="annCancel" type="button" hidden>Cancel everything</button><button class="ghost" id="annClose" type="button">Close</button></div>
   </div>
 </div>
 <div class="modal" id="sumModal" hidden>
@@ -1316,23 +1326,56 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   // owners: schedule the three messages
   var annTimer = null, annState = null;
   var KINDS = { "1h": "1 hour before", "30m": "30 minutes before", "live": "We are live" };
-  function annLiveAt() { return window.EtTime.etToUtcMs($("annDate").value, $("annTime").value); }
+  var annInit = false;
+  function annRows() { return Array.prototype.slice.call($("annDays").querySelectorAll(".annday")); }
+  function rowAt(r) { return window.EtTime.etToUtcMs(r.getAttribute("data-date"), r.querySelector("input[type=time]").value); }
+  function syncRow(r) {
+    var at = rowAt(r), gone = !isFinite(at) || at < Date.now() - 60000, tick = r.querySelector("input[type=checkbox]");
+    tick.disabled = gone; if (gone) tick.checked = false;
+    r.querySelector(".gone").textContent = gone ? (isFinite(at) ? "time passed" : "set a time") : "";
+  }
+  function buildDays(t) {
+    var box = $("annDays"); box.textContent = ""; var today = window.EtTime.todayEt();
+    for (var i = 0; i < 14; i++) {
+      var date = window.EtTime.addDays(today, i), label = window.EtTime.dayLabel(date) + (i === 0 ? " (today)" : i === 1 ? " (tomorrow)" : "");
+      var row = el("div", "annday"); row.setAttribute("data-date", date);
+      var lab = el("label"), tick = el("input"); tick.type = "checkbox"; tick.setAttribute("aria-label", "Announce " + label);
+      lab.appendChild(tick); lab.appendChild(el("span", "", label)); row.appendChild(lab);
+      var ti = el("input"); ti.type = "time"; ti.value = t; ti.setAttribute("aria-label", "Time for " + label + ", Eastern"); row.appendChild(ti);
+      row.appendChild(el("span", "gone", ""));
+      tick.onchange = annSummary; ti.oninput = function () { syncRow(this.parentNode); annSummary(); };
+      box.appendChild(row); syncRow(row);
+    }
+    annSummary();
+  }
   function annSummary() {
-    var at = annLiveAt(), el2 = $("annSum");
-    if (!isFinite(at)) { el2.textContent = "Pick a date and a time."; return; }
-    var F = window.EtTime.fmtEt, mins = Math.round((at - Date.now()) / 60000);
-    el2.textContent = at < Date.now() - 60000 ? "That time has already passed." : "Live at " + F(at, true) + " ET. Messages go out at " + F(at - 3600000) + ", " + F(at - 1800000) + " and " + F(at) + " (" + (mins >= 120 ? "in about " + Math.round(mins / 60) + " hours" : "in " + Math.max(mins, 0) + " minutes") + ").";
+    var on = annRows().filter(function (r) { return r.querySelector("input[type=checkbox]").checked; }), el2 = $("annSum");
+    if (!on.length) { el2.textContent = "Tick the days you want to announce."; return; }
+    var F = window.EtTime.fmtEt, first = rowAt(on[0]);
+    el2.textContent = on.length + (on.length === 1 ? " day" : " days") + " ticked. First: " + F(first, true) + " ET. Messages go out an hour before" + ($("annThirty").checked ? ", 30 minutes before," : "") + " and when you go live.";
+  }
+  function statusText(it) {
+    return it.status === "pending" ? "Waiting" : it.status === "sending" ? "Sending... " + it.sent + " phones so far" : it.status === "done" ? "Sent" + (it.push ? " to " + it.sent + " phone" + (it.sent === 1 ? "" : "s") + (it.failed ? " (" + it.failed + " did not go through)" : "") : "") + (it.discord ? " and posted to Discord" : "") : "Skipped. " + (it.note || "");
   }
   function renderAnn() {
     var s = annState; if (!s) return;
     $("annPushLbl").textContent = "Phone notifications (" + s.devices + (s.devices === 1 ? " phone" : " phones") + " signed up)"; $("annPush").disabled = !s.pushOn; $("annDiscord").disabled = !s.discordOn;
     if (!s.pushOn) $("annPush").checked = false; if (!s.discordOn) $("annDiscord").checked = false;
+    if (!annInit && s.lastTime) { annInit = true; $("annTime").value = s.lastTime; annRows().forEach(function (r) { r.querySelector("input[type=time]").value = s.lastTime; syncRow(r); }); annSummary(); }
     var box = $("annItems"); box.textContent = "";
-    s.items.forEach(function (it) {
+    var groups = [], by = {};
+    s.items.forEach(function (it) { var d = window.EtTime.dayEt(it.live_at); if (!by[d]) { by[d] = { day: d, liveAt: it.live_at, items: [] }; groups.push(by[d]); } by[d].items.push(it); });
+    groups.forEach(function (g) {
       var row = el("div", "pendrow"), left = el("div");
-      left.appendChild(el("div", "t", KINDS[it.kind] + " · " + window.EtTime.fmtEt(it.at, true) + " ET"));
-      left.appendChild(el("div", "m", it.status === "pending" ? "Waiting" : it.status === "sending" ? "Sending... " + it.sent + " phones so far" : it.status === "done" ? "Sent" + (it.push ? " to " + it.sent + " phone" + (it.sent === 1 ? "" : "s") + (it.failed ? " (" + it.failed + " did not go through)" : "") : "") + (it.discord ? " and posted to Discord" : "") : "Skipped. " + (it.note || "")));
-      row.appendChild(left); box.appendChild(row);
+      left.appendChild(el("div", "t", window.EtTime.dayLabel(g.day) + " · live at " + window.EtTime.fmtEt(g.liveAt) + " ET"));
+      g.items.forEach(function (it) { left.appendChild(el("div", "m", KINDS[it.kind] + " (" + window.EtTime.fmtEt(it.at) + "): " + statusText(it))); });
+      row.appendChild(left);
+      if (g.items.some(function (it) { return it.status === "pending" || it.status === "sending"; })) {
+        var cb = el("button", "ghost small danger", "Cancel this day"); cb.type = "button"; cb.setAttribute("aria-label", "Cancel " + window.EtTime.dayLabel(g.day));
+        cb.onclick = function () { api("/api/announce", "POST", { action: "cancel", liveAt: g.liveAt }).then(function (n) { annState = n; renderAnn(); $("annMsg").textContent = window.EtTime.dayLabel(g.day) + " cancelled."; }).catch(function (e) { $("annMsg").textContent = e.message; }); };
+        row.appendChild(cb);
+      }
+      box.appendChild(row);
     });
     $("annCancel").hidden = !s.items.some(function (it) { return it.status === "pending" || it.status === "sending"; });
   }
@@ -1394,22 +1437,33 @@ body.has-bar .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   window.addEventListener("claude-conn", function (e) { if (e.detail && e.detail.state === "live" && state.mode === "host") rdLoad(); });
   function loadAnn() { return api("/api/announce").then(function (s) { annState = s; renderAnn(); }).catch(function (e) { $("annMsg").textContent = e.message; }); }
   function openAnn() {
-    if (!$("annDate").value) $("annDate").value = window.EtTime.todayEt();
-    $("annMsg").textContent = ""; annSummary(); $("annModal").hidden = false; loadAnn();
+    annInit = false; buildDays($("annTime").value || "17:00");
+    $("annMsg").textContent = ""; $("annModal").hidden = false; loadAnn();
     clearInterval(annTimer); annTimer = setInterval(function () { if (!$("annModal").hidden) loadAnn(); }, 5000);
   }
   function closeAnn() { $("annModal").hidden = true; clearInterval(annTimer); }
   $("annBtn").onclick = function (ev) { ev.preventDefault(); openAnn(); };
   $("annClose").onclick = closeAnn;
   $("annModal").addEventListener("click", function (ev) { if (ev.target === $("annModal")) closeAnn(); });
-  $("annDate").oninput = annSummary; $("annTime").oninput = annSummary;
-  $("annGo").onclick = function () {
-    var at = annLiveAt(); if (!isFinite(at)) { $("annMsg").textContent = "Pick a date and a time."; return; }
-    $("annMsg").textContent = "Saving...";
-    api("/api/announce", "POST", { action: "schedule", liveAt: at, push: $("annPush").checked, discord: $("annDiscord").checked, ping: $("annPing").checked })
-      .then(function (s) { annState = s; renderAnn(); $("annMsg").textContent = "Scheduled for " + window.EtTime.fmtEt(at, true) + " ET."; }).catch(function (e) { $("annMsg").textContent = e.message; });
+  $("annThirty").onchange = annSummary;
+  $("annFill").onclick = function () {
+    var t = $("annTime").value; if (!t) { $("annMsg").textContent = "Set the usual time first."; return; }
+    annRows().forEach(function (r) { r.querySelector("input[type=time]").value = t; syncRow(r); var c = r.querySelector("input[type=checkbox]"); if (!c.disabled) c.checked = true; }); annSummary();
   };
-  $("annCancel").onclick = function () { api("/api/announce", "POST", { action: "cancel" }).then(function (s) { annState = s; renderAnn(); $("annMsg").textContent = "Schedule cancelled."; }).catch(function (e) { $("annMsg").textContent = e.message; }); };
+  $("annSame").onclick = function () {
+    var t = (annState && annState.lastTime) || "17:00"; $("annTime").value = t;
+    annRows().forEach(function (r) { r.querySelector("input[type=time]").value = t; syncRow(r); }); annSummary();
+  };
+  $("annNone").onclick = function () { annRows().forEach(function (r) { r.querySelector("input[type=checkbox]").checked = false; }); annSummary(); };
+  $("annGo").onclick = function () {
+    var on = annRows().filter(function (r) { var c = r.querySelector("input[type=checkbox]"); return c.checked && !c.disabled; });
+    if (!on.length) { $("annMsg").textContent = "Tick at least one day."; return; }
+    var days = on.map(function (r) { return { liveAt: rowAt(r) }; });
+    $("annMsg").textContent = "Saving...";
+    api("/api/announce", "POST", { action: "schedule", days: days, thirty: $("annThirty").checked, push: $("annPush").checked, discord: $("annDiscord").checked, ping: $("annPing").checked })
+      .then(function (st) { annState = st; renderAnn(); $("annMsg").textContent = "Scheduled " + days.length + (days.length === 1 ? " day." : " days."); annRows().forEach(function (r) { r.querySelector("input[type=checkbox]").checked = false; }); annSummary(); }).catch(function (e) { $("annMsg").textContent = e.message; });
+  };
+  $("annCancel").onclick = function () { api("/api/announce", "POST", { action: "cancel" }).then(function (st) { annState = st; renderAnn(); $("annMsg").textContent = "Everything cancelled."; }).catch(function (e) { $("annMsg").textContent = e.message; }); };
   $("annTest").onclick = function () {
     $("annMsg").textContent = "Sending...";
     api("/api/announce", "POST", { action: "test" }).then(function (r) { $("annMsg").textContent = r.devices ? "Sent to " + r.sent + " of your " + r.devices + " phone" + (r.devices === 1 ? "" : "s") + "." : "You have not turned notifications on for any device yet. Do that on your phone first."; }).catch(function (e) { $("annMsg").textContent = e.message; });

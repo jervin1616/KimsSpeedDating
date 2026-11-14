@@ -19,7 +19,10 @@
     return new Intl.DateTimeFormat("en-US", Object.assign({ timeZone: ZONE }, o)).format(new Date(ms)).replace(/ /g, " ");
   }
   function todayEt() { var p = parts(Date.now()); return p.year + "-" + String(p.month).padStart(2, "0") + "-" + String(p.day).padStart(2, "0"); }
-  var api = { etToUtcMs: etToUtcMs, fmtEt: fmtEt, todayEt: todayEt };
+  function dayEt(ms) { var p = parts(ms); return p.year + "-" + String(p.month).padStart(2, "0") + "-" + String(p.day).padStart(2, "0"); }
+  function addDays(dateStr, n) { var d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr), t = new Date(Date.UTC(+d[1], +d[2] - 1, +d[3] + n)); return t.getUTCFullYear() + "-" + String(t.getUTCMonth() + 1).padStart(2, "0") + "-" + String(t.getUTCDate()).padStart(2, "0"); }
+  function dayLabel(dateStr) { var d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr); return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" }).format(new Date(Date.UTC(+d[1], +d[2] - 1, +d[3], 12))); }
+  var api = { etToUtcMs: etToUtcMs, fmtEt: fmtEt, todayEt: todayEt, dayEt: dayEt, addDays: addDays, dayLabel: dayLabel };
   g.EtTime = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

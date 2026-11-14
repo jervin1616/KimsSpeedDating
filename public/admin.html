@@ -217,9 +217,9 @@
   <section class="card" id="hGoLive">
     <h2>Going-live messages</h2>
     <ul class="help">
-      <li>Tap <b>Open the announcer</b> on the Today tab (or <b>Announce</b> on the main screen). Pick the date and time, which is Eastern. Tick phones and Discord. Press <b>Schedule it</b>.</li>
-      <li>Three messages go out: 1 hour before, 30 minutes before, and "We are live now!".</li>
-      <li><b>Send me a test</b> goes to your own phone only. <b>Cancel schedule</b> removes what has not been sent. Messages whose time has already passed are skipped, so schedule at least an hour ahead.</li>
+      <li>Tap <b>Open the announcer</b> on the Today tab (or <b>Announce</b> on the main screen). You see the next 14 days. Tick the days you go live and set each time (Eastern). <b>Fill every day</b> ticks them all at your usual time, then untick any days off. <b>Same time as last show</b> reuses the last time you scheduled.</li>
+      <li>Tick phones and Discord, then press <b>Schedule the ticked days</b>. Each day sends two messages: 1 hour before, and "We are live now!". Tick <b>Also send the 30 minute message</b> if you want that one too.</li>
+      <li>Scheduling a day again replaces just that day. <b>Cancel this day</b> removes one day, <b>Cancel everything</b> removes them all. <b>Send me a test</b> goes to your own phone only. A message whose time has already passed is skipped.</li>
       <li>Phones reach only people who turned notifications on. Discord reaches everyone in the channel, so keep it on.</li>
     </ul>
   </section>
@@ -738,10 +738,11 @@
   function loadGo() {
     window.claude.authFetch("/api/announce").then(function (r) { return r.json(); }).then(function (a) {
       if (!a.ok) return; $("goCard").hidden = false;
-      var next = (a.items || []).filter(function (i) { return i.status === "pending" || i.status === "sending"; })[0], F = window.EtTime.fmtEt;
+      var open = (a.items || []).filter(function (i) { return i.status === "pending" || i.status === "sending"; }), next = open[0], F = window.EtTime.fmtEt, seen = {};
+      open.forEach(function (i) { seen[window.EtTime.dayEt(i.live_at)] = 1; }); var days = Object.keys(seen).length;
       $("goNote").textContent = next
-        ? "Scheduled: live at " + F(next.live_at, true) + " ET. The next message goes out at " + F(next.at, true) + " ET (" + ({ "1h": "1 hour before", "30m": "30 minutes before", "live": "we are live" })[next.kind] + ")."
-        : "Nothing is scheduled. Set the go-live time and the app sends the 1 hour, 30 minute and live messages for you.";
+        ? "Scheduled: live at " + F(next.live_at, true) + " ET. The next message goes out at " + F(next.at, true) + " ET (" + ({ "1h": "1 hour before", "30m": "30 minutes before", "live": "we are live" })[next.kind] + ")." + (days > 1 ? " " + days + " days are scheduled in all." : "")
+        : "Nothing is scheduled. Tick the days you go live and the app sends the 1 hour and live messages for you.";
     }).catch(function () {});
   }
 

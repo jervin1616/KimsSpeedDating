@@ -606,3 +606,15 @@ A **Rundown** button sits under the board for hosts and owners (viewers and cont
 - No new secrets or settings. The closing line and interval use the existing settings table.
 
 **Where the Discord posts link:** the 1 hour and 30 minute posts link to the TikTok profile, `https://www.tiktok.com/@kimbrrlee8`, and the "We are live now!" post links to `https://www.tiktok.com/@kimbrrlee8/live` (set in `src/announce.js` as `DISCORD_LINK` and `DISCORD_LIVE_LINK`). Test the /live link yourself while offline and while live before relying on it. Phone notifications still open the app when tapped. To change the link, edit that one line and deploy.
+
+## Scheduling several days at once
+
+The announcer (the **Announce** button, or **Open the announcer** on the Today tab) now shows the next 14 days. You tick the days you go live and set a time for each, in Eastern time.
+
+- **Fill every day** ticks every day that has not already passed and sets them all to the "Usual time". Untick the days off, or change one day's time.
+- **Same time as last show** puts the last time you scheduled into every day.
+- **Schedule the ticked days** saves them. Each day replaces anything already scheduled for that day and leaves the other days alone. Each day sends two messages by default: 1 hour before, and "We are live now!". Tick **Also send the 30 minute message** to add the third.
+- The **Scheduled** list shows each day and what has been sent. **Cancel this day** removes one day, **Cancel everything** removes all of them.
+- Days can be up to 14 days ahead. Times are entered as Eastern and the winter/summer switch is handled for you. A message whose time has already passed is skipped, not sent late.
+- The older one-time schedule (a single date and time) is still accepted by the server and still sends the original three messages.
+- It does not repeat by itself. Someone fills the week once a week. No new secrets or settings.

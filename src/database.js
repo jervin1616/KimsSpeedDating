@@ -8,7 +8,7 @@ import {
 import { resolveRole, secretEntries, validEmail, verifySession, defaultRole, parseRoles } from "./auth.js";
 import { normHandle, handleKey, cleanSignup } from "./people.js";
 import { sendPush, okEndpoint, okKeys, pushConfigured } from "./webpush.js";
-import { STEPS, messageFor, okWebhook } from "./announce.js";
+import { STEPS, STEPS_TWO, etDay, etHm, messageFor, okWebhook } from "./announce.js";
 
 function parseRolesFor(env, email) { return parseRoles(env.ROLES).get(String(email).toLowerCase()); }
 
@@ -896,11 +896,12 @@ export class Database extends DurableObject {
   announceState(actorEmail) {
     if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
     const items = this.sql.exec("SELECT id, at, live_at, kind, status, sent, failed, note, push, discord FROM announce_items ORDER BY at, id").toArray();
-    return { ok: true, items, devices: this.sql.exec("SELECT COUNT(*) AS n FROM push_subs").one().n, pushOn: pushConfigured(this.env), discordOn: okWebhook(this.env, this.env.DISCORD_WEBHOOK || ""), liveAt: items.length ? items[0].live_at : null };
+    return { ok: true, items, devices: this.sql.exec("SELECT COUNT(*) AS n FROM push_subs").one().n, pushOn: pushConfigured(this.env), discordOn: okWebhook(this.env, this.env.DISCORD_WEBHOOK || ""), liveAt: items.length ? items[0].live_at : null, lastTime: ((this.sql.exec("SELECT value FROM settings WHERE key = 'ann_last'").toArray()[0]) || {}).value || null };
   }
 
   scheduleAnnounce(actorEmail, o, origin) {
     if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    if (o && Array.isArray(o.days)) return this.scheduleDays(actorEmail, o, origin);
     const now = Date.now(), liveAt = Number(o && o.liveAt);
     if (!Number.isFinite(liveAt) || liveAt < now - 60000 || liveAt > now + 7 * 86400000) return { ok: false, code: "invalid", message: "Pick a time in the future, within the next 7 days." };
     const push = !!(o && o.push) && pushConfigured(this.env), discord = !!(o && o.discord) && okWebhook(this.env, this.env.DISCORD_WEBHOOK || ""), ping = !!(o && o.ping);
@@ -919,10 +920,46 @@ export class Database extends DurableObject {
     return this.announceState(actorEmail);
   }
 
+  // Several days at once (up to 14). Each ticked day replaces anything already scheduled for that Eastern day and leaves the other days alone.
+  // Default is two messages (1 hour before, and live now); `thirty` adds the 30 minute one.
+  scheduleDays(actorEmail, o, origin) {
+    const now = Date.now(), days = o.days;
+    if (!days.length || days.length > 14) return { ok: false, code: "invalid", message: "Pick between 1 and 14 days." };
+    const times = days.map((d) => Number(d && d.liveAt));
+    if (!times.every((t) => Number.isFinite(t) && t >= now - 60000 && t <= now + 14 * 86400000)) return { ok: false, code: "invalid", message: "Pick times in the future, within the next 14 days." };
+    if (new Set(times.map(etDay)).size !== times.length) return { ok: false, code: "invalid", message: "Only one show per day." };
+    const push = !!o.push && pushConfigured(this.env), discord = !!o.discord && okWebhook(this.env, this.env.DISCORD_WEBHOOK || ""), ping = !!o.ping;
+    if (!push && !discord) return { ok: false, code: "invalid", message: "Turn on app notifications or the Discord post (and make sure they are set up)." };
+    this.rememberOrigin(origin);
+    const scale = this.announceScale(), steps = o.thirty ? STEPS : STEPS_TWO, want = new Set(times.map(etDay));
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec("DELETE FROM announce_items WHERE live_at < ?", now - 86400000); // tidy up old days
+      for (const r of this.sql.exec("SELECT id, live_at FROM announce_items").toArray()) if (want.has(etDay(r.live_at))) this.sql.exec("DELETE FROM announce_items WHERE id = ?", r.id);
+      for (const liveAt of times) {
+        for (const [kind, secs] of steps) {
+          const at = liveAt - secs * 1000 * scale, late = at < now - 120000 * scale;
+          this.sql.exec("INSERT INTO announce_items (at, live_at, kind, msg, push, discord, ping, status, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            at, liveAt, kind, JSON.stringify(messageFor(kind, liveAt, origin)), push ? 1 : 0, discord ? 1 : 0, ping ? 1 : 0, late ? "skipped" : "pending", late ? "Its time had already passed" : null);
+        }
+      }
+      this.sql.exec("INSERT INTO settings (key, value) VALUES ('ann_last', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", etHm(Math.max(...times)));
+    });
+    this.rearmAnnounce();
+    return this.announceState(actorEmail);
+  }
+
   announceScale() { return Number(this.env.ANNOUNCE_SCALE) > 0 ? Number(this.env.ANNOUNCE_SCALE) : 1; } // tests squeeze the hour into seconds
 
-  cancelAnnounce(actorEmail) {
+  cancelAnnounce(actorEmail, liveAt) {
     if (!this.resolve(actorEmail).owner) return { ok: false, code: "forbidden", message: "Only owners can do that." };
+    if (liveAt !== undefined && liveAt !== null) { // just that Eastern day
+      const t = Number(liveAt);
+      if (!Number.isFinite(t)) return { ok: false, code: "invalid", message: "Unknown day." };
+      const day = etDay(t);
+      for (const r of this.sql.exec("SELECT id, live_at FROM announce_items WHERE status IN ('pending', 'sending')").toArray()) if (etDay(r.live_at) === day) this.sql.exec("DELETE FROM announce_items WHERE id = ?", r.id);
+      this.rearmAnnounce();
+      return this.announceState(actorEmail);
+    }
     this.sql.exec("DELETE FROM announce_items WHERE status IN ('pending', 'sending')");
     this.rearmAnnounce();
     return this.announceState(actorEmail);

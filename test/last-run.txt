@@ -458,12 +458,20 @@
   PASS on an iPhone in the browser (where notifications are not available) it explains to add the app to the home screen first
   PASS a browser that cannot do notifications at all shows nothing
   PASS only owners see the Announce button
-  PASS it opens with today's date, a 5:00 PM time, and says it is Eastern time
-  PASS it spells out when the three messages will go out
-  PASS a time that has passed is called out
+  PASS it opens with the next 14 days to tick, a usual time of 5:00 PM, and says it is Eastern time
+  PASS the first two days are marked today and tomorrow, and each day has its own time
+  PASS 'Fill every day' ticks every day that has not already passed
+  PASS 'Clear' unticks them all
+  PASS scheduling with nothing ticked says so
+  PASS ticking two days (one at 7 PM) is summed up
   PASS phones and Discord are both switched on, with the number of phones signed up
-  PASS scheduling lists the three messages as waiting
-  PASS it can be cancelled
+  PASS scheduling lists each day with its own two messages (1 hour before and live), all waiting, and no 30 minute message
+  PASS the ticks clear after scheduling
+  PASS with the 30 minute box ticked, that day gets three messages
+  PASS 'Cancel this day' removes just that day and leaves the others
+  PASS 'Same time as last show' reuses the last time that was scheduled (6:30 PM)
+  PASS on a phone the announcer fits without sideways scrolling
+  PASS everything can be cancelled at once
   PASS 'Send me a test' tells you to turn notifications on first when none of your phones are signed up
   PASS Escape closes it
   PASS the access list says how many people joined automatically, and lists the newest of them (never the owners)
@@ -529,6 +537,17 @@
   PASS owners see how many phones are signed up, and whether phones and Discord are set up
   PASS only owners can see or schedule it (403 for an Editor, a Contributor and a viewer, 401 with no login, 403 from a wrong origin)
   PASS a time in the past, more than 7 days away, or with nothing switched on is refused (400)
+  PASS multi-day scheduling refuses nothing ticked, more than 14 days, a past or far-off time, two shows on one day, or no channel (400)
+  PASS only owners can schedule days (403 for an Editor)
+  PASS three days at 5 PM give two messages each (1 hour before and live, no 30 minute one)
+  PASS the app remembers the last time used (17:00)
+  PASS a day with the 30 minute box gets three messages, and earlier days are kept
+  PASS scheduling a day again replaces only that day (new time, still two messages, others untouched)
+  PASS a day just inside 14 days is accepted
+  PASS cancelling one day removes just that day
+  PASS cancelling a day needs an owner and a real time (403 Editor, 400 nonsense)
+  PASS cancelling without a day removes everything waiting
+  PASS the older one-time schedule still works, and replaces everything
   PASS an owner schedules it: three messages, 1 hour, 30 minutes and live, all waiting
   PASS every message is sent when its time comes, in batches, and the whole schedule finishes (13 phones can receive: 12 plus one Contributor's)
   PASS each of the 12 phones got all three notifications, in order, readable only by that phone
@@ -772,4 +791,4 @@
   PASS 5 abrupt drops in a row: the page reconnected every time
   PASS no JavaScript errors on any page during the whole run
 
-737 passed, 0 failed, 737 total
+756 passed, 0 failed, 756 total

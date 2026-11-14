@@ -215,7 +215,7 @@ export default {
         else {
           let b; try { b = await request.json(); } catch (e) { return json({ error: "bad_request" }, 400); }
           b = b && typeof b === "object" ? b : {};
-          r = b.action === "schedule" ? await d.scheduleAnnounce(s.email, b, url.origin) : b.action === "cancel" ? await d.cancelAnnounce(s.email) : b.action === "test" ? await d.testPush(s.email) : { ok: false, code: "invalid", message: "Unknown action." };
+          r = b.action === "schedule" ? await d.scheduleAnnounce(s.email, b, url.origin) : b.action === "cancel" ? await d.cancelAnnounce(s.email, b.liveAt) : b.action === "test" ? await d.testPush(s.email) : { ok: false, code: "invalid", message: "Unknown action." };
         }
         return r.ok ? json(r) : json({ error: r.code, message: r.message }, r.code === "forbidden" ? 403 : 400);
       }
